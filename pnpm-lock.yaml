@@ -171,6 +171,9 @@ importers:
       '@xq/board':
         specifier: workspace:*
         version: link:../../packages/board
+      '@xq/bots':
+        specifier: workspace:*
+        version: link:../../packages/bots
       '@xq/engine':
         specifier: workspace:*
         version: link:../../packages/engine

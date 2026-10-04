@@ -1,0 +1,155 @@
+import type { BotConfig, BotGroup } from "@xq/bots";
+import { Avatar } from "./Avatar.js";
+
+export type Lang = "en" | "zh";
+export type TimeControl = "none" | "10" | "15+10" | "30";
+
+export interface Assists {
+  hint: boolean;
+  takeback: boolean;
+  evalBar: boolean;
+  threats: boolean;
+  suggestions: boolean;
+  feedback: boolean;
+}
+
+export interface GameSettings {
+  color: "red" | "black" | "random";
+  time: TimeControl;
+  assists: Assists;
+}
+
+export const PRESETS: Record<"learn" | "fair" | "challenge", Assists> = {
+  learn: { hint: true, takeback: true, evalBar: true, threats: true, suggestions: false, feedback: true },
+  fair: { hint: true, takeback: false, evalBar: false, threats: false, suggestions: false, feedback: false },
+  challenge: { hint: false, takeback: false, evalBar: false, threats: false, suggestions: false, feedback: false },
+};
+
+const GROUPS: { id: BotGroup; en: string; zh: string }[] = [
+  { id: "beginner", en: "Beginner", zh: "入门" },
+  { id: "casual", en: "Casual", zh: "休闲" },
+  { id: "club", en: "Club", zh: "俱乐部" },
+  { id: "master", en: "Master", zh: "大师" },
+];
+
+const ASSIST_LABELS: Record<keyof Assists, { en: string; zh: string }> = {
+  hint: { en: "Hints", zh: "提示" },
+  takeback: { en: "Takebacks", zh: "悔棋" },
+  evalBar: { en: "Evaluation bar", zh: "形势条" },
+  threats: { en: "Threat arrows", zh: "威胁箭头" },
+  suggestions: { en: "Suggestion arrows", zh: "建议箭头" },
+  feedback: { en: "Move feedback", zh: "着法评价" },
+};
+
+interface Props {
+  bots: BotConfig[];
+  selected: BotConfig;
+  onSelect: (b: BotConfig) => void;
+  settings: GameSettings;
+  onSettings: (s: GameSettings) => void;
+  crowns: string[];
+  lang: Lang;
+  onLang: (l: Lang) => void;
+  onPlay: () => void;
+}
+
+export function BotPicker({ bots, selected, onSelect, settings, onSettings, crowns, lang, onLang, onPlay }: Props) {
+  const preset = (Object.keys(PRESETS) as (keyof typeof PRESETS)[]).find((k) =>
+    (Object.keys(PRESETS[k]) as (keyof Assists)[]).every((a) => PRESETS[k][a] === settings.assists[a]),
+  );
+  const zh = lang === "zh";
+  return (
+    <div className="picker">
+      <section className="bot-groups">
+        {GROUPS.map((g) => (
+          <div key={g.id} className="bot-group">
+            <h2>{zh ? g.zh : g.en}</h2>
+            <div className="bot-cards">
+              {bots
+                .filter((b) => b.group === g.id)
+                .map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    className={`bot-card${b.id === selected.id ? " active" : ""}`}
+                    onClick={() => onSelect(b)}
+                    aria-pressed={b.id === selected.id}
+                  >
+                    <Avatar bot={b} crown={crowns.includes(b.id)} />
+                    <span className="bot-name">{b.name[lang]}</span>
+                    <span className="bot-rating">{b.ratingLabel}</span>
+                  </button>
+                ))}
+            </div>
+          </div>
+        ))}
+      </section>
+
+      <aside className="panel bot-detail">
+        <div className="bot-head">
+          <Avatar bot={selected} size={64} crown={crowns.includes(selected.id)} />
+          <div>
+            <h1>
+              {selected.name[lang]} <span className="bot-rating">{selected.ratingLabel}</span>
+            </h1>
+            <p className="sub">{selected.bio[lang]}</p>
+          </div>
+        </div>
+
+        <div className="options">
+          <label>
+            {zh ? "我执" : "I play"}
+            <select value={settings.color} onChange={(e) => onSettings({ ...settings, color: e.target.value as GameSettings["color"] })}>
+              <option value="red">{zh ? "红方（先走）" : "Red (moves first)"}</option>
+              <option value="black">{zh ? "黑方" : "Black"}</option>
+              <option value="random">{zh ? "随机" : "Random"}</option>
+            </select>
+          </label>
+          <label>
+            {zh ? "用时" : "Timer"}
+            <select value={settings.time} onChange={(e) => onSettings({ ...settings, time: e.target.value as TimeControl })}>
+              <option value="none">{zh ? "不计时" : "No timer"}</option>
+              <option value="10">10 min</option>
+              <option value="15+10">15 + 10</option>
+              <option value="30">30 min</option>
+            </select>
+          </label>
+          <label>
+            {zh ? "辅助" : "Help"}
+            <select
+              value={preset ?? "custom"}
+              onChange={(e) => e.target.value !== "custom" && onSettings({ ...settings, assists: PRESETS[e.target.value as keyof typeof PRESETS] })}
+            >
+              <option value="learn">{zh ? "学习（全部辅助）" : "Learn (all help)"}</option>
+              <option value="fair">{zh ? "公平（仅提示）" : "Fair (hints only)"}</option>
+              <option value="challenge">{zh ? "挑战（无辅助）" : "Challenge (no help)"}</option>
+              {!preset && <option value="custom">{zh ? "自定义" : "Custom"}</option>}
+            </select>
+          </label>
+          <label>
+            Language
+            <select value={lang} onChange={(e) => onLang(e.target.value as Lang)}>
+              <option value="zh">中文</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+        </div>
+        <fieldset className="assists">
+          {(Object.keys(ASSIST_LABELS) as (keyof Assists)[]).map((a) => (
+            <label key={a} className="check">
+              <input
+                type="checkbox"
+                checked={settings.assists[a]}
+                onChange={(e) => onSettings({ ...settings, assists: { ...settings.assists, [a]: e.target.checked } })}
+              />
+              {ASSIST_LABELS[a][lang]}
+            </label>
+          ))}
+        </fieldset>
+        <button type="button" className="primary play" onClick={onPlay}>
+          {zh ? "开始对局" : "Play"}
+        </button>
+      </aside>
+    </div>
+  );
+}

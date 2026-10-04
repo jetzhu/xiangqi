@@ -48,6 +48,7 @@ export default defineConfig({
     alias: {
       "@xq/board": src("board/src/index.ts"),
       "@xq/engine": src("engine/src/index.ts"),
+      "@xq/bots": src("bots/src/index.ts"),
       "xiangqi-core": src("xiangqi-core/src/index.ts"),
     },
   },

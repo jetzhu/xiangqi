@@ -8,7 +8,8 @@ describe("move grading", () => {
     expect(winChance({ mate: -2 })).toBe(0);
   });
   it("grades by the drop in the mover's win chance", () => {
-    expect(gradeMove({ cp: 20 }, { cp: 15 }, true).grade).toBe("best");
+    expect(gradeMove({ cp: 20 }, { cp: 15 }, true, true).grade).toBe("best"); // the engine's move
+    expect(gradeMove({ cp: 20 }, { cp: 15 }, true).grade).toBe("excellent");
     expect(gradeMove({ cp: 20 }, { cp: -10 }, true).grade).toBe("excellent");
     expect(gradeMove({ cp: 0 }, { cp: -80 }, true).grade).toBe("good");
     expect(gradeMove({ cp: 0 }, { cp: -150 }, true).grade).toBe("inaccuracy");
@@ -18,10 +19,10 @@ describe("move grading", () => {
   it("works from Black's side", () => {
     // Black was fine (Red +0.2) and now Red is +9: a blunder by Black.
     expect(gradeMove({ cp: 20 }, { cp: 900 }, false).grade).toBe("blunder");
-    expect(gradeMove({ cp: 20 }, { cp: -50 }, false).grade).toBe("best");
+    expect(gradeMove({ cp: 20 }, { cp: -50 }, false).grade).toBe("excellent");
   });
   it("small slips matter less when already winning", () => {
-    expect(gradeMove({ cp: 1200 }, { cp: 950 }, true).grade).toBe("best");
+    expect(gradeMove({ cp: 1200 }, { cp: 950 }, true).grade).toBe("excellent");
     expect(gradeMove({ mate: 2 }, { cp: 0 }, true).grade).toBe("blunder");
   });
   it("counts grades per side", () => {

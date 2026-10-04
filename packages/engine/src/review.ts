@@ -15,9 +15,11 @@ export function winChance(s: Score): number {
   return 1 / (1 + Math.exp(-s.cp / 270));
 }
 
-/** Grade boundaries on the drop in win chance (0–1). */
+/**
+ * Grade boundaries on the drop in win chance (0–1). "best" is reserved for the engine's own
+ * top move; anything else that loses almost nothing is "excellent".
+ */
 const BANDS: [MoveGrade, number][] = [
-  ["best", 0.02],
   ["excellent", 0.05],
   ["good", 0.1],
   ["inaccuracy", 0.2],
