@@ -55,6 +55,11 @@ export interface XiangqiBoardProps {
   /** Text for screen readers, e.g. the last move in notation. */
   announce?: string;
   ariaLabel?: string;
+  /**
+   * Editing mode (e.g. a position editor): when set, clicks on points are reported here
+   * instead of moving pieces. Right-clicks report "right".
+   */
+  onSquareClick?: (square: string, button: "left" | "right") => void;
 }
 
 const ARROW_COLORS: Record<ArrowColor, string> = {
@@ -108,6 +113,7 @@ export function XiangqiBoard({
   drawable = true,
   announce = "",
   ariaLabel = "Xiangqi board",
+  onSquareClick,
 }: XiangqiBoardProps) {
   const theme = THEMES[themeName];
   const uid = useId().replace(/:/g, "");
@@ -185,6 +191,10 @@ export function XiangqiBoard({
   const onPointerDown = (e: PointerEvent<SVGSVGElement>) => {
     setKeyboardMode(false);
     const square = squareAt(e);
+    if (onSquareClick) {
+      if (square && (e.button === 0 || e.button === 2)) onSquareClick(square, e.button === 2 ? "right" : "left");
+      return;
+    }
     if (e.button === 2) {
       if (drawable && square) setDrawFrom(square);
       return;
@@ -264,6 +274,10 @@ export function XiangqiBoard({
     }
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
+      if (onSquareClick) {
+        onSquareClick(cursor, "left");
+        return;
+      }
       const p = pieceAt(cursor);
       if (selected && cursor !== selected && !(p && p.color === pieceAt(selected)?.color)) {
         tryMove(selected, cursor, false);

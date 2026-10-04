@@ -12,3 +12,4 @@ export { type Orientation, toScreen, fromScreen } from "./geometry.js";
 export { PieceGlyph, PIECE_NAMES, type PieceSet } from "./pieces.js";
 export { THEMES, type Theme, type ThemeName } from "./themes.js";
 export { playSound, type SoundKind } from "./sounds.js";
+export { EvalBar, type EvalBarProps } from "./EvalBar.js";

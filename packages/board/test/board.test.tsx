@@ -119,3 +119,17 @@ describe("XiangqiBoard", () => {
     expect(container.querySelector("[style*='pulse']")).toBeTruthy();
   });
 });
+
+describe("editing mode", () => {
+  it("reports clicks instead of moving pieces", () => {
+    const onMove = vi.fn();
+    const onSquareClick = vi.fn();
+    const { container } = render(
+      <XiangqiBoard fen={START_FEN} legalMoves={legal(START_FEN)} onMove={onMove} onSquareClick={onSquareClick} />,
+    );
+    click(container, "h2");
+    fireEvent.pointerDown(hit(container, "e5"), { button: 2, pointerId: 1 });
+    expect(onSquareClick.mock.calls).toEqual([["h2", "left"], ["e5", "right"]]);
+    expect(onMove).not.toHaveBeenCalled();
+  });
+});
