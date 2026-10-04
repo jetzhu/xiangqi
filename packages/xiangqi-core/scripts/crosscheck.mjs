@@ -64,7 +64,7 @@ function ourDivide(fen, d) {
 
 const HAND = {
   "stalemate (black to move, no legal move)": "4k4/9/6N2/9/9/9/9/9/3R1R3/3K5 b - - 0 1",
-  "checkmate (chariot on the back rank)": "R3k4/9/6N2/9/9/9/9/9/3R1R3/3K5 b - - 0 1",
+  "checkmate (chariot on the back rank)": "R3k4/9/6N2/9/9/9/9/9/5R3/3K5 b - - 0 1",
   "pinned by the flying general": "4k4/9/9/9/4c4/9/9/4R4/9/4K4 w - - 0 1",
   "cannon screens and horse legs": "r1bakab1r/9/1cn3nc1/p1p1C1p1p/9/9/P1P1P1P1P/2N4C1/9/R1BAKABNR b - - 0 1",
   "crossed soldiers": "3k5/4a4/2P1P1P2/9/4p4/2p6/9/9/4A4/3AK4 w - - 0 1",

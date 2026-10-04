@@ -392,6 +392,48 @@ export class Position {
     this.hashHi = u.hashHi;
   }
 
+  /**
+   * Problems that make this position impossible in a real game (empty array if fine).
+   * Used for set-up positions and FEN imports.
+   */
+  validate(): string[] {
+    const errors: string[] = [];
+    const counts = new Map<number, number>();
+    const max = [0, 1, 2, 2, 2, 2, 2, 5];
+    for (let s = 0; s < SQUARES; s++) {
+      const c = this.board[s]!;
+      if (c === 0) continue;
+      counts.set(c, (counts.get(c) ?? 0) + 1);
+      const side: Side = c > 0 ? 1 : -1;
+      const name = `${side === 1 ? "Red" : "Black"} ${typeChar(c)} on ${"abcdefghi"[fileOf(s)]}${rankOf(s)}`;
+      const f = fileOf(s);
+      const ownRank = side === 1 ? rankOf(s) : 9 - rankOf(s); // rank from the owner's side
+      switch (Math.abs(c)) {
+        case KING:
+          if (!inPalace(s, side)) errors.push(`${name}: the general must stay in the palace`);
+          break;
+        case ADVISOR:
+          if (!inPalace(s, side) || (f + ownRank) % 2 !== 1) errors.push(`${name}: not an advisor point`);
+          break;
+        case ELEPHANT: {
+          // The seven elephant points: even file and rank on its own half, file + rank ≡ 2 (mod 4).
+          const ok = ownRank <= 4 && ownRank % 2 === 0 && f % 2 === 0 && (f + ownRank) % 4 === 2;
+          if (!ok) errors.push(`${name}: not an elephant point`);
+          break;
+        }
+        case SOLDIER:
+          if (ownRank < 3 || (ownRank <= 4 && f % 2 === 1)) errors.push(`${name}: a soldier cannot be there`);
+          break;
+      }
+    }
+    for (const [c, n] of counts) {
+      if (n > max[Math.abs(c)]!) errors.push(`too many ${c > 0 ? "Red" : "Black"} ${typeChar(c)} (${n})`);
+    }
+    if (this.generalsFacing()) errors.push("the generals face each other on an open file");
+    if (this.isInCheck(this.turn === 1 ? -1 : 1)) errors.push("the side not to move is in check");
+    return errors;
+  }
+
   /** Count leaf nodes of the legal move tree (for testing move generation). */
   perft(depth: number): number {
     if (depth === 0) return 1;

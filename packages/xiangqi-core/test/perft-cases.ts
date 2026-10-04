@@ -11,7 +11,7 @@ export const PERFT_CASES: { name: string; fen: string; counts: number[] }[] = [
   },
   {
     "name": "checkmate (chariot on the back rank)",
-    "fen": "R3k4/9/6N2/9/9/9/9/9/3R1R3/3K5 b - - 0 1",
+    "fen": "R3k4/9/6N2/9/9/9/9/9/5R3/3K5 b - - 0 1",
     "counts": [
       0,
       0,
