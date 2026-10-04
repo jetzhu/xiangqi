@@ -9,10 +9,11 @@ A guest-first Xiangqi (Chinese chess) teaching and playing website, modeled on w
 
 | Path | Purpose |
 | --- | --- |
-| `packages/xiangqi-core` | Rules, notation, FEN (milestone M1) |
-| `packages/board` | React SVG board component (M2) |
+| `packages/xiangqi-core` | Rules, notation, FEN (M1, done) |
+| `packages/board` | React SVG board component (M2, done) |
 | `packages/engine` | Engine Web Worker + UCI wrapper |
-| `apps/web` | Next.js site |
+| `apps/web` | Next.js site (planned) |
+| `apps/board-demo` | M2 demo: two players on one screen (`pnpm --filter board-demo dev`) |
 | `content/` | Lessons, puzzles, bots |
 | `spikes/engine` | M0: engine size and speed comparison |
 

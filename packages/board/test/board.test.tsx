@@ -32,7 +32,7 @@ describe("XiangqiBoard", () => {
     const { container } = render(<XiangqiBoard fen={START_FEN} legalMoves={legal(START_FEN)} />);
     const before = container.querySelectorAll("circle").length;
     click(container, "b0"); // horse: a2 and c2
-    expect(container.querySelectorAll("circle").length).toBe(before + 1 + 2); // selection + 2 dots
+    expect(container.querySelectorAll("circle").length).toBe(before + 2 + 2); // selection fill + ring, 2 dots
   });
 
   it("reports an illegal destination", () => {

@@ -11,7 +11,7 @@ export interface Point {
 }
 
 /** Margin around the outer lines; larger when coordinates are drawn. */
-export const margin = (coordinates: boolean) => (coordinates ? 0.95 : 0.6);
+export const margin = (coordinates: boolean) => (coordinates ? 1.15 : 0.6);
 
 export const viewBox = (coordinates: boolean) => {
   const m = margin(coordinates);

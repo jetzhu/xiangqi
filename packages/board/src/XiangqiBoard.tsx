@@ -1,6 +1,6 @@
 import { type CSSProperties, type KeyboardEvent, type PointerEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import { type Color, type PieceType, Position, typeChar } from "xiangqi-core";
-import { ALL_SQUARES, type Orientation, type Point, fromScreen, toScreen, viewBox } from "./geometry.js";
+import { ALL_SQUARES, type Orientation, type Point, fromScreen, margin, toScreen, viewBox } from "./geometry.js";
 import { PIECE_NAMES, PieceGlyph, type PieceSet } from "./pieces.js";
 import { THEMES, type ThemeName } from "./themes.js";
 
@@ -118,7 +118,8 @@ export function XiangqiBoard({
   const [userMarks, setUserMarks] = useState<string[]>([]);
   const [drawFrom, setDrawFrom] = useState<string | null>(null);
   const [cursor, setCursor] = useState<string>(orientation === "red" ? "e0" : "e9");
-  const [focused, setFocused] = useState(false);
+  // The cursor box shows only while the keyboard is being used (not after mouse clicks).
+  const [keyboardMode, setKeyboardMode] = useState(false);
   const [liveText, setLiveText] = useState("");
   const draggedMove = useRef<string | null>(null);
 
@@ -182,6 +183,7 @@ export function XiangqiBoard({
   };
 
   const onPointerDown = (e: PointerEvent<SVGSVGElement>) => {
+    setKeyboardMode(false);
     const square = squareAt(e);
     if (e.button === 2) {
       if (drawable && square) setDrawFrom(square);
@@ -247,6 +249,7 @@ export function XiangqiBoard({
   // --- Keyboard input ------------------------------------------------------------
 
   const onKeyDown = (e: KeyboardEvent<SVGSVGElement>) => {
+    setKeyboardMode(true);
     const { x, y } = toScreen(cursor, orientation);
     const step: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
     const dir = step[e.key];
@@ -280,6 +283,7 @@ export function XiangqiBoard({
   // --- Rendering -------------------------------------------------------------------
 
   const flipped = orientation === "black";
+  const m = margin(showCoordinates);
   const lineProps = { stroke: theme.line, strokeWidth: theme.lineWidth, strokeLinecap: "square" as const };
   const lines: { x1: number; y1: number; x2: number; y2: number }[] = [];
   for (let y = 0; y <= 9; y++) lines.push({ x1: 0, y1: y, x2: 8, y2: y });
@@ -331,24 +335,24 @@ export function XiangqiBoard({
     for (let x = 0; x <= 8; x++) {
       const file = flipped ? 8 - x : x; // a=0 … i=8
       if (coordinates === "iccs") {
-        out.push(<text key={`f${x}`} x={x} y={9.62} {...style}>{"abcdefghi"[file]}</text>);
+        out.push(<text key={`f${x}`} x={x} y={9.78} {...style}>{"abcdefghi"[file]}</text>);
       } else {
         // Bottom side counts from its right; top side from its right (our left).
         const bottomRed = !flipped;
         const bottomNum = 9 - x;
         const topNum = x + 1;
         out.push(
-          <text key={`b${x}`} x={x} y={9.62} {...style}>
+          <text key={`b${x}`} x={x} y={9.78} {...style}>
             {bottomRed ? CN_FILES[bottomNum] : String(bottomNum)}
           </text>,
-          <text key={`t${x}`} x={x} y={-0.62} {...style}>
+          <text key={`t${x}`} x={x} y={-0.78} {...style}>
             {bottomRed ? String(topNum) : CN_FILES[topNum]}
           </text>,
         );
       }
     }
     if (coordinates === "iccs") {
-      for (let y = 0; y <= 9; y++) out.push(<text key={`r${y}`} x={-0.62} y={y} {...style}>{flipped ? y : 9 - y}</text>);
+      for (let y = 0; y <= 9; y++) out.push(<text key={`r${y}`} x={-0.8} y={y} {...style}>{flipped ? y : 9 - y}</text>);
     }
     return out;
   };
@@ -393,8 +397,7 @@ export function XiangqiBoard({
         onPointerUp={onPointerUp}
         onContextMenu={(e) => e.preventDefault()}
         onKeyDown={onKeyDown}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
+        onBlur={() => setKeyboardMode(false)}
       >
         <style>{`
           @keyframes ${uid}-slide { from { transform: translate(var(--dx), var(--dy)); } to { transform: translate(0, 0); } }
@@ -414,8 +417,7 @@ export function XiangqiBoard({
         </defs>
 
         {/* Board */}
-        <rect x={-0.5} y={-0.5} width={9} height={10} rx={0.08} fill={theme.board} />
-        {showCoordinates && <rect x={-1} y={-1} width={10} height={11} fill={theme.board} opacity={0.6} />}
+        <rect x={-m} y={-m} width={8 + 2 * m} height={9 + 2 * m} rx={0.15} fill={theme.board} />
         <g>
           {lines.map((l, i) => (
             <line key={i} {...l} {...lineProps} />
@@ -433,7 +435,7 @@ export function XiangqiBoard({
 
         {/* Square highlights */}
         {[lastFrom, lastTo].map(
-          (s, i) => s && <circle key={`l${i}`} {...ptAttrs(toScreen(s, orientation))} r={0.47} fill={theme.lastMove} />,
+          (s, i) => s && <circle key={`l${i}`} {...ptAttrs(toScreen(s, orientation))} r={0.52} fill={theme.lastMove} />,
         )}
         {highlights.map((h, i) => (
           <circle key={`h${i}`} {...ptAttrs(toScreen(h.square, orientation))} r={0.47} fill={highlightColor[h.kind]} />
@@ -478,6 +480,11 @@ export function XiangqiBoard({
           );
         })}
 
+        {/* Selection ring drawn above the piece so it stays visible */}
+        {selected && (
+          <circle {...ptAttrs(toScreen(selected, orientation))} r={0.49} fill="none" stroke={theme.cursor} strokeWidth={0.07} style={{ pointerEvents: "none" }} />
+        )}
+
         {/* Badges */}
         {badges.map((b, i) => {
           const { x, y } = toScreen(b.square, orientation);
@@ -505,7 +512,7 @@ export function XiangqiBoard({
         {allArrows.map(arrowLine)}
 
         {/* Keyboard cursor */}
-        {focused && (
+        {keyboardMode && (
           <rect x={cursorPt.x - 0.5} y={cursorPt.y - 0.5} width={1} height={1} rx={0.12} fill="none" stroke={theme.cursor} strokeWidth={0.06} />
         )}
 
