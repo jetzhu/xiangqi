@@ -1,0 +1,29 @@
+{
+  "name": "@xq/engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Xiangqi engine wrapper: UCI parsing, coordinate conversion, cancellable analysis; loads Fairy-Stockfish WASM in the browser",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "fairy-stockfish-nnue.wasm": "1.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.4",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3",
+    "xiangqi-core": "workspace:*"
+  }
+}
