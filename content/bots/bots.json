@@ -1,0 +1,162 @@
+[
+  {
+    "id": "xiaobing",
+    "name": { "en": "Little Soldier", "zh": "小兵" },
+    "group": "beginner",
+    "ratingLabel": 250,
+    "color": "#e0a030",
+    "bio": { "en": "Just learned how the pieces move. Loves pushing soldiers.", "zh": "刚学会走棋，最爱拱兵。" },
+    "strength": { "depth": 1, "multipv": 8, "temperature": 250, "maxLoss": 900, "blunderChance": 0.3, "thinkMs": 500 },
+    "style": { "captures": 30, "checks": 0, "advance": 60, "cannon": 0 },
+    "book": [["c3c4"], ["g3g4"], ["h2e2", "c6c5"], ["h2e2", "g6g5"]],
+    "chat": {
+      "greet": [{ "en": "Hi! Let's play. I just learned!", "zh": "你好！我们下一盘吧，我刚学会！" }],
+      "botCheck": [{ "en": "Check! Did I do it right?", "zh": "将军！我走对了吗？" }],
+      "botCapture": [{ "en": "Yay, I got one!", "zh": "耶，吃到一个！" }],
+      "lostPiece": [{ "en": "Oh no, my piece!", "zh": "哎呀，我的棋子！" }],
+      "win": [{ "en": "I won? Really? Wow!", "zh": "我赢了？真的吗？哇！" }],
+      "lose": [{ "en": "Good game! You're good at this.", "zh": "下得好！你真厉害。" }],
+      "draw": [{ "en": "A draw! That's fair.", "zh": "和棋！挺公平的。" }]
+    }
+  },
+  {
+    "id": "afu",
+    "name": { "en": "Grandpa Fu", "zh": "阿福爷爷" },
+    "group": "beginner",
+    "ratingLabel": 400,
+    "color": "#8a6f4d",
+    "bio": { "en": "Plays in the park every morning. Happy to trade pieces.", "zh": "每天早上在公园下棋，喜欢兑子。" },
+    "strength": { "depth": 2, "multipv": 8, "temperature": 180, "maxLoss": 700, "blunderChance": 0.18, "thinkMs": 700 },
+    "style": { "captures": 40, "checks": 10, "advance": 10, "cannon": 0 },
+    "book": [["h0g2"], ["h2e2", "h9g7"]],
+    "chat": {
+      "greet": [{ "en": "Sit down, young one. Tea is still warm.", "zh": "坐吧，年轻人，茶还热着呢。" }],
+      "botCheck": [{ "en": "Check! Hehe.", "zh": "将军！呵呵。" }],
+      "botCapture": [{ "en": "A fair trade, I think.", "zh": "这一换，不亏。" }],
+      "lostPiece": [{ "en": "Ah, my eyes aren't what they used to be.", "zh": "唉，老眼昏花了。" }],
+      "win": [{ "en": "Ha! The old man still has it.", "zh": "哈！老头子还行吧。" }],
+      "lose": [{ "en": "Well played. Come back tomorrow?", "zh": "下得好。明天还来吗？" }],
+      "draw": [{ "en": "A peaceful draw. Good.", "zh": "和气生财，和棋好。" }]
+    }
+  },
+  {
+    "id": "xiaoyu",
+    "name": { "en": "Xiaoyu", "zh": "小雨" },
+    "group": "casual",
+    "ratingLabel": 600,
+    "color": "#4a90c8",
+    "bio": { "en": "Middle-school chess club. Chases pieces with her horses.", "zh": "中学棋社成员，喜欢用马追着吃子。" },
+    "strength": { "depth": 3, "multipv": 6, "temperature": 120, "maxLoss": 500, "blunderChance": 0.1, "thinkMs": 800 },
+    "style": { "captures": 30, "checks": 10, "advance": 0, "cannon": 0 },
+    "book": [["b0c2"], ["h2e2", "b9c7"], ["c3c4", "b9c7"]],
+    "chat": {
+      "greet": [{ "en": "Ready? I've been practising!", "zh": "准备好了吗？我最近一直在练！" }],
+      "botCheck": [{ "en": "Check!", "zh": "将军！" }],
+      "botCapture": [{ "en": "Got it!", "zh": "吃掉！" }],
+      "lostPiece": [{ "en": "Hmm, I missed that.", "zh": "嗯，我没看到。" }],
+      "win": [{ "en": "Yes! I'm telling my club!", "zh": "赢啦！我要告诉棋社的同学！" }],
+      "lose": [{ "en": "You're strong. Can you teach me that?", "zh": "你好厉害，能教教我吗？" }],
+      "draw": [{ "en": "Draw. Next time I'll win!", "zh": "和了。下次我一定赢！" }]
+    }
+  },
+  {
+    "id": "laochen",
+    "name": { "en": "Old Chen", "zh": "老陈" },
+    "group": "casual",
+    "ratingLabel": 800,
+    "color": "#b5302e",
+    "bio": { "en": "Cannons first, questions later. Always opens with the central cannon.", "zh": "先架炮再说。开局必走当头炮。" },
+    "strength": { "depth": 4, "multipv": 5, "temperature": 80, "maxLoss": 300, "blunderChance": 0.05, "thinkMs": 900 },
+    "style": { "captures": 20, "checks": 20, "advance": 0, "cannon": 40 },
+    "book": [["h2e2"], ["h2e2", "h7e7"], ["b2e2", "b7e7"]],
+    "chat": {
+      "greet": [{ "en": "Central cannon, as always. Let's go.", "zh": "当头炮，老规矩。来吧。" }],
+      "botCheck": [{ "en": "Check! Feel the cannon.", "zh": "将军！尝尝我的炮。" }],
+      "botCapture": [{ "en": "That one's mine.", "zh": "这个归我了。" }],
+      "lostPiece": [{ "en": "Hm. Bold move.", "zh": "嗯，胆子不小。" }],
+      "win": [{ "en": "The cannon never lies.", "zh": "炮从来不骗人。" }],
+      "lose": [{ "en": "You handled my cannons well.", "zh": "我的炮被你化解了，佩服。" }],
+      "draw": [{ "en": "A draw. Fine game.", "zh": "和棋，好棋。" }]
+    }
+  },
+  {
+    "id": "meiling",
+    "name": { "en": "Meiling", "zh": "美玲" },
+    "group": "club",
+    "ratingLabel": 1000,
+    "color": "#7a5ca8",
+    "bio": { "en": "Patient defender. Builds a solid shape and waits for your mistake.", "zh": "防守型棋手，阵形稳固，等你犯错。" },
+    "strength": { "depth": 6, "multipv": 4, "temperature": 50, "maxLoss": 200, "blunderChance": 0.02, "thinkMs": 1000 },
+    "style": { "captures": 0, "checks": 0, "advance": -10, "cannon": 0 },
+    "book": [["g0e2"], ["h2e2", "h9g7", "h0g2", "b9c7"], ["c3c4", "g6g5"]],
+    "chat": {
+      "greet": [{ "en": "Take your time. I will.", "zh": "慢慢来，我也不急。" }],
+      "botCheck": [{ "en": "Check.", "zh": "将军。" }],
+      "botCapture": [{ "en": "Thank you.", "zh": "谢谢。" }],
+      "lostPiece": [{ "en": "Nicely found.", "zh": "这步找得好。" }],
+      "win": [{ "en": "Patience pays.", "zh": "耐心总有回报。" }],
+      "lose": [{ "en": "You broke through. Well done.", "zh": "你攻破了我的防线，漂亮。" }],
+      "draw": [{ "en": "A solid draw.", "zh": "稳稳的和棋。" }]
+    }
+  },
+  {
+    "id": "aqiang",
+    "name": { "en": "Aqiang", "zh": "阿强" },
+    "group": "club",
+    "ratingLabel": 1300,
+    "color": "#d0602a",
+    "bio": { "en": "All attack. Will sacrifice a piece to get at your general.", "zh": "全力进攻，为了攻王不惜弃子。" },
+    "strength": { "depth": 8, "multipv": 3, "temperature": 30, "maxLoss": 120, "blunderChance": 0.01, "thinkMs": 1000 },
+    "style": { "captures": 10, "checks": 40, "advance": 10, "cannon": 10 },
+    "book": [["h2e2"], ["h2e2", "b7e7"], ["b2e2", "h7e7"]],
+    "chat": {
+      "greet": [{ "en": "I don't defend. Hope you do.", "zh": "我不会防守，希望你会。" }],
+      "botCheck": [{ "en": "Check! Run!", "zh": "将军！快跑！" }],
+      "botCapture": [{ "en": "Too slow!", "zh": "太慢了！" }],
+      "lostPiece": [{ "en": "Doesn't matter, the attack goes on.", "zh": "没关系，攻势继续。" }],
+      "win": [{ "en": "Attack wins games!", "zh": "进攻就是胜利！" }],
+      "lose": [{ "en": "Your defence held. Respect.", "zh": "你守住了，佩服。" }],
+      "draw": [{ "en": "Draw? I wanted more.", "zh": "和棋？我还没打够。" }]
+    }
+  },
+  {
+    "id": "teacherlin",
+    "name": { "en": "Teacher Lin", "zh": "林老师" },
+    "group": "master",
+    "ratingLabel": 1600,
+    "color": "#3a7d44",
+    "bio": { "en": "Club coach. Plays clean, classical Xiangqi.", "zh": "棋社教练，棋风正统、干净。" },
+    "strength": { "depth": 10, "multipv": 2, "temperature": 15, "maxLoss": 60, "blunderChance": 0, "thinkMs": 1200 },
+    "style": { "captures": 0, "checks": 0, "advance": 0, "cannon": 0 },
+    "book": [["h2e2"], ["c3c4"], ["h2e2", "h9g7", "h0g2", "b9c7"], ["c3c4", "b7c7"]],
+    "chat": {
+      "greet": [{ "en": "Let's have a good, instructive game.", "zh": "我们下一盘有收获的棋吧。" }],
+      "botCheck": [{ "en": "Check. Look at your general's safety.", "zh": "将军。注意老将的安全。" }],
+      "botCapture": [{ "en": "Count the pieces before you move.", "zh": "走棋前先算算子力。" }],
+      "lostPiece": [{ "en": "Good. You saw the tactic.", "zh": "不错，你看到了这个战术。" }],
+      "win": [{ "en": "Review the game later: there are lessons in it.", "zh": "赛后复盘一下，里面有不少可学的。" }],
+      "lose": [{ "en": "Excellent play. You've improved.", "zh": "下得非常好，你进步了。" }],
+      "draw": [{ "en": "A correct draw.", "zh": "正确的和棋。" }]
+    }
+  },
+  {
+    "id": "longwang",
+    "name": { "en": "Dragon King", "zh": "龙王" },
+    "group": "master",
+    "ratingLabel": 2000,
+    "color": "#1f1f1f",
+    "bio": { "en": "The strongest bot here. Plays the engine's best move.", "zh": "这里最强的对手，每步都走引擎最佳着法。" },
+    "strength": { "depth": 14, "multipv": 1, "temperature": 0, "maxLoss": 0, "blunderChance": 0, "thinkMs": 600 },
+    "style": { "captures": 0, "checks": 0, "advance": 0, "cannon": 0 },
+    "book": [],
+    "chat": {
+      "greet": [{ "en": "Begin.", "zh": "请。" }],
+      "botCheck": [{ "en": "Check.", "zh": "将。" }],
+      "botCapture": [{ "en": "…", "zh": "……" }],
+      "lostPiece": [{ "en": "Interesting.", "zh": "有意思。" }],
+      "win": [{ "en": "As expected.", "zh": "不出所料。" }],
+      "lose": [{ "en": "Remarkable. You defeated the Dragon King.", "zh": "了不起，你战胜了龙王。" }],
+      "draw": [{ "en": "Well held.", "zh": "守得好。" }]
+    }
+  }
+]

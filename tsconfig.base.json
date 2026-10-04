@@ -9,6 +9,20 @@
     "declaration": true,
     "sourceMap": true,
     "skipLibCheck": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "xiangqi-core": [
+        "./packages/xiangqi-core/src/index.ts"
+      ],
+      "@xq/board": [
+        "./packages/board/src/index.ts"
+      ],
+      "@xq/engine": [
+        "./packages/engine/src/index.ts"
+      ],
+      "@xq/bots": [
+        "./packages/bots/src/index.ts"
+      ]
+    }
   }
 }

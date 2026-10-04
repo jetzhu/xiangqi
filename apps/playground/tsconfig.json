@@ -11,7 +11,8 @@
     "paths": {
       "@xq/board": ["../../packages/board/src/index.ts"],
       "xiangqi-core": ["../../packages/xiangqi-core/src/index.ts"],
-      "@xq/engine": ["../../packages/engine/src/index.ts"]
+      "@xq/engine": ["../../packages/engine/src/index.ts"],
+      "@xq/bots": ["../../packages/bots/src/index.ts"]
     }
   },
   "include": ["src", "vite.config.ts"]
