@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.next/
+*.log
+.DS_Store
+
+# Engine build outputs and downloaded networks (large; fetched or built by scripts)
+spikes/engine/vendor/
+*.nnue

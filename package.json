@@ -1,0 +1,12 @@
+{
+  "name": "xiangqi-site",
+  "private": true,
+  "description": "Xiangqi (Chinese chess) teaching and playing site",
+  "packageManager": "pnpm@12.9.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "spike:engine": "pnpm --filter engine-spike bench"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "engine-spike",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench": "node bench.mjs",
+    "serve": "node serve.mjs"
+  },
+  "dependencies": {
+    "fairy-stockfish-nnue.wasm": "1.1.12"
+  }
+}
