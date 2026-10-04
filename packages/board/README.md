@@ -32,4 +32,4 @@ for point marks, keyboard (arrow keys move a cursor, Enter selects/moves, Escape
 announcements. Honours `prefers-reduced-motion`. `playSound()` synthesizes move, capture, check,
 illegal and end sounds with Web Audio (no audio files).
 
-Demo: `pnpm --filter board-demo dev` → http://127.0.0.1:5173
+Demo: `pnpm --filter playground dev` → http://127.0.0.1:5173

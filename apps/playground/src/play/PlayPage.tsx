@@ -52,7 +52,7 @@ const T = {
   },
 } as const;
 
-export function App() {
+export function PlayPage() {
   const [game, setGame] = useState(() => new Game());
   const [version, setVersion] = useState(0); // bump to re-render after mutating `game`
   const [orientation, setOrientation] = useState<"red" | "black">("red");

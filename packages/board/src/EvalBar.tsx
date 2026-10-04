@@ -43,7 +43,7 @@ export function EvalBar({ value, label = "", orientation = "red", pending = fals
             left: 0,
             right: 0,
             textAlign: "center",
-            fontSize: 11,
+            fontSize: 10,
             fontWeight: 700,
             fontFamily: "system-ui, sans-serif",
             color: "#fff",
