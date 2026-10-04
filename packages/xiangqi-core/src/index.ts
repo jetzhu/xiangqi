@@ -4,3 +4,4 @@ export * from "./notation.js";
 export * from "./rules.js";
 export { Game, type MoveRecord } from "./game.js";
 export * from "./explain.js";
+export { GameTree, type TreeNode } from "./tree.js";
