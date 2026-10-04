@@ -74,3 +74,21 @@ describe("XiangqiEngine with Fairy-Stockfish", () => {
     expect(r.bestmove).toBeNull();
   });
 });
+
+describe("reviewGame", () => {
+  it("grades a game that hangs a chariot", async () => {
+    const { reviewGame } = await import("../src/review.js");
+    // Red's cannon grabs the e6 soldier and is taken by the black horse.
+    const g = new Game();
+    const moves = ["h2e2", "h9g7", "e2e6", "g7e6"];
+    const fens = [g.fen];
+    for (const m of moves) {
+      expect(g.move(m), m).not.toBeNull();
+      fens.push(g.fen);
+    }
+    const r = await reviewGame(engine, fens, moves, { depth: 6, isBook: (i) => i < 2 });
+    expect(r.map((x) => x.grade).slice(0, 2)).toEqual(["book", "book"]);
+    expect(["mistake", "blunder"]).toContain(r[2]!.grade); // e2e6 loses the cannon for a soldier
+    expect(r[3]!.bestMove).toBe("g7e6");
+  });
+});
