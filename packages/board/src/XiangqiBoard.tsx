@@ -404,10 +404,10 @@ export function XiangqiBoard({
       <svg
         ref={svgRef}
         viewBox={viewBox(showCoordinates)}
-        role="application"
-        aria-label={ariaLabel}
-        aria-roledescription="Xiangqi board"
-        tabIndex={0}
+        // A board without a label is decorative: hidden from assistive tech and the tab order.
+        {...(ariaLabel
+          ? { role: "application", "aria-label": ariaLabel, "aria-roledescription": "Xiangqi board", tabIndex: 0 }
+          : { "aria-hidden": true, tabIndex: -1 })}
         style={{ width: "100%", height: "auto", display: "block", touchAction: "none", userSelect: "none", outline: "none" }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

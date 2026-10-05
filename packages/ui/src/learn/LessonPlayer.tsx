@@ -86,7 +86,7 @@ export function LessonPlayer({ lesson, lang, onDone, onExit, hasNext, onNext }: 
           ←
         </button>
         <h1>{t(lesson.title)}</h1>
-        <div className="steps-bar" role="progressbar" aria-valuemin={0} aria-valuemax={lesson.steps.length} aria-valuenow={index}>
+        <div className="steps-bar" role="progressbar" aria-label={tt("Lesson progress", "课程进度")} aria-valuemin={0} aria-valuemax={lesson.steps.length} aria-valuenow={index}>
           {lesson.steps.map((_, i) => (
             <span key={i} className={i < index ? "done" : i === index ? "now" : ""} />
           ))}

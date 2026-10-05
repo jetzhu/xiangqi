@@ -4,6 +4,9 @@
   "private": true,
   "description": "Site pages and shared UI: learn, puzzles, bots, analysis, two-player board, settings and navigation",
   "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {

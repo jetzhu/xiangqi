@@ -4,6 +4,7 @@
   "private": true,
   "description": "Xiangqi rules, move generation, notation (ICCS, WXF, Chinese), FEN and game-end rulings",
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

@@ -4,6 +4,7 @@
   "private": true,
   "description": "Xiangqi engine wrapper: UCI parsing, coordinate conversion, cancellable analysis; loads Fairy-Stockfish WASM in the browser",
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

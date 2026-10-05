@@ -4,6 +4,7 @@
   "private": true,
   "description": "React SVG Xiangqi board: drag and click moves, legal-move dots, arrows, badges, piece sets, themes, keyboard play",
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

@@ -4,6 +4,7 @@
   "private": true,
   "description": "Bot personalities and move choice: engine lines sampled by strength, style and opening book",
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
