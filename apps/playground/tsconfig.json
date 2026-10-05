@@ -15,7 +15,9 @@
       "@xq/engine": ["../../packages/engine/src/index.ts"],
       "@xq/bots": ["../../packages/bots/src/index.ts"],
       "@xq/lessons": ["../../packages/lessons/src/index.ts"],
-      "@xq/puzzles": ["../../packages/puzzles/src/index.ts"]
+      "@xq/puzzles": ["../../packages/puzzles/src/index.ts"],
+      "@xq/content": ["../../packages/content/src/index.ts"],
+      "@xq/ui": ["../../packages/ui/src/index.ts"]
     }
   },
   "include": ["src", "vite.config.ts"]

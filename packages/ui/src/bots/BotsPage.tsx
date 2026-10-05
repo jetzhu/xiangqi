@@ -1,17 +1,17 @@
 import type { BotConfig } from "@xq/bots";
+import { useT } from "../settings.js";
 import { useEffect, useState } from "react";
 import type { Color } from "xiangqi-core";
-import botsJson from "../../../../content/bots/bots.json";
+import { BOTS } from "@xq/content";
 import { BotGame } from "./BotGame.js";
-import { BotPicker, type GameSettings, type Lang, PRESETS } from "./BotPicker.js";
+import { BotPicker, type GameSettings, PRESETS } from "./BotPicker.js";
 import { loadCrowns } from "./crowns.js";
 
-const BOTS = botsJson as BotConfig[];
 
 export function BotsPage() {
   const [selected, setSelected] = useState<BotConfig>(BOTS[0]!);
   const [settings, setSettings] = useState<GameSettings>({ color: "red", time: "none", assists: PRESETS.learn });
-  const [lang, setLang] = useState<Lang>("zh");
+  const { lang } = useT();
   const [crowns, setCrowns] = useState<string[]>([]);
   const [game, setGame] = useState<{ key: number; color: Color } | null>(null);
 
@@ -46,7 +46,6 @@ export function BotsPage() {
       onSettings={setSettings}
       crowns={crowns}
       lang={lang}
-      onLang={setLang}
       onPlay={start}
     />
   );

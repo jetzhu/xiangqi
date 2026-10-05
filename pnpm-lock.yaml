@@ -174,6 +174,9 @@ importers:
       '@xq/bots':
         specifier: workspace:*
         version: link:../../packages/bots
+      '@xq/content':
+        specifier: workspace:*
+        version: link:../../packages/content
       '@xq/engine':
         specifier: workspace:*
         version: link:../../packages/engine
@@ -183,6 +186,9 @@ importers:
       '@xq/puzzles':
         specifier: workspace:*
         version: link:../../packages/puzzles
+      '@xq/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       idb-keyval:
         specifier: ^6.3.0
         version: 6.3.0
@@ -271,6 +277,28 @@ importers:
         specifier: 5.0.3
         version: 5.0.3(@types/node@26.6.4)(jsdom@30.1.1)(vite@8.3.2(@types/node@26.6.4))
 
+  packages/content:
+    dependencies:
+      '@xq/bots':
+        specifier: workspace:*
+        version: link:../bots
+      '@xq/lessons':
+        specifier: workspace:*
+        version: link:../lessons
+      '@xq/puzzles':
+        specifier: workspace:*
+        version: link:../puzzles
+    devDependencies:
+      '@types/node':
+        specifier: 26.6.4
+        version: 26.6.4
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: 5.0.3
+        version: 5.0.3(@types/node@26.6.4)(jsdom@30.1.1)(vite@8.3.2(@types/node@26.6.4))
+
   packages/engine:
     dependencies:
       fairy-stockfish-nnue.wasm:
@@ -318,6 +346,61 @@ importers:
       '@types/node':
         specifier: 26.6.4
         version: 26.6.4
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: 5.0.3
+        version: 5.0.3(@types/node@26.6.4)(jsdom@30.1.1)(vite@8.3.2(@types/node@26.6.4))
+
+  packages/ui:
+    dependencies:
+      '@xq/board':
+        specifier: workspace:*
+        version: link:../board
+      '@xq/bots':
+        specifier: workspace:*
+        version: link:../bots
+      '@xq/content':
+        specifier: workspace:*
+        version: link:../content
+      '@xq/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@xq/lessons':
+        specifier: workspace:*
+        version: link:../lessons
+      '@xq/puzzles':
+        specifier: workspace:*
+        version: link:../puzzles
+      idb-keyval:
+        specifier: ^6.3.0
+        version: 6.3.0
+      xiangqi-core:
+        specifier: workspace:*
+        version: link:../xiangqi-core
+    devDependencies:
+      '@testing-library/dom':
+        specifier: ^10.4.2
+        version: 10.4.2
+      '@testing-library/react':
+        specifier: 16.3.3
+        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@types/react':
+        specifier: 19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: 19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      jsdom:
+        specifier: 30.1.1
+        version: 30.1.1
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: 19.3.0
+        version: 19.3.0(react@19.3.0)
       typescript:
         specifier: 7.0.2
         version: 7.0.2

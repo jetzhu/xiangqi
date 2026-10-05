@@ -10,9 +10,11 @@
   "dependencies": {
     "@xq/board": "workspace:*",
     "@xq/bots": "workspace:*",
+    "@xq/content": "workspace:*",
     "@xq/engine": "workspace:*",
     "@xq/lessons": "workspace:*",
     "@xq/puzzles": "workspace:*",
+    "@xq/ui": "workspace:*",
     "idb-keyval": "^6.3.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",

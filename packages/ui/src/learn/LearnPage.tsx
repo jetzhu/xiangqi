@@ -1,19 +1,14 @@
 import { PieceGlyph, THEMES } from "@xq/board";
-import { type Lesson, type Unit, learningRank } from "@xq/lessons";
+import { LESSON_ORDER, LESSONS as LESSON_LIST, UNITS } from "@xq/content";
+import { learningRank } from "@xq/lessons";
 import { type CSSProperties, useEffect, useState } from "react";
 import type { PieceType } from "xiangqi-core";
-import unitsJson from "../../../../content/lessons/units.json";
-import { type Lang, LessonPlayer } from "./LessonPlayer.js";
+import { useT } from "../settings.js";
+import { LessonPlayer } from "./LessonPlayer.js";
 import { type Progress, loadProgress, setStatus } from "./progress.js";
 
-const lessonModules = import.meta.glob<Lesson>("../../../../content/lessons/*.json", { eager: true, import: "default" });
-const LESSONS = new Map(
-  Object.entries(lessonModules)
-    .filter(([path]) => !path.endsWith("/units.json"))
-    .map(([, l]) => [l.id, l] as const),
-);
-const UNITS = unitsJson as Unit[];
-const ORDER = UNITS.flatMap((u) => u.lessons);
+const LESSONS = new Map(LESSON_LIST.map((l) => [l.id, l] as const));
+const ORDER = LESSON_ORDER;
 
 function UnitIcon({ icon }: { icon: string }) {
   if (icon === "board")
@@ -31,7 +26,7 @@ function UnitIcon({ icon }: { icon: string }) {
 }
 
 export function LearnPage() {
-  const [lang, setLang] = useState<Lang>("zh");
+  const { lang } = useT();
   const [progress, setProgress] = useState<Progress>({});
   const [open, setOpen] = useState<string | null>(null);
   const tt = (en: string, zh: string) => (lang === "zh" ? zh : en);
@@ -114,13 +109,6 @@ export function LearnPage() {
             {tt("Next lesson", "下一课")}: {LESSONS.get(nextLesson)?.title[lang]}
           </button>
         )}
-        <label className="lang">
-          Language{" "}
-          <select value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
-            <option value="zh">中文</option>
-            <option value="en">English</option>
-          </select>
-        </label>
       </aside>
     </div>
   );

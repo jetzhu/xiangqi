@@ -1,6 +1,7 @@
 import { type GameTree, Position, type TreeNode, parseIccs, toChinese, toWxf } from "xiangqi-core";
 
-export type NotationStyle = "chinese" | "wxf" | "iccs";
+export type { NotationStyle } from "../settings.js";
+import type { NotationStyle } from "../settings.js";
 
 export const nodeLabel = (n: TreeNode, style: NotationStyle) =>
   style === "chinese" ? n.move!.chinese : style === "wxf" ? n.move!.wxf : n.move!.iccs;

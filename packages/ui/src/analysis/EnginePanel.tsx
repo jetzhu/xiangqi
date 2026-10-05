@@ -1,4 +1,5 @@
 import { type Progress, formatScore } from "@xq/engine";
+import { useT } from "../settings.js";
 import type { EngineStatus } from "./useEngine.js";
 import { type NotationStyle, lineLabels } from "./notation.js";
 
@@ -18,29 +19,30 @@ interface Props {
 }
 
 export function EnginePanel({ enabled, onToggle, status, error, progress, fen, multipv, onMultipv, style, onPlayLine, gameOver }: Props) {
+  const { tt } = useT();
   const head =
     status === "loading"
-      ? "Loading engine…"
+      ? tt("Loading engine…", "正在加载引擎…")
       : status === "error"
-        ? `Engine unavailable: ${error}`
+        ? `${tt("Engine unavailable", "引擎不可用")}: ${error}`
         : !enabled
-          ? "Engine off"
+          ? tt("Engine off", "引擎已关闭")
           : gameOver
-            ? "Game over in this position"
+            ? tt("Game over in this position", "此局面已终局")
             : progress
-              ? `Fairy-Stockfish · depth ${progress.depth} · ${Math.round(progress.nps / 1000)}k nodes/s`
-              : "Thinking…";
+              ? `Fairy-Stockfish · ${tt("depth", "深度")} ${progress.depth} · ${Math.round(progress.nps / 1000)}k ${tt("nodes/s", "节点/秒")}`
+              : tt("Thinking…", "思考中…");
   return (
-    <section className="engine" aria-label="Engine analysis">
+    <section className="engine" aria-label={tt("Engine analysis", "引擎分析")}>
       <div className="engine-head">
         <label className="switch">
-          <input type="checkbox" checked={enabled} onChange={(e) => onToggle(e.target.checked)} /> Engine
+          <input type="checkbox" checked={enabled} onChange={(e) => onToggle(e.target.checked)} /> {tt("Engine", "引擎")}
         </label>
         <span className="engine-status">{head}</span>
-        <select value={multipv} onChange={(e) => onMultipv(Number(e.target.value))} aria-label="Number of lines">
+        <select value={multipv} onChange={(e) => onMultipv(Number(e.target.value))} aria-label={tt("Number of lines", "显示几条变化")}>
           {[1, 2, 3].map((n) => (
             <option key={n} value={n}>
-              {n} {n === 1 ? "line" : "lines"}
+              {n} {tt(n === 1 ? "line" : "lines", "条")}
             </option>
           ))}
         </select>

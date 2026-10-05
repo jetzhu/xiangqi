@@ -1,15 +1,13 @@
-import { type Arrow, type Highlight, XiangqiBoard, playSound } from "@xq/board";
+import { type Arrow, type Highlight } from "@xq/board";
 import { type Puzzle, goalOf, judge, pickPuzzle, updateRating } from "@xq/puzzles";
 import { useEffect, useMemo, useState } from "react";
 import { Game, Position, explainIllegal, parseSquare, squareName, toIccs } from "xiangqi-core";
-import puzzlesRaw from "../../../../content/puzzles/generated.jsonl?raw";
+import { PUZZLES } from "@xq/content";
 import { type PuzzleState, loadPuzzleState, savePuzzleState } from "./store.js";
+import { Board } from "../Board.js";
+import { useNav } from "../nav.js";
+import { useSound, useT } from "../settings.js";
 
-type Lang = "en" | "zh";
-const PUZZLES: Puzzle[] = puzzlesRaw
-  .split("\n")
-  .filter((l) => l.trim())
-  .map((l) => JSON.parse(l) as Puzzle);
 /** The first puzzles a new solver sees: the easiest mates in one. */
 const ONBOARDING = PUZZLES.filter((p) => p.themes.includes("mateIn1"))
   .sort((a, b) => a.rating - b.rating)
@@ -37,7 +35,9 @@ const THEME_NAMES: Record<string, [string, string]> = {
 type Phase = "solving" | "solved" | "failed" | "review";
 
 export function PuzzlesPage() {
-  const [lang, setLang] = useState<Lang>("zh");
+  const { lang } = useT();
+  const playSound = useSound();
+  const nav = useNav();
   const tt = (en: string, zh: string) => (lang === "zh" ? zh : en);
   const [state, setState] = useState<PuzzleState | null>(null);
   const [puzzle, setPuzzle] = useState<Puzzle | null>(null);
@@ -166,12 +166,12 @@ export function PuzzlesPage() {
   const highlights: Highlight[] = hint >= 1 && solverMove && phase === "solving" ? [{ square: solverMove.slice(0, 2), kind: "hint" }] : [];
   const myTurn = phase === "solving" && position !== null && (position.turn === 1) === solverRed;
   const solved = state.history.filter((h) => h.score > 0).length;
-  const analyseLink = `#/analysis?fen=${encodeURIComponent(puzzle.fen)}&moves=${puzzle.solution.join(",")}`;
+  const analyseLink = nav.href(`/analysis?fen=${encodeURIComponent(puzzle.fen)}&moves=${puzzle.solution.join(",")}`);
 
   return (
     <div className="botgame">
       <div className="board-col">
-        <XiangqiBoard
+        <Board
           fen={fen}
           orientation={solver}
           movable={myTurn ? solver : "none"}
@@ -249,13 +249,6 @@ export function PuzzlesPage() {
             ))}
           </div>
         )}
-        <label className="lang">
-          Language{" "}
-          <select value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
-            <option value="zh">中文</option>
-            <option value="en">English</option>
-          </select>
-        </label>
         <p className="muted small">{tt(`${PUZZLES.length} puzzles, generated from engine self-play and checked by Pikafish.`, `共${PUZZLES.length}道题，由引擎自弈生成并经Pikafish验证。`)}</p>
       </aside>
     </div>

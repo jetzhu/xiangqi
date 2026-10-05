@@ -1,4 +1,4 @@
-import { type Arrow, type Highlight, XiangqiBoard, playSound } from "@xq/board";
+import { type Arrow, type Highlight } from "@xq/board";
 import {
   type Lesson,
   type StarsState,
@@ -13,8 +13,11 @@ import {
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Game, Position, explainIllegal, parseSquare, squareName, toIccs } from "xiangqi-core";
 import { useEngineInstance } from "../bots/useEngineInstance.js";
+import { Board } from "../Board.js";
+import { useSound } from "../settings.js";
 
-export type Lang = "en" | "zh";
+export type { Lang } from "../settings.js";
+import type { Lang } from "../settings.js";
 
 interface Props {
   lesson: Lesson;
@@ -32,6 +35,7 @@ const checkSquareOf = (fen: string) => {
 };
 
 export function LessonPlayer({ lesson, lang, onDone, onExit, hasNext, onNext }: Props) {
+  const playSound = useSound();
   const [index, setIndex] = useState(0);
   const [finished, setFinished] = useState(false);
   const step = lesson.steps[index]!;
@@ -102,6 +106,7 @@ interface StepProps {
 
 /** One step. Remounted per step (key), so all state starts fresh. */
 function StepView({ step, lang, onComplete, engine }: StepProps) {
+  const playSound = useSound();
   const t = (x: Text) => x[lang];
   const tt = (en: string, zh: string) => (lang === "zh" ? zh : en);
   const [done, setDone] = useState(step.type === "explain" || step.type === "show-moves");
@@ -161,7 +166,7 @@ function StepView({ step, lang, onComplete, engine }: StepProps) {
     case "explain":
       if (step.fen)
         board = (
-          <XiangqiBoard
+          <Board
             fen={step.fen}
             movable="none"
             arrows={step.arrows ?? []}
@@ -173,14 +178,14 @@ function StepView({ step, lang, onComplete, engine }: StepProps) {
 
     case "show-moves": {
       const arrows: Arrow[] = movesOf(step.fen, step.square).map((m) => ({ from: m.slice(0, 2), to: m.slice(2, 4), color: "green" }));
-      board = <XiangqiBoard fen={step.fen} movable="none" arrows={arrows} highlights={[{ square: step.square, kind: "hint" }]} />;
+      board = <Board fen={step.fen} movable="none" arrows={arrows} highlights={[{ square: step.square, kind: "hint" }]} />;
       break;
     }
 
     case "capture-stars": {
       const s = stars!;
       board = (
-        <XiangqiBoard
+        <Board
           fen={s.fen}
           movable={learner}
           legalMoves={done ? [] : movesOf(s.fen, s.square)}
@@ -229,7 +234,7 @@ function StepView({ step, lang, onComplete, engine }: StepProps) {
     case "find-move": {
       const hintMove = showHint ? acceptedMoves(step)[0] : undefined;
       board = (
-        <XiangqiBoard
+        <Board
           fen={fen}
           movable={done ? "none" : learner}
           legalMoves={done ? [] : new Game(fen).legalMoves().map(toIccs)}
@@ -278,7 +283,7 @@ function StepView({ step, lang, onComplete, engine }: StepProps) {
       const g = gameRef.current!;
       const myTurn = g.turn === learner && !done && !g.result;
       board = (
-        <XiangqiBoard
+        <Board
           fen={fen}
           movable={myTurn ? learner : "none"}
           legalMoves={myTurn ? g.legalMoves().map(toIccs) : []}
@@ -344,7 +349,7 @@ function StepView({ step, lang, onComplete, engine }: StepProps) {
     }
 
     case "quiz":
-      if (step.fen) board = <XiangqiBoard fen={step.fen} movable="none" />;
+      if (step.fen) board = <Board fen={step.fen} movable="none" />;
       controls = (
         <div className="quiz">
           {step.options.map((o, i) => {

@@ -1,4 +1,4 @@
-import { type Arrow, type Badge, type BadgeIcon, EvalBar, type Highlight, XiangqiBoard, playSound } from "@xq/board";
+import { type Arrow, type Badge, type BadgeIcon, EvalBar, type Highlight } from "@xq/board";
 import { type BotConfig, type ChatEvent, type Text, chatLine, chooseMove } from "@xq/bots";
 import { type MoveGrade, type Score, formatScore, gradeCounts, gradeMove, reviewGame, scoreToBar } from "@xq/engine";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -18,6 +18,9 @@ import { Avatar } from "./Avatar.js";
 import type { GameSettings, Lang } from "./BotPicker.js";
 import { addCrown } from "./crowns.js";
 import { useEngineInstance } from "./useEngineInstance.js";
+import { Board } from "../Board.js";
+import { useNav } from "../nav.js";
+import { useSettings, useSound } from "../settings.js";
 
 const other = (c: Color): Color => (c === "red" ? "black" : "red");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -56,6 +59,9 @@ interface Props {
 }
 
 export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }: Props) {
+  const playSound = useSound();
+  const nav = useNav();
+  const notation = useSettings().settings.notation;
   const t = (x: Text) => x[lang];
   const tt = (en: string, zh: string) => (lang === "zh" ? zh : en);
   const a = settings.assists;
@@ -334,7 +340,7 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
   const rows: [MoveRecord | undefined, MoveRecord | undefined][] = [];
   const list = history[0]?.color === "black" ? [undefined, ...history] : history;
   for (let i = 0; i < list.length; i += 2) rows.push([list[i], list[i + 1]]);
-  const analyseLink = `#/analysis${moves.length ? `?moves=${moves.join(",")}` : ""}`;
+  const analyseLink = nav.href(`/analysis${moves.length ? `?moves=${moves.join(",")}` : ""}`);
   const status =
     botEng.status === "error"
       ? tt(`Engine unavailable: ${botEng.error}`, `引擎不可用：${botEng.error}`)
@@ -368,7 +374,7 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
               />
             </div>
           )}
-          <XiangqiBoard
+          <Board
             fen={fen}
             orientation={playerColor}
             movable={myTurn ? playerColor : "none"}
@@ -464,8 +470,8 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
             {rows.map(([r, b], i) => (
               <li key={i}>
                 <span className="num">{i + 1}.</span>
-                <span className="mv">{r ? r.chinese : "…"}</span>
-                <span className="mv">{b ? b.chinese : ""}</span>
+                <span className="mv">{r ? (notation === "wxf" ? r.wxf : notation === "iccs" ? r.iccs : r.chinese) : "…"}</span>
+                <span className="mv">{b ? (notation === "wxf" ? b.wxf : notation === "iccs" ? b.iccs : b.chinese) : ""}</span>
               </li>
             ))}
           </ol>

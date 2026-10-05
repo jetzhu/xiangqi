@@ -1,7 +1,8 @@
 import type { BotConfig, BotGroup } from "@xq/bots";
 import { Avatar } from "./Avatar.js";
 
-export type Lang = "en" | "zh";
+export type { Lang } from "../settings.js";
+import type { Lang } from "../settings.js";
 export type TimeControl = "none" | "10" | "15+10" | "30";
 
 export interface Assists {
@@ -49,11 +50,10 @@ interface Props {
   onSettings: (s: GameSettings) => void;
   crowns: string[];
   lang: Lang;
-  onLang: (l: Lang) => void;
   onPlay: () => void;
 }
 
-export function BotPicker({ bots, selected, onSelect, settings, onSettings, crowns, lang, onLang, onPlay }: Props) {
+export function BotPicker({ bots, selected, onSelect, settings, onSettings, crowns, lang, onPlay }: Props) {
   const preset = (Object.keys(PRESETS) as (keyof typeof PRESETS)[]).find((k) =>
     (Object.keys(PRESETS[k]) as (keyof Assists)[]).every((a) => PRESETS[k][a] === settings.assists[a]),
   );
@@ -124,13 +124,6 @@ export function BotPicker({ bots, selected, onSelect, settings, onSettings, crow
               <option value="fair">{zh ? "公平（仅提示）" : "Fair (hints only)"}</option>
               <option value="challenge">{zh ? "挑战（无辅助）" : "Challenge (no help)"}</option>
               {!preset && <option value="custom">{zh ? "自定义" : "Custom"}</option>}
-            </select>
-          </label>
-          <label>
-            Language
-            <select value={lang} onChange={(e) => onLang(e.target.value as Lang)}>
-              <option value="zh">中文</option>
-              <option value="en">English</option>
             </select>
           </label>
         </div>

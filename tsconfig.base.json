@@ -28,6 +28,12 @@
       ],
       "@xq/puzzles": [
         "./packages/puzzles/src/index.ts"
+      ],
+      "@xq/content": [
+        "./packages/content/src/index.ts"
+      ],
+      "@xq/ui": [
+        "./packages/ui/src/index.ts"
       ]
     }
   }

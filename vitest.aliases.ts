@@ -11,4 +11,6 @@ export const workspaceAliases = {
   "@xq/bots": src("bots"),
   "@xq/lessons": src("lessons"),
   "@xq/puzzles": src("puzzles"),
+  "@xq/content": src("content"),
+  "@xq/ui": src("ui"),
 };

@@ -1,9 +1,8 @@
-import { type PieceSet, type ThemeName, XiangqiBoard, playSound } from "@xq/board";
+import { type PieceSet, type ThemeName } from "@xq/board";
 import { useMemo, useState } from "react";
 import { Game, type MoveRecord, explainIllegal, parseSquare, squareName, toIccs } from "xiangqi-core";
-
-type Notation = "wxf" | "chinese" | "iccs";
-type Lang = "en" | "zh";
+import { Board } from "../Board.js";
+import { type NotationStyle as Notation, useSettings, useSound } from "../settings.js";
 
 const T = {
   en: {
@@ -56,13 +55,18 @@ export function PlayPage() {
   const [game, setGame] = useState(() => new Game());
   const [version, setVersion] = useState(0); // bump to re-render after mutating `game`
   const [orientation, setOrientation] = useState<"red" | "black">("red");
-  const [pieceSet, setPieceSet] = useState<PieceSet>("traditional");
-  const [theme, setTheme] = useState<ThemeName>("wood");
-  const [coords, setCoords] = useState<"wxf" | "iccs" | "off">("wxf");
-  const [method, setMethod] = useState<"both" | "drag" | "click">("both");
-  const [notation, setNotation] = useState<Notation>("chinese");
-  const [lang, setLang] = useState<Lang>("zh");
-  const [sound, setSound] = useState(true);
+  // The options on this page are the site settings, so changes here apply everywhere.
+  const { settings, update } = useSettings();
+  const { pieceSet, theme, notation, lang, sound } = settings;
+  const coords = settings.coordinates;
+  const method = settings.moveMethod;
+  const setPieceSet = (pieceSet: PieceSet) => update({ pieceSet });
+  const setTheme = (theme: ThemeName) => update({ theme });
+  const setCoords = (coordinates: "wxf" | "iccs" | "off") => update({ coordinates });
+  const setMethod = (moveMethod: "both" | "drag" | "click") => update({ moveMethod });
+  const setNotation = (notation: Notation) => update({ notation });
+  const setSound = (sound: boolean) => update({ sound });
+  const playSound = useSound();
   const [message, setMessage] = useState<string | null>(null);
   const [fenInput, setFenInput] = useState("");
   const t = T[lang];
@@ -86,13 +90,13 @@ export function PlayPage() {
     if (!r) return;
     setMessage(null);
     refresh();
-    if (sound) playSound(game.result ? "end" : r.check ? "check" : r.captured ? "capture" : "move");
+    playSound(game.result ? "end" : r.check ? "check" : r.captured ? "capture" : "move");
   };
 
   const onIllegal = (from: string, to: string) => {
     const why = explainIllegal(game.position(), parseSquare(from), parseSquare(to));
     setMessage(why ? why[lang] : null);
-    if (sound && why) playSound("illegal");
+    if (why) playSound("illegal");
   };
 
   const notate = (r: MoveRecord) => (notation === "wxf" ? r.wxf : notation === "chinese" ? r.chinese : r.iccs);
@@ -109,7 +113,7 @@ export function PlayPage() {
   return (
     <main className="layout">
       <section className="board-col">
-        <XiangqiBoard
+        <Board
           fen={game.fen}
           orientation={orientation}
           legalMoves={legalMoves}
@@ -198,13 +202,6 @@ export function PlayPage() {
               <option value="both">Drag + click</option>
               <option value="drag">Drag</option>
               <option value="click">Click</option>
-            </select>
-          </label>
-          <label>
-            Language
-            <select value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
-              <option value="zh">中文</option>
-              <option value="en">English</option>
             </select>
           </label>
           <label className="check">

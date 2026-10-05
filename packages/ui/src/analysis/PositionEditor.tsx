@@ -1,6 +1,8 @@
-import { PieceGlyph, THEMES, XiangqiBoard } from "@xq/board";
+import { PieceGlyph, THEMES } from "@xq/board";
 import { useState } from "react";
 import { type Color, type PieceType, Position, START_FEN } from "xiangqi-core";
+import { Board } from "../Board.js";
+import { useT } from "../settings.js";
 
 const TYPES: PieceType[] = ["k", "a", "b", "n", "r", "c", "p"];
 // Generals on different files so a cleared board is already legal.
@@ -28,6 +30,7 @@ interface Props {
 }
 
 export function PositionEditor({ initialFen, onDone, onCancel }: Props) {
+  const { tt } = useT();
   const [rows, setRows] = useState(() => parse(initialFen));
   const [turn, setTurn] = useState<"w" | "b">(initialFen.split(" ")[1] === "b" ? "b" : "w");
   const [brush, setBrush] = useState<{ color: Color; type: PieceType } | "erase">({ color: "red", type: "r" });
@@ -71,9 +74,9 @@ export function PositionEditor({ initialFen, onDone, onCancel }: Props) {
 
   return (
     <div className="editor">
-      <XiangqiBoard fen={fen} onSquareClick={paint} movable="none" drawable={false} showLegalMoves={false} ariaLabel="Position editor" />
+      <Board fen={fen} onSquareClick={paint} movable="none" drawable={false} showLegalMoves={false} ariaLabel={tt("Position editor", "摆棋")} />
       <div className="editor-side">
-        <p className="muted">Pick a piece, then click points to place it. Right-click (or the eraser) removes.</p>
+        <p className="muted">{tt("Pick a piece, then click points to place it. Right-click (or the eraser) removes.", "选一个棋子，再点击棋盘放置；右键（或橡皮）可移除。")}</p>
         <div className="palette">
           {TYPES.map((t) => swatch("red", t))}
           {TYPES.map((t) => swatch("black", t))}
@@ -83,15 +86,15 @@ export function PositionEditor({ initialFen, onDone, onCancel }: Props) {
         </div>
         <div className="buttons">
           <label>
-            <input type="radio" checked={turn === "w"} onChange={() => setTurn("w")} /> Red to move
+            <input type="radio" checked={turn === "w"} onChange={() => setTurn("w")} /> {tt("Red to move", "红方走")}
           </label>
           <label>
-            <input type="radio" checked={turn === "b"} onChange={() => setTurn("b")} /> Black to move
+            <input type="radio" checked={turn === "b"} onChange={() => setTurn("b")} /> {tt("Black to move", "黑方走")}
           </label>
         </div>
         <div className="buttons">
-          <button type="button" onClick={() => setRows(parse(START_FEN))}>Start position</button>
-          <button type="button" onClick={() => setRows(parse(EMPTY_FEN))}>Clear</button>
+          <button type="button" onClick={() => setRows(parse(START_FEN))}>{tt("Start position", "初始局面")}</button>
+          <button type="button" onClick={() => setRows(parse(EMPTY_FEN))}>{tt("Clear", "清空")}</button>
         </div>
         {errors.length > 0 ? (
           <ul className="errors">
@@ -100,15 +103,15 @@ export function PositionEditor({ initialFen, onDone, onCancel }: Props) {
             ))}
           </ul>
         ) : (
-          <p className="ok">Position is legal.</p>
+          <p className="ok">{tt("Position is legal.", "局面合法。")}</p>
         )}
         <code className="fen">{fen}</code>
         <div className="buttons">
           <button type="button" className="primary" disabled={errors.length > 0} onClick={() => onDone(fen)}>
-            Analyse this position
+            {tt("Analyse this position", "分析此局面")}
           </button>
           <button type="button" onClick={onCancel}>
-            Cancel
+            {tt("Cancel", "取消")}
           </button>
         </div>
       </div>

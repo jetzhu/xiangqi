@@ -1,20 +1,23 @@
+import {
+  AnalysisPage,
+  BotsPage,
+  HomePage,
+  LearnPage,
+  NavProvider,
+  PlayPage,
+  PuzzlesPage,
+  SettingsPage,
+  SettingsProvider,
+  SiteNav,
+  hashNav,
+} from "@xq/ui";
 import { useEffect, useState } from "react";
-import { AnalysisPage } from "./analysis/AnalysisPage.js";
-import { BotsPage } from "./bots/BotsPage.js";
-import { LearnPage } from "./learn/LearnPage.js";
-import { PuzzlesPage } from "./puzzles/PuzzlesPage.js";
-import { PlayPage } from "./play/PlayPage.js";
 
-type Route = "play" | "analysis" | "bots" | "learn" | "puzzles";
-const routeFromHash = (): Route => {
-  const h = location.hash;
-  if (h.startsWith("#/play")) return "play";
-  if (h.startsWith("#/bots")) return "bots";
-  if (h.startsWith("#/learn")) return "learn";
-  if (h.startsWith("#/puzzles")) return "puzzles";
-  return "analysis";
-};
+type Route = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings";
+const ROUTES: Route[] = ["learn", "puzzles", "bots", "analysis", "play", "settings"];
+const routeFromHash = (): Route => ROUTES.find((r) => location.hash.startsWith(`#/${r}`)) ?? "home";
 
+/** Dev playground: the site's pages under hash routes (#/learn, #/analysis?moves=…). */
 export function App() {
   const [route, setRoute] = useState<Route>(routeFromHash);
   useEffect(() => {
@@ -22,27 +25,21 @@ export function App() {
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
+  const page = {
+    home: <HomePage />,
+    learn: <LearnPage />,
+    puzzles: <PuzzlesPage />,
+    bots: <BotsPage />,
+    analysis: <AnalysisPage />,
+    play: <PlayPage />,
+    settings: <SettingsPage />,
+  }[route];
   return (
-    <>
-      <nav className="topnav">
-        <strong>象棋 Xiangqi playground</strong>
-        <a href="#/learn" aria-current={route === "learn" ? "page" : undefined}>
-          Learn
-        </a>
-        <a href="#/puzzles" aria-current={route === "puzzles" ? "page" : undefined}>
-          Puzzles
-        </a>
-        <a href="#/bots" aria-current={route === "bots" ? "page" : undefined}>
-          Play bots
-        </a>
-        <a href="#/analysis" aria-current={route === "analysis" ? "page" : undefined}>
-          Analysis
-        </a>
-        <a href="#/play" aria-current={route === "play" ? "page" : undefined}>
-          Two players
-        </a>
-      </nav>
-      {route === "analysis" ? <AnalysisPage /> : route === "bots" ? <BotsPage /> : route === "learn" ? <LearnPage /> : route === "puzzles" ? <PuzzlesPage /> : <PlayPage />}
-    </>
+    <SettingsProvider>
+      <NavProvider nav={hashNav}>
+        <SiteNav current={route} />
+        <main key={route}>{page}</main>
+      </NavProvider>
+    </SettingsProvider>
   );
 }

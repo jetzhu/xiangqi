@@ -1,17 +1,19 @@
-import { type Arrow, type ArrowColor, EvalBar, type PieceSet, XiangqiBoard, playSound } from "@xq/board";
+import { type Arrow, type ArrowColor, EvalBar } from "@xq/board";
 import { formatScore, scoreToBar } from "@xq/engine";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GameTree, Position, START_FEN, type TreeNode, explainIllegal, parseSquare, squareName, toIccs } from "xiangqi-core";
 import { EnginePanel } from "./EnginePanel.js";
 import { MoveTreeView } from "./MoveTreeView.js";
 import { PositionEditor } from "./PositionEditor.js";
-import type { NotationStyle } from "./notation.js";
 import { type SavedAnalysis, deleteSaved, listSaved, saveAnalysis } from "./storage.js";
 import { useEngine } from "./useEngine.js";
+import { Board } from "../Board.js";
+import { type Nav, useNav } from "../nav.js";
+import { type NotationStyle, useSettings, useSound, useT } from "../settings.js";
 
-/** Read "#/analysis?fen=…&moves=h2e2,h9g7" into a tree and the node at the end of the moves. */
-function fromHash(): { tree: GameTree; node: TreeNode } {
-  const q = new URLSearchParams(location.hash.split("?")[1] ?? "");
+/** Read "?fen=…&moves=h2e2,h9g7" into a tree and the node at the end of the moves. */
+function fromUrl(nav: Nav): { tree: GameTree; node: TreeNode } {
+  const q = nav.params();
   let tree: GameTree;
   try {
     tree = new GameTree(q.get("fen") || START_FEN);
@@ -27,23 +29,28 @@ function fromHash(): { tree: GameTree; node: TreeNode } {
   return { tree, node };
 }
 
-function shareLink(tree: GameTree, node: TreeNode): string {
+/** App path for a position: "/analysis?fen=…&moves=…". */
+function sharePath(tree: GameTree, node: TreeNode): string {
   const q = new URLSearchParams();
   if (tree.startFen !== new GameTree().startFen) q.set("fen", tree.startFen);
   const moves = tree.path(node).map((n) => n.move!.iccs);
   if (moves.length) q.set("moves", moves.join(","));
-  return `${location.origin}${location.pathname}#/analysis${q.size ? `?${q}` : ""}`;
+  return `/analysis${q.size ? `?${q}` : ""}`;
 }
 
 const LINE_COLORS: ArrowColor[] = ["green", "blue", "orange"];
 
 export function AnalysisPage() {
-  const [{ tree, node: initial }] = useState(fromHash);
+  const nav = useNav();
+  const playSound = useSound();
+  const { settings, update } = useSettings();
+  const { tt } = useT();
+  const style = settings.notation;
+  const setStyle = (notation: NotationStyle) => update({ notation });
+  const [{ tree, node: initial }] = useState(() => fromUrl(nav));
   const [treeState, setTreeState] = useState({ tree, current: initial, version: 0 });
   const { current } = treeState;
   const [orientation, setOrientation] = useState<"red" | "black">("red");
-  const [style, setStyle] = useState<NotationStyle>("chinese");
-  const [pieceSet, setPieceSet] = useState<PieceSet>("traditional");
   const [engineOn, setEngineOn] = useState(true);
   const [multipv, setMultipv] = useState(3);
   const [editing, setEditing] = useState(false);
@@ -73,8 +80,8 @@ export function AnalysisPage() {
 
   // Keep the share link in the address bar.
   useEffect(() => {
-    history.replaceState(null, "", shareLink(t, current));
-  }, [t, current, treeState.version]);
+    nav.replace(sharePath(t, current));
+  }, [t, current, treeState.version]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keyboard: ← → step, Home/End jump (not while typing or using the board's own cursor).
   useEffect(() => {
@@ -106,7 +113,7 @@ export function AnalysisPage() {
 
   const onIllegal = (from: string, to: string) => {
     const why = explainIllegal(position, parseSquare(from), parseSquare(to));
-    setMessage(why ? `${why.en} ${why.zh}` : null);
+    setMessage(why ? why[settings.lang] : null);
   };
 
   const playLine = (pv: string[], count: number) => {
@@ -129,19 +136,19 @@ export function AnalysisPage() {
         const { tree: nt } = GameTree.fromPgn(text);
         replaceTree(nt, nt.mainline().at(-1) ?? nt.root);
       }
-      setMessage("Loaded.");
+      setMessage(tt("Loaded.", "已载入。"));
     } catch (e) {
-      setMessage(`Could not load: ${(e as Error).message}`);
+      setMessage(`${tt("Could not load", "无法载入")}: ${(e as Error).message}`);
     }
   };
 
   const copy = async (text: string, what: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      setMessage(`${what} copied.`);
+      setMessage(`${what} ${tt("copied.", "已复制。")}`);
     } catch {
       setIo(text);
-      setMessage(`${what} is in the box below (clipboard unavailable).`);
+      setMessage(`${what}: ${tt("see the box below (clipboard unavailable).", "见下方文本框（剪贴板不可用）。")}`);
     }
   };
 
@@ -158,7 +165,7 @@ export function AnalysisPage() {
     );
   }
 
-  const gameResult = gameOver ? (inCheck ? "Checkmate" : "No legal move (stalemate loses)") : null;
+  const gameResult = gameOver ? (inCheck ? tt("Checkmate", "将死") : tt("No legal move (that loses)", "无子可动（判负）")) : null;
 
   return (
     <div className="analysis">
@@ -171,7 +178,7 @@ export function AnalysisPage() {
             pending={!best || !engineOn}
           />
         </div>
-        <XiangqiBoard
+        <Board
           fen={current.fen}
           orientation={orientation}
           legalMoves={legalMoves}
@@ -180,7 +187,6 @@ export function AnalysisPage() {
           lastMove={current.move?.iccs ?? null}
           check={checkSquare}
           arrows={arrows}
-          pieceSet={pieceSet}
           announce={current.move ? current.move.wxf : ""}
         />
       </div>
@@ -207,7 +213,7 @@ export function AnalysisPage() {
           <button type="button" onClick={() => current.parent && go(current.parent)} aria-label="Back">◀</button>
           <button type="button" onClick={() => current.children[0] && go(current.children[0])} aria-label="Forward">▶</button>
           <button type="button" onClick={() => go(t.mainline(current).at(-1) ?? current)} aria-label="End">⏭</button>
-          <button type="button" onClick={() => setOrientation((o) => (o === "red" ? "black" : "red"))}>Flip</button>
+          <button type="button" onClick={() => setOrientation((o) => (o === "red" ? "black" : "red"))}>{tt("Flip", "翻转")}</button>
         </div>
 
         <MoveTreeView tree={t} current={current} style={style} onSelect={go} />
@@ -221,7 +227,7 @@ export function AnalysisPage() {
               bump(current);
             }}
           >
-            Promote line
+            {tt("Promote line", "设为主线")}
           </button>
           <button
             type="button"
@@ -231,13 +237,13 @@ export function AnalysisPage() {
               if (p) bump(p);
             }}
           >
-            Delete from here
+            {tt("Delete from here", "从此处删除")}
           </button>
-          <button type="button" onClick={() => setEditing(true)}>Set up position</button>
-          <button type="button" onClick={() => replaceTree(new GameTree())}>New</button>
+          <button type="button" onClick={() => setEditing(true)}>{tt("Set up position", "摆棋")}</button>
+          <button type="button" onClick={() => replaceTree(new GameTree())}>{tt("New", "新局")}</button>
         </div>
         <label className="comment-box">
-          Comment on this move
+          {tt("Comment on this move", "本步注释")}
           <textarea
             value={current.comment}
             disabled={!current.move}
@@ -251,32 +257,25 @@ export function AnalysisPage() {
 
         <div className="options">
           <label>
-            Notation
+            {tt("Notation", "记谱")}
             <select value={style} onChange={(e) => setStyle(e.target.value as NotationStyle)}>
               <option value="chinese">中文</option>
               <option value="wxf">WXF</option>
               <option value="iccs">ICCS</option>
             </select>
           </label>
-          <label>
-            Pieces
-            <select value={pieceSet} onChange={(e) => setPieceSet(e.target.value as PieceSet)}>
-              <option value="traditional">汉字 / Characters</option>
-              <option value="icons">Icons</option>
-            </select>
-          </label>
         </div>
 
-        <h2>Import / export</h2>
-        <textarea className="io" rows={4} value={io} onChange={(e) => setIo(e.target.value)} placeholder="Paste a FEN or PGN, then Load" aria-label="FEN or PGN" />
+        <h2>{tt("Import / export", "导入 / 导出")}</h2>
+        <textarea className="io" rows={4} value={io} onChange={(e) => setIo(e.target.value)} placeholder={tt("Paste a FEN or PGN, then Load", "粘贴 FEN 或 PGN，然后载入")} aria-label="FEN / PGN" />
         <div className="buttons">
-          <button type="button" onClick={load}>Load</button>
-          <button type="button" onClick={() => copy(current.fen, "FEN")}>Copy FEN</button>
-          <button type="button" onClick={() => copy(t.toPgn(), "PGN")}>Copy PGN</button>
-          <button type="button" onClick={() => copy(shareLink(t, current), "Link")}>Copy link</button>
+          <button type="button" onClick={load}>{tt("Load", "载入")}</button>
+          <button type="button" onClick={() => copy(current.fen, "FEN")}>{tt("Copy FEN", "复制 FEN")}</button>
+          <button type="button" onClick={() => copy(t.toPgn(), "PGN")}>{tt("Copy PGN", "复制 PGN")}</button>
+          <button type="button" onClick={() => copy(new URL(nav.href(sharePath(t, current)), location.href).href, tt("Link", "链接"))}>{tt("Copy link", "复制链接")}</button>
         </div>
 
-        <h2>Saved analyses</h2>
+        <h2>{tt("Saved analyses", "已保存的分析")}</h2>
         <form
           className="fen-form"
           onSubmit={async (e) => {
@@ -285,17 +284,17 @@ export function AnalysisPage() {
               const item = await saveAnalysis(title, t.toPgn({ Event: title || "Analysis" }));
               setSaved((s) => [item, ...s]);
               setTitle("");
-              setMessage("Saved in this browser.");
+              setMessage(tt("Saved in this browser.", "已保存在本浏览器中。"));
             } catch (err) {
-              setMessage(`Could not save: ${(err as Error).message}`);
+              setMessage(`${tt("Could not save", "无法保存")}: ${(err as Error).message}`);
             }
           }}
         >
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" aria-label="Title" />
-          <button type="submit">Save</button>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={tt("Title", "标题")} aria-label={tt("Title", "标题")} />
+          <button type="submit">{tt("Save", "保存")}</button>
         </form>
         {saved.length === 0 ? (
-          <p className="muted">Nothing saved yet.</p>
+          <p className="muted">{tt("Nothing saved yet.", "还没有保存的分析。")}</p>
         ) : (
           <ul className="saved">
             {saved.map((s) => (
