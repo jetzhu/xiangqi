@@ -25,6 +25,9 @@
       ],
       "@xq/lessons": [
         "./packages/lessons/src/index.ts"
+      ],
+      "@xq/puzzles": [
+        "./packages/puzzles/src/index.ts"
       ]
     }
   }

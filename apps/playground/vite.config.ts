@@ -50,6 +50,7 @@ export default defineConfig({
       "@xq/engine": src("engine/src/index.ts"),
       "@xq/bots": src("bots/src/index.ts"),
       "@xq/lessons": src("lessons/src/index.ts"),
+      "@xq/puzzles": src("puzzles/src/index.ts"),
       "xiangqi-core": src("xiangqi-core/src/index.ts"),
     },
   },

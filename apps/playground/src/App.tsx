@@ -2,14 +2,16 @@ import { useEffect, useState } from "react";
 import { AnalysisPage } from "./analysis/AnalysisPage.js";
 import { BotsPage } from "./bots/BotsPage.js";
 import { LearnPage } from "./learn/LearnPage.js";
+import { PuzzlesPage } from "./puzzles/PuzzlesPage.js";
 import { PlayPage } from "./play/PlayPage.js";
 
-type Route = "play" | "analysis" | "bots" | "learn";
+type Route = "play" | "analysis" | "bots" | "learn" | "puzzles";
 const routeFromHash = (): Route => {
   const h = location.hash;
   if (h.startsWith("#/play")) return "play";
   if (h.startsWith("#/bots")) return "bots";
   if (h.startsWith("#/learn")) return "learn";
+  if (h.startsWith("#/puzzles")) return "puzzles";
   return "analysis";
 };
 
@@ -27,6 +29,9 @@ export function App() {
         <a href="#/learn" aria-current={route === "learn" ? "page" : undefined}>
           Learn
         </a>
+        <a href="#/puzzles" aria-current={route === "puzzles" ? "page" : undefined}>
+          Puzzles
+        </a>
         <a href="#/bots" aria-current={route === "bots" ? "page" : undefined}>
           Play bots
         </a>
@@ -37,7 +42,7 @@ export function App() {
           Two players
         </a>
       </nav>
-      {route === "analysis" ? <AnalysisPage /> : route === "bots" ? <BotsPage /> : route === "learn" ? <LearnPage /> : <PlayPage />}
+      {route === "analysis" ? <AnalysisPage /> : route === "bots" ? <BotsPage /> : route === "learn" ? <LearnPage /> : route === "puzzles" ? <PuzzlesPage /> : <PlayPage />}
     </>
   );
 }

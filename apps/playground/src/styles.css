@@ -219,3 +219,12 @@ button.continue { width: 100%; margin-top: 16px; padding: 10px; font-size: 16px;
 .lesson-done { max-width: 480px; margin: 40px auto; text-align: center; }
 .big-check { width: 72px; height: 72px; margin: 0 auto 8px; border-radius: 50%; background: #3a7d44; color: #fff; font-size: 40px; display: flex; align-items: center; justify-content: center; }
 .lesson-done .buttons { justify-content: center; }
+
+/* --- Puzzles --- */
+.puzzle-head { display: flex; justify-content: space-between; align-items: flex-end; }
+.big-rating { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.big-rating .up { color: #3a7d44; font-size: 16px; }
+.big-rating .down { color: #ca3431; font-size: 16px; }
+.themes { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip { font-size: 12px; padding: 2px 8px; border-radius: 10px; background: var(--button); border: 1px solid var(--border); }
+.small { font-size: 12px; margin-top: 12px; }
