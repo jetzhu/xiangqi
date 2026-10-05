@@ -1,0 +1,98 @@
+{
+  "id": "the-advisor",
+  "title": {
+    "en": "The Advisor",
+    "zh": "仕士"
+  },
+  "summary": {
+    "en": "One step diagonally, guarding the general.",
+    "zh": "斜走一步，守护老将。"
+  },
+  "steps": [
+    {
+      "type": "show-moves",
+      "fen": "3k5/9/9/9/9/9/9/9/4A4/4K4 w - - 0 1",
+      "square": "e1",
+      "text": {
+        "en": "The advisor moves one point diagonally and, like the general, never leaves the palace.",
+        "zh": "士（仕）斜走一步，和将帅一样不能离开九宫。"
+      }
+    },
+    {
+      "type": "capture-stars",
+      "fen": "3k5/9/9/9/9/9/9/9/9/3AK4 w - - 0 1",
+      "square": "d0",
+      "stars": [
+        "e1",
+        "f2"
+      ],
+      "maxMoves": 4,
+      "text": {
+        "en": "Collect the stars with your advisor, moving diagonally.",
+        "zh": "用仕斜着走，吃掉星星。"
+      }
+    },
+    {
+      "type": "explain",
+      "fen": "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1",
+      "highlights": [
+        {
+          "square": "d0",
+          "kind": "hint"
+        },
+        {
+          "square": "f0",
+          "kind": "hint"
+        },
+        {
+          "square": "e1",
+          "kind": "hint"
+        },
+        {
+          "square": "d2",
+          "kind": "hint"
+        },
+        {
+          "square": "f2",
+          "kind": "hint"
+        }
+      ],
+      "text": {
+        "en": "Those are the only five points an advisor can ever stand on. Advisors are defenders: keep them near your general.",
+        "zh": "仕只能站在这五个点上。仕是防守的棋子，要守在老帅身边。"
+      }
+    },
+    {
+      "type": "quiz",
+      "text": {
+        "en": "On how many points can an advisor stand?",
+        "zh": "仕一共能站在几个点上？"
+      },
+      "options": [
+        {
+          "text": {
+            "en": "5",
+            "zh": "5个"
+          },
+          "correct": true
+        },
+        {
+          "text": {
+            "en": "9",
+            "zh": "9个"
+          }
+        },
+        {
+          "text": {
+            "en": "4",
+            "zh": "4个"
+          }
+        }
+      ],
+      "explanation": {
+        "en": "Five: the four corners and the centre of the palace.",
+        "zh": "5个：九宫的四个角和中心。"
+      }
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "id": "the-cannon",
+  "title": {
+    "en": "The Cannon",
+    "zh": "炮"
+  },
+  "summary": {
+    "en": "Moves like a chariot, captures by jumping one screen.",
+    "zh": "走法像车，吃子要隔一个子（炮架）。"
+  },
+  "steps": [
+    {
+      "type": "show-moves",
+      "fen": "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1",
+      "square": "h2",
+      "text": {
+        "en": "The cannon moves like a chariot. But to capture, it must jump over exactly one piece. From h2 it can take the horse on h9 by jumping the cannon on h7.",
+        "zh": "炮的走法和车一样，但吃子时必须隔一个子。h2的炮可以隔着h7的炮打掉h9的马。"
+      }
+    },
+    {
+      "type": "find-move",
+      "fen": "3k5/9/9/4r4/9/9/4P4/9/4C4/4K4 w - - 0 1",
+      "accept": [
+        "e1e6"
+      ],
+      "text": {
+        "en": "Use your soldier as a screen and capture the chariot.",
+        "zh": "用你的兵当炮架，打掉黑车。"
+      },
+      "hint": {
+        "en": "Count the pieces between your cannon and the chariot.",
+        "zh": "数一数炮和车之间有几个子。"
+      },
+      "wrong": {
+        "en": "That doesn't capture the chariot.",
+        "zh": "这步没有吃到车。"
+      },
+      "success": {
+        "en": "Boom! The soldier was the screen (炮架).",
+        "zh": "打掉了！兵就是炮架。"
+      }
+    },
+    {
+      "type": "find-move",
+      "fen": "4k4/4a4/9/9/1C7/9/9/9/9/3K5 w - - 0 1",
+      "accept": [
+        "b5e5"
+      ],
+      "text": {
+        "en": "Give check with your cannon. The black advisor can be your screen.",
+        "zh": "用炮将军，黑士可以当你的炮架。"
+      },
+      "hint": {
+        "en": "Line your cannon up with the black general.",
+        "zh": "把炮移到黑将的那条纵线上。"
+      },
+      "wrong": {
+        "en": "That isn't check.",
+        "zh": "这步不是将军。"
+      },
+      "success": {
+        "en": "Check! The advisor in front of the general became your screen.",
+        "zh": "将军！老将前面的士成了你的炮架。"
+      }
+    },
+    {
+      "type": "quiz",
+      "text": {
+        "en": "How many pieces must be between a cannon and the piece it captures?",
+        "zh": "炮吃子时，中间要隔几个子？"
+      },
+      "options": [
+        {
+          "text": {
+            "en": "Exactly one",
+            "zh": "正好一个"
+          },
+          "correct": true
+        },
+        {
+          "text": {
+            "en": "None",
+            "zh": "不用隔"
+          }
+        },
+        {
+          "text": {
+            "en": "Any number",
+            "zh": "几个都行"
+          }
+        }
+      ],
+      "explanation": {
+        "en": "Exactly one: that piece is called the screen (炮架).",
+        "zh": "正好一个，这个子叫“炮架”。"
+      }
+    }
+  ]
+}

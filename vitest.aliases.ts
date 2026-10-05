@@ -9,4 +9,5 @@ export const workspaceAliases = {
   "@xq/board": src("board"),
   "@xq/engine": src("engine"),
   "@xq/bots": src("bots"),
+  "@xq/lessons": src("lessons"),
 };

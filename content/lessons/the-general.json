@@ -1,0 +1,110 @@
+{
+  "id": "the-general",
+  "title": {
+    "en": "The General",
+    "zh": "将帅"
+  },
+  "summary": {
+    "en": "One step at a time, inside the palace.",
+    "zh": "每次走一步，不出九宫。"
+  },
+  "steps": [
+    {
+      "type": "explain",
+      "fen": "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1",
+      "highlights": [
+        {
+          "square": "e0",
+          "kind": "hint"
+        },
+        {
+          "square": "e9",
+          "kind": "hint"
+        }
+      ],
+      "text": {
+        "en": "The general (帅 for Red, 将 for Black) is the most important piece. If your general is trapped, you lose.",
+        "zh": "将帅是最重要的棋子。老将被困死，就输了。"
+      }
+    },
+    {
+      "type": "show-moves",
+      "fen": "3k5/9/9/9/9/9/9/9/4K4/9 w - - 0 1",
+      "square": "e1",
+      "text": {
+        "en": "The general moves one point at a time along a line: forward, back or sideways. It never moves diagonally.",
+        "zh": "将帅每次沿直线走一步：前进、后退或横走，不能斜走。"
+      }
+    },
+    {
+      "type": "capture-stars",
+      "fen": "3k5/9/3n5/9/9/9/9/9/9/4K4 w - - 0 1",
+      "square": "e0",
+      "stars": [
+        "f1",
+        "d2"
+      ],
+      "maxMoves": 6,
+      "text": {
+        "en": "Move your general to collect both stars. Remember: it can't leave the palace.",
+        "zh": "走动老帅，吃掉两颗星星。记住：不能出九宫。"
+      }
+    },
+    {
+      "type": "find-move",
+      "fen": "3k5/9/3nr4/9/9/9/9/9/4K4/9 w - - 0 1",
+      "accept": [
+        "e1d1",
+        "e1f1"
+      ],
+      "text": {
+        "en": "The black chariot gives check along the file! Move your general out of its line.",
+        "zh": "黑车在纵线上将军！把老帅移出这条线。"
+      },
+      "hint": {
+        "en": "Step sideways, off the e-file.",
+        "zh": "横走一步，离开这条纵线。"
+      },
+      "wrong": {
+        "en": "Your general is still on the chariot's line.",
+        "zh": "老帅还在车的攻击线上。"
+      },
+      "success": {
+        "en": "Safe! Stepping out of the line is one way to escape check.",
+        "zh": "安全了！走出攻击线是应将的一种方法。"
+      }
+    },
+    {
+      "type": "quiz",
+      "text": {
+        "en": "Can the general leave the palace?",
+        "zh": "将帅可以走出九宫吗？"
+      },
+      "options": [
+        {
+          "text": {
+            "en": "Never",
+            "zh": "绝对不能"
+          },
+          "correct": true
+        },
+        {
+          "text": {
+            "en": "Yes, after crossing the river",
+            "zh": "过河以后可以"
+          }
+        },
+        {
+          "text": {
+            "en": "Only to capture",
+            "zh": "只有吃子时可以"
+          }
+        }
+      ],
+      "explanation": {
+        "en": "The general always stays in its palace.",
+        "zh": "将帅永远不能离开九宫。"
+      }
+    }
+  ]
+}

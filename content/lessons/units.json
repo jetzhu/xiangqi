@@ -1,0 +1,123 @@
+[
+  {
+    "id": "board",
+    "title": {
+      "en": "The Board",
+      "zh": "棋盘"
+    },
+    "icon": "board",
+    "lessons": [
+      "the-board"
+    ]
+  },
+  {
+    "id": "general",
+    "title": {
+      "en": "General",
+      "zh": "将帅"
+    },
+    "icon": "k",
+    "lessons": [
+      "the-general"
+    ]
+  },
+  {
+    "id": "advisor",
+    "title": {
+      "en": "Advisor",
+      "zh": "仕士"
+    },
+    "icon": "a",
+    "lessons": [
+      "the-advisor"
+    ]
+  },
+  {
+    "id": "elephant",
+    "title": {
+      "en": "Elephant",
+      "zh": "相象"
+    },
+    "icon": "b",
+    "lessons": [
+      "the-elephant"
+    ]
+  },
+  {
+    "id": "horse",
+    "title": {
+      "en": "Horse",
+      "zh": "马"
+    },
+    "icon": "n",
+    "lessons": [
+      "the-horse"
+    ]
+  },
+  {
+    "id": "chariot",
+    "title": {
+      "en": "Chariot",
+      "zh": "车"
+    },
+    "icon": "r",
+    "lessons": [
+      "the-chariot"
+    ]
+  },
+  {
+    "id": "cannon",
+    "title": {
+      "en": "Cannon",
+      "zh": "炮"
+    },
+    "icon": "c",
+    "lessons": [
+      "the-cannon"
+    ]
+  },
+  {
+    "id": "soldier",
+    "title": {
+      "en": "Soldier",
+      "zh": "兵卒"
+    },
+    "icon": "p",
+    "lessons": [
+      "the-soldier"
+    ]
+  },
+  {
+    "id": "checkmate",
+    "title": {
+      "en": "Check and Checkmate",
+      "zh": "将军与将死"
+    },
+    "icon": "k",
+    "lessons": [
+      "check-and-mate"
+    ]
+  },
+  {
+    "id": "special",
+    "title": {
+      "en": "Special Rules",
+      "zh": "特殊规则"
+    },
+    "icon": "board",
+    "lessons": [
+      "special-rules"
+    ]
+  },
+  {
+    "id": "first-game",
+    "title": {
+      "en": "Your First Game",
+      "zh": "第一盘棋"
+    },
+    "icon": "c",
+    "lessons": [
+      "first-game"
+    ]
+  }
+]

@@ -1,0 +1,92 @@
+{
+  "id": "the-chariot",
+  "title": {
+    "en": "The Chariot",
+    "zh": "车"
+  },
+  "summary": {
+    "en": "Any distance along a line: the strongest piece.",
+    "zh": "沿直线走任意距离，是最强的棋子。"
+  },
+  "steps": [
+    {
+      "type": "show-moves",
+      "fen": "3k5/9/9/9/9/4R4/9/9/9/4K4 w - - 0 1",
+      "square": "e4",
+      "text": {
+        "en": "The chariot moves any number of points along a file or rank, as long as nothing is in the way.",
+        "zh": "车沿纵线或横线走，只要路上没有棋子，走多远都行。"
+      }
+    },
+    {
+      "type": "capture-stars",
+      "fen": "3k5/9/9/9/9/9/9/9/9/R3K4 w - - 0 1",
+      "square": "a0",
+      "stars": [
+        "a5",
+        "f5",
+        "f8"
+      ],
+      "maxMoves": 5,
+      "text": {
+        "en": "Collect the stars with your chariot in as few moves as you can.",
+        "zh": "用车吃掉星星，步数越少越好。"
+      }
+    },
+    {
+      "type": "find-move",
+      "fen": "3k5/9/6n2/9/9/9/9/9/9/4K1R2 w - - 0 1",
+      "accept": [
+        "g0g7"
+      ],
+      "text": {
+        "en": "The black horse is unprotected. Take it!",
+        "zh": "黑马没有保护，吃掉它！"
+      },
+      "hint": {
+        "en": "Your chariot has a clear path up its file.",
+        "zh": "你的车沿着纵线一路畅通。"
+      },
+      "wrong": {
+        "en": "Look for a capture.",
+        "zh": "找一步吃子的棋。"
+      },
+      "success": {
+        "en": "Free piece! A chariot is worth about two horses.",
+        "zh": "白得一子！一个车大约值两个马。"
+      }
+    },
+    {
+      "type": "quiz",
+      "text": {
+        "en": "Which piece is usually the strongest?",
+        "zh": "哪个棋子通常最强？"
+      },
+      "options": [
+        {
+          "text": {
+            "en": "The chariot",
+            "zh": "车"
+          },
+          "correct": true
+        },
+        {
+          "text": {
+            "en": "The horse",
+            "zh": "马"
+          }
+        },
+        {
+          "text": {
+            "en": "The soldier",
+            "zh": "兵"
+          }
+        }
+      ],
+      "explanation": {
+        "en": "The chariot controls whole lines. A saying goes: 三步不出车，必定要输棋 — if your chariots aren't out within three moves, you're in trouble.",
+        "zh": "车能控制整条线。俗话说“三步不出车，必定要输棋”。"
+      }
+    }
+  ]
+}

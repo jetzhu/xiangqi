@@ -60,6 +60,8 @@ export interface XiangqiBoardProps {
    * instead of moving pieces. Right-clicks report "right".
    */
   onSquareClick?: (square: string, button: "left" | "right") => void;
+  /** Gold stars on points (lesson "capture the star" challenges). */
+  stars?: readonly string[];
 }
 
 const ARROW_COLORS: Record<ArrowColor, string> = {
@@ -114,6 +116,7 @@ export function XiangqiBoard({
   announce = "",
   ariaLabel = "Xiangqi board",
   onSquareClick,
+  stars = [],
 }: XiangqiBoardProps) {
   const theme = THEMES[themeName];
   const uid = useId().replace(/:/g, "");
@@ -467,6 +470,21 @@ export function XiangqiBoard({
             style={{ animation: `${uid}-pulse 1.2s ease-in-out infinite` }}
           />
         )}
+
+        {/* Stars */}
+        {stars.map((s) => {
+          const { x, y } = toScreen(s, orientation);
+          return (
+            <g key={`star-${s}`} transform={`translate(${x} ${y})`} style={{ pointerEvents: "none" }} data-star={s}>
+              <path
+                d="M0,-0.36L0.106,-0.146L0.342,-0.111L0.171,0.056L0.212,0.291L0,0.18L-0.212,0.291L-0.171,0.056L-0.342,-0.111L-0.106,-0.146Z"
+                fill="#f2c230"
+                stroke="#a87b00"
+                strokeWidth={0.03}
+              />
+            </g>
+          );
+        })}
 
         {/* Pieces */}
         {pieces.map((p) => {

@@ -22,6 +22,9 @@
       ],
       "@xq/bots": [
         "./packages/bots/src/index.ts"
+      ],
+      "@xq/lessons": [
+        "./packages/lessons/src/index.ts"
       ]
     }
   }

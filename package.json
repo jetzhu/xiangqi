@@ -2,6 +2,7 @@
   "name": "xiangqi-site",
   "private": true,
   "description": "Xiangqi (Chinese chess) teaching and playing site",
+  "type": "module",
   "packageManager": "pnpm@12.9.1",
   "engines": {
     "node": ">=24"

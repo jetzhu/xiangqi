@@ -1,0 +1,98 @@
+{
+  "id": "special-rules",
+  "title": {
+    "en": "Special Rules",
+    "zh": "特殊规则"
+  },
+  "summary": {
+    "en": "Flying general, no legal move loses, no perpetual check.",
+    "zh": "将帅不能照面、困毙判负、禁止长将。"
+  },
+  "steps": [
+    {
+      "type": "explain",
+      "fen": "4k4/9/9/9/9/4C4/9/9/9/4K4 w - - 0 1",
+      "text": {
+        "en": "The two generals may never face each other on an open file (将帅不能照面). Here only your cannon stands between them.",
+        "zh": "两个老将不能在同一条纵线上直接相对（将帅不能照面）。现在只有你的炮挡在中间。"
+      }
+    },
+    {
+      "type": "show-moves",
+      "fen": "4k4/9/9/9/9/4C4/9/9/9/4K4 w - - 0 1",
+      "square": "e4",
+      "text": {
+        "en": "So the cannon may move up and down the file, but not sideways: that would leave the generals facing.",
+        "zh": "所以这个炮只能在这条纵线上走，不能横走，否则老将就照面了。"
+      }
+    },
+    {
+      "type": "find-move",
+      "fen": "3k5/R8/9/9/9/9/9/9/1R7/4K4 w - - 0 1",
+      "accept": "checkmate",
+      "text": {
+        "en": "Your general can help in the attack: Black's general may not step onto the e-file while yours faces it. Find the checkmate.",
+        "zh": "你的老帅也能参与进攻：黑将不能走到和红帅照面的e线上。找出将死的一步。"
+      },
+      "hint": {
+        "en": "The chariot on a8 already covers rank 8. Check along rank 9 or the d-file.",
+        "zh": "a8的车已经封住了第8条横线。在第9横线或d线上将军。"
+      },
+      "wrong": {
+        "en": "Black still has an escape.",
+        "zh": "黑将还有退路。"
+      },
+      "success": {
+        "en": "Checkmate! The facing-generals rule took away the e9 escape.",
+        "zh": "将死！“将帅不能照面”的规则封住了e9这个退路。"
+      }
+    },
+    {
+      "type": "explain",
+      "fen": "4k4/9/6N2/9/9/9/9/9/3R1R3/3K5 b - - 0 1",
+      "text": {
+        "en": "Black to move here has no legal move and is not in check. In Xiangqi that is a loss for Black (困毙).",
+        "zh": "黑方走棋，但无棋可走，也没有被将军。在象棋里，这是黑方输（困毙）。"
+      }
+    },
+    {
+      "type": "explain",
+      "text": {
+        "en": "You may not check forever. If the same position keeps repeating because one side checks every move, the checking side loses (长将判负). Chasing the same unprotected piece forever is also forbidden.",
+        "zh": "不能一直将军。如果因为一方不停将军而局面反复出现，将军的一方判负（长将判负）。一直捉同一个没有保护的子也是禁止的。"
+      }
+    },
+    {
+      "type": "quiz",
+      "text": {
+        "en": "Red checks on every move and the position repeats three times. Who loses?",
+        "zh": "红方每步都将军，局面重复了三次。谁输？"
+      },
+      "options": [
+        {
+          "text": {
+            "en": "Red, for perpetual check",
+            "zh": "红方，长将判负"
+          },
+          "correct": true
+        },
+        {
+          "text": {
+            "en": "Black",
+            "zh": "黑方"
+          }
+        },
+        {
+          "text": {
+            "en": "Nobody: it's a draw",
+            "zh": "没人输，和棋"
+          }
+        }
+      ],
+      "explanation": {
+        "en": "Perpetual check is not allowed: the checking side must change or lose.",
+        "zh": "长将是不允许的：将军的一方必须变着，否则判负。"
+      }
+    }
+  ]
+}

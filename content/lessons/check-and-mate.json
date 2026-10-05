@@ -1,0 +1,99 @@
+{
+  "id": "check-and-mate",
+  "title": {
+    "en": "Check and Checkmate",
+    "zh": "将军与将死"
+  },
+  "summary": {
+    "en": "Attack the general; trap it to win.",
+    "zh": "攻击老将，困死它就赢了。"
+  },
+  "steps": [
+    {
+      "type": "explain",
+      "fen": "4k4/9/9/9/4R4/9/9/9/9/3K5 b - - 0 1",
+      "arrows": [
+        {
+          "from": "e5",
+          "to": "e9",
+          "color": "red"
+        }
+      ],
+      "text": {
+        "en": "When a piece attacks the general, that's check (将军). The other side must answer it at once: move the general, block, or capture the attacker.",
+        "zh": "攻击对方的将（帅）叫“将军”。对方必须马上应将：走开老将、垫子挡住，或吃掉将军的棋子。"
+      }
+    },
+    {
+      "type": "find-move",
+      "fen": "4k4/R8/6N2/9/9/9/9/9/5R3/3K5 w - - 0 1",
+      "accept": "checkmate",
+      "text": {
+        "en": "Checkmate means check with no way out. Find a move that checkmates Black.",
+        "zh": "将死就是被将军后无法应将。找一步把黑方将死。"
+      },
+      "hint": {
+        "en": "Your horse already guards e8. Use a chariot to check.",
+        "zh": "你的马已经控制了e8。用车来将军。"
+      },
+      "wrong": {
+        "en": "Black can still escape. Try another check.",
+        "zh": "黑将还能逃走。换一步将军试试。"
+      },
+      "success": {
+        "en": "Checkmate! Black's general has nowhere to go.",
+        "zh": "将死了！黑将无路可逃。"
+      }
+    },
+    {
+      "type": "play-out",
+      "fen": "4k4/9/9/9/9/9/9/1R7/R8/3K5 w - - 0 1",
+      "goal": "checkmate",
+      "maxMoves": 4,
+      "text": {
+        "en": "Two chariots against a lone general. Checkmate Black in at most 4 moves — Black will defend.",
+        "zh": "双车对单将。最多走4步将死黑方——黑方会防守。"
+      },
+      "hint": {
+        "en": "Use one chariot to cut off a rank, then check with the other on the next rank.",
+        "zh": "一个车封住一条横线，另一个车在旁边那条横线将军。"
+      },
+      "success": {
+        "en": "Well done! This two-chariot mate (双车错) is a pattern worth remembering.",
+        "zh": "很好！这个双车错杀法值得牢记。"
+      }
+    },
+    {
+      "type": "quiz",
+      "text": {
+        "en": "A player has no legal move but is not in check. What happens?",
+        "zh": "一方无棋可走，但没有被将军，结果是什么？"
+      },
+      "options": [
+        {
+          "text": {
+            "en": "That player loses",
+            "zh": "这一方输"
+          },
+          "correct": true
+        },
+        {
+          "text": {
+            "en": "It's a draw",
+            "zh": "和棋"
+          }
+        },
+        {
+          "text": {
+            "en": "They skip a turn",
+            "zh": "跳过这一步"
+          }
+        }
+      ],
+      "explanation": {
+        "en": "In Xiangqi, having no legal move always loses (困毙), unlike chess where stalemate is a draw.",
+        "zh": "象棋中无子可动就输（困毙），这和国际象棋的逼和不同。"
+      }
+    }
+  ]
+}

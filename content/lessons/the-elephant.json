@@ -1,0 +1,71 @@
+{
+  "id": "the-elephant",
+  "title": {
+    "en": "The Elephant",
+    "zh": "相象"
+  },
+  "summary": {
+    "en": "Two points diagonally, never across the river.",
+    "zh": "斜走两步（走田字），不能过河。"
+  },
+  "steps": [
+    {
+      "type": "show-moves",
+      "fen": "3k5/9/9/9/9/9/9/4B4/9/4K4 w - - 0 1",
+      "square": "e2",
+      "text": {
+        "en": "The elephant moves exactly two points diagonally (a 田 shape) and can never cross the river.",
+        "zh": "相（象）斜走两格，走“田”字，而且不能过河。"
+      }
+    },
+    {
+      "type": "show-moves",
+      "fen": "3k5/9/9/9/9/9/3N5/4B4/9/4K4 w - - 0 1",
+      "square": "e2",
+      "text": {
+        "en": "The point in the middle of its move is the elephant's eye. A piece there blocks that move (塞象眼). Here the horse on d3 blocks the jump to c4.",
+        "zh": "相走田字的中心叫“象眼”。象眼上有棋子，就不能走那一步（塞象眼）。这里d3的马挡住了去c4的路。"
+      }
+    },
+    {
+      "type": "capture-stars",
+      "fen": "3k5/9/9/9/9/9/9/9/9/2B1K4 w - - 0 1",
+      "square": "c0",
+      "stars": [
+        "e2",
+        "g4"
+      ],
+      "maxMoves": 4,
+      "text": {
+        "en": "Collect the stars with your elephant.",
+        "zh": "用相吃掉星星。"
+      }
+    },
+    {
+      "type": "quiz",
+      "text": {
+        "en": "Can the elephant cross the river?",
+        "zh": "相可以过河吗？"
+      },
+      "options": [
+        {
+          "text": {
+            "en": "No, never",
+            "zh": "不能"
+          },
+          "correct": true
+        },
+        {
+          "text": {
+            "en": "Yes",
+            "zh": "可以"
+          }
+        }
+      ],
+      "explanation": {
+        "en": "The elephant always stays on its own side. It is a defender.",
+        "zh": "相永远留在自己一方，是防守的棋子。"
+      }
+    }
+  ]
+}

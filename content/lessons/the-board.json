@@ -1,0 +1,245 @@
+{
+  "id": "the-board",
+  "title": {
+    "en": "The Board",
+    "zh": "棋盘"
+  },
+  "summary": {
+    "en": "Points, files, the river and the palaces.",
+    "zh": "交叉点、纵线、河界与九宫。"
+  },
+  "steps": [
+    {
+      "type": "explain",
+      "fen": "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1",
+      "text": {
+        "en": "Welcome! In Xiangqi the pieces stand on the points where lines cross, not inside the squares. The board has 9 files and 10 ranks.",
+        "zh": "欢迎！象棋的棋子放在线与线的交叉点上，而不是格子里。棋盘有9条纵线、10条横线。"
+      }
+    },
+    {
+      "type": "explain",
+      "fen": "4k4/9/9/9/9/9/9/9/9/3K5 w - - 0 1",
+      "highlights": [
+        {
+          "square": "a4",
+          "kind": "hint"
+        },
+        {
+          "square": "b4",
+          "kind": "hint"
+        },
+        {
+          "square": "c4",
+          "kind": "hint"
+        },
+        {
+          "square": "d4",
+          "kind": "hint"
+        },
+        {
+          "square": "e4",
+          "kind": "hint"
+        },
+        {
+          "square": "f4",
+          "kind": "hint"
+        },
+        {
+          "square": "g4",
+          "kind": "hint"
+        },
+        {
+          "square": "h4",
+          "kind": "hint"
+        },
+        {
+          "square": "i4",
+          "kind": "hint"
+        },
+        {
+          "square": "a5",
+          "kind": "hint"
+        },
+        {
+          "square": "b5",
+          "kind": "hint"
+        },
+        {
+          "square": "c5",
+          "kind": "hint"
+        },
+        {
+          "square": "d5",
+          "kind": "hint"
+        },
+        {
+          "square": "e5",
+          "kind": "hint"
+        },
+        {
+          "square": "f5",
+          "kind": "hint"
+        },
+        {
+          "square": "g5",
+          "kind": "hint"
+        },
+        {
+          "square": "h5",
+          "kind": "hint"
+        },
+        {
+          "square": "i5",
+          "kind": "hint"
+        }
+      ],
+      "text": {
+        "en": "The empty band across the middle is the river (楚河 汉界). Some pieces change how they move once they cross it.",
+        "zh": "中间这条空带是河界（楚河汉界）。有些棋子过河后走法会改变。"
+      }
+    },
+    {
+      "type": "explain",
+      "fen": "4k4/9/9/9/9/9/9/9/9/3K5 w - - 0 1",
+      "highlights": [
+        {
+          "square": "d0",
+          "kind": "hint"
+        },
+        {
+          "square": "d1",
+          "kind": "hint"
+        },
+        {
+          "square": "d2",
+          "kind": "hint"
+        },
+        {
+          "square": "d7",
+          "kind": "hint"
+        },
+        {
+          "square": "d8",
+          "kind": "hint"
+        },
+        {
+          "square": "d9",
+          "kind": "hint"
+        },
+        {
+          "square": "e0",
+          "kind": "hint"
+        },
+        {
+          "square": "e1",
+          "kind": "hint"
+        },
+        {
+          "square": "e2",
+          "kind": "hint"
+        },
+        {
+          "square": "e7",
+          "kind": "hint"
+        },
+        {
+          "square": "e8",
+          "kind": "hint"
+        },
+        {
+          "square": "e9",
+          "kind": "hint"
+        },
+        {
+          "square": "f0",
+          "kind": "hint"
+        },
+        {
+          "square": "f1",
+          "kind": "hint"
+        },
+        {
+          "square": "f2",
+          "kind": "hint"
+        },
+        {
+          "square": "f7",
+          "kind": "hint"
+        },
+        {
+          "square": "f8",
+          "kind": "hint"
+        },
+        {
+          "square": "f9",
+          "kind": "hint"
+        }
+      ],
+      "text": {
+        "en": "Each side has a palace: the 3×3 points with the diagonal lines. The general and the advisors must stay inside it.",
+        "zh": "双方各有一个九宫：画有斜线的3×3个点。将（帅）和士（仕）不能离开九宫。"
+      }
+    },
+    {
+      "type": "explain",
+      "fen": "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1",
+      "text": {
+        "en": "Each side has 16 pieces: a general, two advisors, two elephants, two horses, two chariots, two cannons and five soldiers. Red moves first.",
+        "zh": "双方各有16个棋子：将（帅）一个，士、象、马、车、炮各两个，兵（卒）五个。红方先走。"
+      }
+    },
+    {
+      "type": "quiz",
+      "text": {
+        "en": "Where do the pieces stand?",
+        "zh": "棋子放在哪里？"
+      },
+      "options": [
+        {
+          "text": {
+            "en": "On the points where lines cross",
+            "zh": "线的交叉点上"
+          },
+          "correct": true
+        },
+        {
+          "text": {
+            "en": "Inside the squares",
+            "zh": "格子里面"
+          }
+        }
+      ],
+      "explanation": {
+        "en": "Right: Xiangqi pieces always stand on points.",
+        "zh": "对：象棋棋子总是放在交叉点上。"
+      }
+    },
+    {
+      "type": "quiz",
+      "text": {
+        "en": "Who moves first?",
+        "zh": "哪一方先走？"
+      },
+      "options": [
+        {
+          "text": {
+            "en": "Red",
+            "zh": "红方"
+          },
+          "correct": true
+        },
+        {
+          "text": {
+            "en": "Black",
+            "zh": "黑方"
+          }
+        }
+      ],
+      "explanation": {
+        "en": "Red always makes the first move.",
+        "zh": "总是红方先走。"
+      }
+    }
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "id": "first-game",
+  "title": {
+    "en": "Your First Game",
+    "zh": "第一盘棋"
+  },
+  "summary": {
+    "en": "Good opening habits, then play a bot.",
+    "zh": "开局的好习惯，然后和机器人下一盘。"
+  },
+  "steps": [
+    {
+      "type": "explain",
+      "fen": "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1",
+      "text": {
+        "en": "Good opening habits: bring out your horses and chariots, control the centre, and keep your general safe.",
+        "zh": "开局的好习惯：出马出车，控制中路，保护老帅。"
+      }
+    },
+    {
+      "type": "find-move",
+      "fen": "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1",
+      "accept": [
+        "h2e2",
+        "b2e2"
+      ],
+      "text": {
+        "en": "A classic first move is the Central Cannon (中炮): move a cannon to the middle file.",
+        "zh": "经典的第一步是“中炮”：把一个炮移到中路。"
+      },
+      "hint": {
+        "en": "Slide a cannon sideways to file 5.",
+        "zh": "把一个炮横移到“五”路。"
+      },
+      "wrong": {
+        "en": "Good try — but put a cannon on the middle file.",
+        "zh": "不错的尝试——不过请把炮放到中路。"
+      },
+      "success": {
+        "en": "炮二平五 — the most popular opening of all.",
+        "zh": "炮二平五——最流行的开局。"
+      }
+    },
+    {
+      "type": "find-move",
+      "fen": "rnbakab1r/9/1c4nc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR w - - 2 2",
+      "accept": [
+        "h0g2",
+        "b0c2"
+      ],
+      "text": {
+        "en": "Black answered with a horse. Now bring out one of your horses.",
+        "zh": "黑方跳马应对。现在你也跳出一个马。"
+      },
+      "hint": {
+        "en": "A horse jumps up toward the centre.",
+        "zh": "马向中间跳出来。"
+      },
+      "wrong": {
+        "en": "Try developing a horse instead.",
+        "zh": "试试先出马。"
+      },
+      "success": {
+        "en": "Good development! Next, get your chariots moving.",
+        "zh": "出子很好！接下来让车动起来。"
+      }
+    },
+    {
+      "type": "quiz",
+      "text": {
+        "en": "Which is a good first move?",
+        "zh": "哪一步是好的第一步？"
+      },
+      "options": [
+        {
+          "text": {
+            "en": "炮二平五 (Central Cannon)",
+            "zh": "炮二平五（中炮）"
+          },
+          "correct": true
+        },
+        {
+          "text": {
+            "en": "帅五进一 (general forward)",
+            "zh": "帅五进一（老帅上前）"
+          }
+        },
+        {
+          "text": {
+            "en": "兵九进一 (edge soldier)",
+            "zh": "兵九进一（边兵）"
+          }
+        }
+      ],
+      "explanation": {
+        "en": "The central cannon aims straight at Black's general and helps your other pieces come out.",
+        "zh": "中炮直指黑将，也有利于其他棋子出动。"
+      }
+    },
+    {
+      "type": "explain",
+      "fen": "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1",
+      "text": {
+        "en": "You know all the pieces and rules now. Go and play your first game against a bot — Little Soldier is waiting!",
+        "zh": "你已经学会了所有棋子和规则。去和机器人下第一盘棋吧——小兵在等你！"
+      }
+    }
+  ]
+}

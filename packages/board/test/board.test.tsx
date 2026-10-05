@@ -133,3 +133,10 @@ describe("editing mode", () => {
     expect(onMove).not.toHaveBeenCalled();
   });
 });
+
+describe("stars", () => {
+  it("draws a star on each given point", () => {
+    const { container } = render(<XiangqiBoard fen={START_FEN} stars={["e5", "a4"]} />);
+    expect([...container.querySelectorAll("[data-star]")].map((g) => g.getAttribute("data-star"))).toEqual(["e5", "a4"]);
+  });
+});

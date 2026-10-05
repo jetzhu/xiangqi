@@ -1,0 +1,95 @@
+{
+  "id": "the-horse",
+  "title": {
+    "en": "The Horse",
+    "zh": "马"
+  },
+  "summary": {
+    "en": "One step straight, then one diagonally — unless its leg is blocked.",
+    "zh": "先直走一步，再斜走一步——马腿被绊住就不行。"
+  },
+  "steps": [
+    {
+      "type": "show-moves",
+      "fen": "3k5/9/9/9/9/4N4/9/9/9/4K4 w - - 0 1",
+      "square": "e4",
+      "text": {
+        "en": "The horse moves one point straight and then one point diagonally outward (a 日 shape). From the middle it has eight moves.",
+        "zh": "马先直走一步，再向外斜走一步，走“日”字。在中间时有八个去处。"
+      }
+    },
+    {
+      "type": "show-moves",
+      "fen": "3k5/9/9/9/4P4/4N4/9/9/9/4K4 w - - 0 1",
+      "square": "e4",
+      "text": {
+        "en": "If a piece stands right next to the horse, it blocks the horse's leg (蹩马腿). The soldier on e5 stops the jumps to d6 and f6.",
+        "zh": "如果马旁边紧挨着有棋子，就绊住了马腿（蹩马腿）。e5的兵挡住了去d6和f6的路。"
+      }
+    },
+    {
+      "type": "capture-stars",
+      "fen": "3k5/9/9/9/9/9/9/9/9/1N2K4 w - - 0 1",
+      "square": "b0",
+      "stars": [
+        "c2",
+        "d4",
+        "f5"
+      ],
+      "maxMoves": 6,
+      "text": {
+        "en": "Hop your horse to collect the stars.",
+        "zh": "跳马吃掉所有星星。"
+      }
+    },
+    {
+      "type": "find-move",
+      "fen": "3k5/6c2/3r5/9/9/4N4/9/9/9/4K4 w - - 0 1",
+      "accept": [
+        "e4f6"
+      ],
+      "text": {
+        "en": "Find a horse move that attacks the chariot and the cannon at the same time.",
+        "zh": "找一步马，同时攻击黑车和黑炮。"
+      },
+      "hint": {
+        "en": "Look at the point between them, in front of your horse.",
+        "zh": "看看马前面、它们俩中间的位置。"
+      },
+      "wrong": {
+        "en": "That attacks only one piece, or none.",
+        "zh": "这步只攻击了一个子，或者都没攻击到。"
+      },
+      "success": {
+        "en": "A fork! Black can only save one of them.",
+        "zh": "捉双！黑方只能救一个。"
+      }
+    },
+    {
+      "type": "quiz",
+      "text": {
+        "en": "A piece stands right next to the horse in the direction it wants to go. Can it jump that way?",
+        "zh": "马要走的方向上紧挨着有一个棋子，马能跳过去吗？"
+      },
+      "options": [
+        {
+          "text": {
+            "en": "No, its leg is blocked",
+            "zh": "不能，马腿被绊住了"
+          },
+          "correct": true
+        },
+        {
+          "text": {
+            "en": "Yes, horses jump over pieces",
+            "zh": "能，马可以跳过棋子"
+          }
+        }
+      ],
+      "explanation": {
+        "en": "Unlike the chess knight, the Xiangqi horse can be blocked.",
+        "zh": "和国际象棋的马不同，象棋的马会被绊腿。"
+      }
+    }
+  ]
+}

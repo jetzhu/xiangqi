@@ -1,0 +1,77 @@
+{
+  "id": "the-soldier",
+  "title": {
+    "en": "The Soldier",
+    "zh": "兵卒"
+  },
+  "summary": {
+    "en": "Forward only; sideways too after crossing the river.",
+    "zh": "只能前进，过河后也能横走。"
+  },
+  "steps": [
+    {
+      "type": "show-moves",
+      "fen": "3k5/9/9/9/9/9/4P4/9/9/4K4 w - - 0 1",
+      "square": "e3",
+      "text": {
+        "en": "Before crossing the river, a soldier can only move one point forward.",
+        "zh": "兵在过河前只能向前走一步。"
+      }
+    },
+    {
+      "type": "show-moves",
+      "fen": "3k5/9/9/9/4P4/9/9/9/9/4K4 w - - 0 1",
+      "square": "e5",
+      "text": {
+        "en": "Once across the river, it may also move one point sideways. It still never moves backward.",
+        "zh": "过河以后，兵也可以横走一步，但永远不能后退。"
+      }
+    },
+    {
+      "type": "capture-stars",
+      "fen": "3k5/9/9/9/9/9/2P6/9/9/4K4 w - - 0 1",
+      "square": "c3",
+      "stars": [
+        "c5",
+        "d6"
+      ],
+      "maxMoves": 4,
+      "text": {
+        "en": "March your soldier across the river to collect the stars.",
+        "zh": "让兵过河，吃掉星星。"
+      }
+    },
+    {
+      "type": "quiz",
+      "text": {
+        "en": "When can a soldier move backward?",
+        "zh": "兵什么时候可以后退？"
+      },
+      "options": [
+        {
+          "text": {
+            "en": "Never",
+            "zh": "永远不能"
+          },
+          "correct": true
+        },
+        {
+          "text": {
+            "en": "After crossing the river",
+            "zh": "过河以后"
+          }
+        },
+        {
+          "text": {
+            "en": "When it reaches the last rank",
+            "zh": "走到底线时"
+          }
+        }
+      ],
+      "explanation": {
+        "en": "Soldiers only go forward (and sideways after the river). They never retreat.",
+        "zh": "兵只能前进（过河后可以横走），永不后退。"
+      }
+    }
+  ]
+}
