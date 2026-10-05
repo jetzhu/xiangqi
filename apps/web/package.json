@@ -25,6 +25,7 @@
     "@types/node": "26.6.4",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "coi-serviceworker": "0.1.7",
     "typescript": "7.0.2"
   }
 }

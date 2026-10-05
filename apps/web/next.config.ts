@@ -11,6 +11,8 @@ const prod = process.env.NODE_ENV === "production";
 
 const config: NextConfig = {
   ...(prod ? { output: "export" as const, trailingSlash: true } : {}),
+  // A project site on GitHub Pages lives under /<repo>; see lib/site.ts.
+  ...(process.env.NEXT_PUBLIC_BASE_PATH ? { basePath: process.env.NEXT_PUBLIC_BASE_PATH } : {}),
   images: { unoptimized: true },
   // Workspace packages ship TypeScript sources.
   transpilePackages: ["@xq/ui", "@xq/board", "@xq/engine", "@xq/bots", "@xq/lessons", "@xq/puzzles", "@xq/content", "xiangqi-core"],

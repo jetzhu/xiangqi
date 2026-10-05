@@ -1,4 +1,5 @@
 // Serve the static export (out/) locally with the same headers as production (public/_headers).
+// BASE_PATH=/xiangqi serves it under that path; NO_HEADERS=1 leaves out COOP/COEP, like GitHub Pages.
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
@@ -7,8 +8,18 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../out/", import.meta.url));
 const types = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".wasm": "application/wasm", ".json": "application/json", ".xml": "application/xml", ".txt": "text/plain", ".svg": "image/svg+xml", ".ico": "image/x-icon" };
 const port = Number(process.env.PORT ?? 4000);
+const base = (process.env.BASE_PATH ?? "").replace(/\/$/, "");
+const isolation = process.env.NO_HEADERS
+  ? {}
+  : { "Cross-Origin-Opener-Policy": "same-origin", "Cross-Origin-Embedder-Policy": "require-corp", "Cross-Origin-Resource-Policy": "same-origin" };
 createServer((req, res) => {
-  let path = normalize(decodeURIComponent((req.url ?? "/").split("?")[0])).replace(/^(\.\.[/\\])+/, "");
+  const url = decodeURIComponent((req.url ?? "/").split("?")[0]);
+  if (base && url !== base && !url.startsWith(`${base}/`)) {
+    res.writeHead(404, { "Content-Type": "text/plain" });
+    res.end("not found");
+    return;
+  }
+  const path = normalize(url.slice(base.length) || "/").replace(/^(\.\.[/\\])+/, "");
   let file = join(root, path);
   if (existsSync(file) && statSync(file).isDirectory()) file = join(file, "index.html");
   if (!existsSync(file)) {
@@ -18,9 +29,7 @@ createServer((req, res) => {
   }
   res.writeHead(200, {
     "Content-Type": types[extname(file)] ?? "application/octet-stream",
-    "Cross-Origin-Opener-Policy": "same-origin",
-    "Cross-Origin-Embedder-Policy": "require-corp",
-    "Cross-Origin-Resource-Policy": "same-origin",
+    ...isolation,
   });
   createReadStream(file).pipe(res);
-}).listen(port, "127.0.0.1", () => console.log(`serving out/ on http://127.0.0.1:${port}`));
+}).listen(port, "127.0.0.1", () => console.log(`serving out/ on http://127.0.0.1:${port}${base}/`));

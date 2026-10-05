@@ -1,7 +1,7 @@
 import { LESSONS, LESSON_ORDER } from "@xq/content";
 import type { Metadata } from "next";
 import { LearnWithLinks } from "../../../components/pages";
-import { type Locale, pageMetadata } from "../../../lib/site";
+import { type Locale, pageMetadata, withBase } from "../../../lib/site";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   return pageMetadata("learn", (await params).locale as Locale);
@@ -18,7 +18,7 @@ export default async function Learn({ params }: { params: Promise<{ locale: stri
         <ol>
           {lessons.map((l) => (
             <li key={l.id}>
-              <a href={`/${locale}/learn/${l.id}/`}>{l.title[locale]}</a> — {l.summary[locale]}
+              <a href={withBase(`/${locale}/learn/${l.id}/`)}>{l.title[locale]}</a> — {l.summary[locale]}
             </li>
           ))}
         </ol>

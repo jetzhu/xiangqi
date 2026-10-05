@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { Shell } from "../../components/Shell";
-import { LOCALES, SITE_NAME, SITE_URL, isLocale } from "../../lib/site";
+import { COI_SERVICE_WORKER, LOCALES, SITE_NAME, SITE_URL, isLocale, withBase } from "../../lib/site";
 
 export const dynamicParams = false;
 export const generateStaticParams = () => LOCALES.map((locale) => ({ locale }));
@@ -21,6 +21,12 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   if (!isLocale(locale)) notFound();
   return (
     <html lang={locale === "zh" ? "zh-CN" : "en"}>
+      {COI_SERVICE_WORKER && (
+        <head>
+          {/* Must run before anything else: adds COOP/COEP via a service worker, reloading once. */}
+          <script src={withBase("/coi-serviceworker.js")} />
+        </head>
+      )}
       <body>
         <Shell locale={locale}>
           <main id="main">{children}</main>

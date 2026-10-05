@@ -6,6 +6,14 @@ export const isLocale = (s: string): s is Locale => (LOCALES as readonly string[
 
 /** Public address of the site (set NEXT_PUBLIC_SITE_URL at build time once the domain is chosen). */
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://xiangqi.example").replace(/\/$/, "");
+/**
+ * Where the site lives under its domain: "" at the root, "/xiangqi" for a GitHub Pages project site.
+ * Next adds it to its own assets; plain links and static files go through `withBase`.
+ */
+export const BASE_PATH = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
+export const withBase = (path: string) => `${BASE_PATH}${path}`;
+/** Hosts that cannot send COOP/COEP headers (GitHub Pages) get them from a service worker instead. */
+export const COI_SERVICE_WORKER = process.env.NEXT_PUBLIC_COI_SERVICE_WORKER === "1";
 export const SITE_NAME = { zh: "象棋学堂", en: "Xiangqi School" } as const;
 
 type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings";

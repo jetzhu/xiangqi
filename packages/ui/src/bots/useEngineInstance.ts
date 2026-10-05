@@ -1,5 +1,6 @@
 import { type XiangqiEngine, engineSupported, loadFairyStockfish } from "@xq/engine";
 import { useEffect, useRef, useState } from "react";
+import { useNav } from "../nav.js";
 
 export type InstanceStatus = "off" | "loading" | "ready" | "error";
 
@@ -10,6 +11,7 @@ export type InstanceStatus = "off" | "loading" | "ready" | "error";
 export function useEngineInstance(enabled: boolean): { engine: XiangqiEngine | null; status: InstanceStatus; error: string | null } {
   const [engine, setEngine] = useState<XiangqiEngine | null>(null);
   const [status, setStatus] = useState<InstanceStatus>("off");
+  const baseUrl = useNav().asset("/engine/fairy");
   const [error, setError] = useState<string | null>(null);
   const loading = useRef<Promise<XiangqiEngine> | null>(null);
   const mounted = useRef(false);
@@ -34,7 +36,7 @@ export function useEngineInstance(enabled: boolean): { engine: XiangqiEngine | n
       return;
     }
     setStatus("loading");
-    loading.current = loadFairyStockfish({ threads: 1, hashMb: 16 });
+    loading.current = loadFairyStockfish({ baseUrl, threads: 1, hashMb: 16 });
     loading.current.then(
       (e) => {
         if (!mounted.current) return;

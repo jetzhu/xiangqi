@@ -28,7 +28,31 @@ Header configs are already in the repo:
 | Vercel | `vercel.json` |
 | nginx / others | add the two headers to every location |
 
-## Steps
+## GitHub Pages (current setup)
+
+`.github/workflows/pages.yml` publishes to https://jetzhu.github.io/xiangqi/ on every push to `main`.
+It runs the unit tests, builds, checks the size budget and runs the end-to-end tests against the
+build as Pages will serve it, then deploys.
+
+- One-time setup: repo Settings → Pages → Source: **GitHub Actions**.
+- Pages cannot set headers, so the build includes `coi-serviceworker`
+  (`NEXT_PUBLIC_COI_SERVICE_WORKER=1`): on a visitor's first page load it installs a service
+  worker that adds COOP/COEP, and the page reloads once. Browsers without service workers
+  (some private modes) get the site without the engine.
+- A project site lives under `/xiangqi`, set by `NEXT_PUBLIC_BASE_PATH`. Plain links and static
+  files go through `withBase()` in `lib/site.ts`; the engine path comes from `nav.asset()`.
+- `robots.txt` ends up at `/xiangqi/robots.txt`, where crawlers don't look; submit the sitemap
+  (`/xiangqi/sitemap.xml`) in Search Console instead. A custom domain fixes both: set it in
+  Pages settings and build with `NEXT_PUBLIC_BASE_PATH` empty and `NEXT_PUBLIC_SITE_URL` the domain.
+- Test a Pages build locally:
+  ```
+  NEXT_PUBLIC_BASE_PATH=/xiangqi NEXT_PUBLIC_SITE_URL=https://jetzhu.github.io/xiangqi \
+    NEXT_PUBLIC_COI_SERVICE_WORKER=1 pnpm --filter web build
+  NEXT_PUBLIC_BASE_PATH=/xiangqi E2E_PAGES=1 pnpm --filter web e2e
+  BASE_PATH=/xiangqi NO_HEADERS=1 pnpm --filter web serve   # http://127.0.0.1:4000/xiangqi/
+  ```
+
+## Other hosts: steps
 
 1. Set the public address, used for canonical links, hreflang and the sitemap:
    `NEXT_PUBLIC_SITE_URL=https://your-domain` (no trailing slash).

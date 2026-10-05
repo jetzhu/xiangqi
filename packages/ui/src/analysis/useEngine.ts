@@ -1,5 +1,6 @@
 import { type Progress, type XiangqiEngine, engineSupported, loadFairyStockfish } from "@xq/engine";
 import { useEffect, useRef, useState } from "react";
+import { useNav } from "../nav.js";
 
 export type EngineStatus = "off" | "loading" | "ready" | "error";
 
@@ -17,6 +18,7 @@ export interface EngineView {
 export function useEngine(enabled: boolean, fen: string, multipv: number, depth: number): EngineView {
   const engine = useRef<XiangqiEngine | null>(null);
   const [status, setStatus] = useState<EngineStatus>("off");
+  const baseUrl = useNav().asset("/engine/fairy");
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<EngineView["progress"]>(null);
 
@@ -30,7 +32,7 @@ export function useEngine(enabled: boolean, fen: string, multipv: number, depth:
       return;
     }
     setStatus("loading");
-    loadFairyStockfish()
+    loadFairyStockfish({ baseUrl })
       .then((e) => {
         engine.current = e;
         setStatus("ready");
