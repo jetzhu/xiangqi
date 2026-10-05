@@ -181,3 +181,41 @@ button.play { width: 100%; font-size: 16px; padding: 10px; }
 .grades td { padding: 3px 0; border-bottom: 1px solid var(--border); }
 .grades td:last-child { text-align: right; font-weight: 700; }
 a.button { font-size: 14px; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--button); color: var(--text); text-decoration: none; }
+
+/* --- Learn --- */
+.learn { display: grid; grid-template-columns: minmax(0, 560px) minmax(260px, 360px); gap: 24px; justify-content: center; padding: 20px 16px; align-items: start; }
+@media (max-width: 900px) { .learn { grid-template-columns: minmax(0, 1fr); } .learn-side { order: -1; } }
+.path { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 0 30px; }
+.path-row { display: flex; flex-direction: column; align-items: center; transform: translateX(var(--shift)); }
+.path-node { position: relative; width: 76px; height: 76px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid var(--border); background: var(--panel); padding: 0; }
+.path-node.mastered { border-color: #3a7d44; }
+.path-node.next { border-color: var(--accent); box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 25%, transparent); }
+.path-node .tick { position: absolute; bottom: -4px; right: -4px; background: #3a7d44; color: #fff; border-radius: 50%; width: 24px; height: 24px; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+.path-node .next-tag { position: absolute; top: -12px; background: var(--accent); color: #fff; font-size: 11px; padding: 1px 8px; border-radius: 10px; }
+.path-label { font-size: 14px; margin-top: 4px; color: var(--muted); }
+.rank { display: flex; gap: 12px; align-items: center; margin: 14px 0; }
+.lang { display: block; margin-top: 14px; font-size: 13px; color: var(--muted); }
+
+.lesson { padding: 12px 16px 24px; max-width: 1040px; margin: 0 auto; }
+.lesson-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.lesson-head h1 { font-size: 18px; margin: 0; white-space: nowrap; }
+.steps-bar { display: flex; gap: 4px; flex: 1; }
+.steps-bar span { flex: 1; height: 8px; border-radius: 4px; background: var(--border); }
+.steps-bar span.done { background: #3a7d44; }
+.steps-bar span.now { background: var(--accent); }
+.lesson-body { display: grid; grid-template-columns: minmax(0, 560px) minmax(260px, 380px); gap: 24px; justify-content: center; align-items: start; }
+.lesson-body.no-board { grid-template-columns: minmax(260px, 520px); }
+@media (max-width: 900px) { .lesson-body { grid-template-columns: minmax(0, 1fr); } }
+.coach { display: flex; gap: 10px; align-items: flex-start; }
+.coach .bubble { font-size: 16px; line-height: 1.5; }
+.say { margin-top: 12px; padding: 8px 12px; border-radius: 8px; background: var(--button); font-weight: 600; }
+.say.ok { background: color-mix(in srgb, #3a7d44 22%, var(--panel)); }
+.say.bad { background: color-mix(in srgb, #ca3431 20%, var(--panel)); }
+.quiz { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.quiz .option { text-align: left; padding: 10px 12px; font-size: 15px; }
+.quiz .option.right { border-color: #3a7d44; background: color-mix(in srgb, #3a7d44 25%, var(--panel)); }
+.quiz .option.wrong { border-color: #ca3431; background: color-mix(in srgb, #ca3431 20%, var(--panel)); }
+button.continue { width: 100%; margin-top: 16px; padding: 10px; font-size: 16px; }
+.lesson-done { max-width: 480px; margin: 40px auto; text-align: center; }
+.big-check { width: 72px; height: 72px; margin: 0 auto 8px; border-radius: 50%; background: #3a7d44; color: #fff; font-size: 40px; display: flex; align-items: center; justify-content: center; }
+.lesson-done .buttons { justify-content: center; }

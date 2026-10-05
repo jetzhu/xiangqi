@@ -14,7 +14,9 @@ A guest-first Xiangqi (Chinese chess) teaching and playing website, modeled on w
 | `packages/engine` | Engine Web Worker + UCI wrapper |
 | `apps/web` | Next.js site (planned) |
 | `apps/playground` | Dev playground: two-player board (M2) and analysis board (M3) (`pnpm --filter playground dev`) |
-| `content/` | Lessons, puzzles, bots |
+| `packages/bots` | Bot personalities and move choice (M4) |
+| `packages/lessons` | Lesson format, step logic, content validator (M5) |
+| `content/` | Lessons (11 units), bots; puzzles to come |
 | `spikes/engine` | M0: engine size and speed comparison |
 
 ## Requirements

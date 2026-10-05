@@ -11,6 +11,7 @@
     "@xq/board": "workspace:*",
     "@xq/bots": "workspace:*",
     "@xq/engine": "workspace:*",
+    "@xq/lessons": "workspace:*",
     "idb-keyval": "^6.3.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",

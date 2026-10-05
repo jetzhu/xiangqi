@@ -6,6 +6,9 @@ Development app for the shared packages (not the production site).
   arrows; move tree with variations, comments, promote/delete; keyboard ← → Home End; position editor
   with live legality checks; FEN/PGN import and export; share links (`#/analysis?fen=…&moves=…`);
   saved analyses in IndexedDB.
+- `#/learn` — learn path (M5): 11 units from the board to your first game, lesson player with the six step
+  types (explain, show moves, capture the stars, find the move, play it out vs the engine, quiz), coach
+  bubble, bilingual text, illegal-move explanations, progress and Learning Rank saved in IndexedDB.
 - `#/bots` — play vs bots (M4): 8 bots (content/bots/bots.json) from 250 to 2000; colour, timer and
   assist presets (Learn / Fair / Challenge); hints in two steps, takeback, resign with confirm, threat and
   suggestion arrows, move feedback badges, eval bar, live opening name, bot chat, clocks, post-game card

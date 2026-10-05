@@ -24,6 +24,8 @@ export interface ShowMovesStep extends StepBase {
   type: "show-moves";
   fen: string;
   square: string;
+  /** Set when the step deliberately shows moves cut down by check or facing generals. */
+  restricted?: boolean;
 }
 
 /** Move one piece to collect every star; other pieces don't move. */

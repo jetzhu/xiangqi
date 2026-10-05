@@ -177,6 +177,9 @@ importers:
       '@xq/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@xq/lessons':
+        specifier: workspace:*
+        version: link:../../packages/lessons
       idb-keyval:
         specifier: ^6.3.0
         version: 6.3.0

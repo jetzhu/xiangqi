@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { START_FEN } from "xiangqi-core";
-import { acceptedMoves, fewestStarMoves, judgeFindMove, learningRank, movesOf, playStarMove, startStars } from "../src/index.js";
+import { acceptedMoves, fewestStarMoves, judgeFindMove, learningRank, movesOf, playStarMove, startStars, validateStep } from "../src/index.js";
 import type { CaptureStarsStep, FindMoveStep } from "../src/index.js";
 
 const T = { en: "x", zh: "x" };
@@ -34,6 +34,13 @@ describe("lesson steps", () => {
     expect(judgeFindMove(listed, "h2h8")).toBe("illegal");
     const mate: FindMoveStep = { ...listed, fen: "4k4/R8/6N2/9/9/9/9/9/5R3/3K5 w - - 0 1", accept: "checkmate" };
     expect(acceptedMoves(mate).sort()).toEqual(["a8a9", "a8e8", "f1e1", "f1f9"]);
+  });
+
+  it("flags show-moves steps where a rule hides moves by accident", () => {
+    // Red general on e1 can't go to d1: it would face the black general on d9.
+    const step = { type: "show-moves" as const, text: T, fen: "3k5/9/9/9/9/9/9/9/4K4/9 w - - 0 1", square: "e1" };
+    expect(validateStep(step).join()).toMatch(/hidden by check or facing generals/);
+    expect(validateStep({ ...step, restricted: true })).toEqual([]);
   });
 
   it("ranks learners from Soldier to General", () => {

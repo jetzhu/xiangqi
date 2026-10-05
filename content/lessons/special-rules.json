@@ -24,7 +24,8 @@
       "text": {
         "en": "So the cannon may move up and down the file, but not sideways: that would leave the generals facing.",
         "zh": "所以这个炮只能在这条纵线上走，不能横走，否则老将就照面了。"
-      }
+      },
+      "restricted": true
     },
     {
       "type": "find-move",

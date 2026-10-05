@@ -33,6 +33,12 @@ export function validateStep(step: Step): string[] {
     case "show-moves":
       if (!pieceSideMatches(step.fen, step.square)) errs.push(`no piece of the side to move on ${step.square}`);
       else if (movesOf(step.fen, step.square).length === 0) errs.push(`piece on ${step.square} has no legal move`);
+      else if (!step.restricted) {
+        // Showing how a piece moves: rules about check or facing generals shouldn't hide moves by accident.
+        const pseudo = Position.fromFen(step.fen).pieceMoves(parseSquare(step.square)).length;
+        const legal = movesOf(step.fen, step.square).length;
+        if (legal < pseudo) errs.push(`${pseudo - legal} move(s) hidden by check or facing generals (set "restricted" if intended)`);
+      }
       break;
     case "capture-stars": {
       if (!pieceSideMatches(step.fen, step.square)) errs.push(`no piece of the side to move on ${step.square}`);

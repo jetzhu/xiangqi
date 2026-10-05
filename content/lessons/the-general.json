@@ -29,7 +29,7 @@
     },
     {
       "type": "show-moves",
-      "fen": "3k5/9/9/9/9/9/9/9/4K4/9 w - - 0 1",
+      "fen": "3k5/9/3n5/9/9/9/9/9/4K4/9 w - - 0 1",
       "square": "e1",
       "text": {
         "en": "The general moves one point at a time along a line: forward, back or sideways. It never moves diagonally.",
