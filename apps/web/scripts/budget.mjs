@@ -8,6 +8,9 @@ import { gzipSync } from "node:zlib";
 
 const BUDGET = { initialKB: 150, chunkKB: 100 };
 const out = fileURLToPath(new URL("../out/", import.meta.url));
+// Script URLs carry the base path (e.g. /xiangqi/_next/…); files in out/ do not.
+const base = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
+const fileOf = (src) => join(out, decodeURIComponent(base && src.startsWith(`${base}/`) ? src.slice(base.length) : src));
 const gz = (file) => gzipSync(readFileSync(file)).length / 1024;
 
 const pages = [];
@@ -25,7 +28,7 @@ let worst = { page: "", kb: 0 };
 for (const page of pages) {
   const html = readFileSync(page, "utf8");
   const scripts = [...html.matchAll(/<script src="([^"]+\.js)"([^>]*)>/g)].filter((m) => !m[2].includes("noModule") && !m[2].includes("nomodule"));
-  const kb = scripts.reduce((sum, m) => sum + gz(join(out, decodeURIComponent(m[1]))), 0);
+  const kb = scripts.reduce((sum, m) => sum + gz(fileOf(m[1])), 0);
   if (kb > worst.kb) worst = { page: page.slice(out.length), kb };
   if (kb > BUDGET.initialKB) {
     console.error(`✗ ${page.slice(out.length)}: initial JS ${kb.toFixed(0)} KB gz > ${BUDGET.initialKB}`);
