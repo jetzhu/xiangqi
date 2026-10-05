@@ -6,12 +6,12 @@ import { type Lang, type NotationStyle, type Settings, useSettings, useT } from 
 /** The start position after 1. 炮二平五, used for decorative boards. */
 const AFTER_CENTRAL_CANNON = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR b - - 1 1";
 
-interface Props {
+export interface SettingsPageProps {
   /** Called when the language changes (the website switches to the other locale's URL). */
   onLanguage?: (lang: Lang) => void;
 }
 
-export function SettingsPage({ onLanguage }: Props) {
+export function SettingsPage({ onLanguage }: SettingsPageProps) {
   const { settings, update } = useSettings();
   const { tt } = useT();
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => update({ [k]: v } as Partial<Settings>);

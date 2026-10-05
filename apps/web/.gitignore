@@ -1,0 +1,5 @@
+.next/
+out/
+public/engine/
+next-env.d.ts
+*.tsbuildinfo

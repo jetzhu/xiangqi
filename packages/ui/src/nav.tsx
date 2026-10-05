@@ -19,12 +19,20 @@ export const hashNav: Nav = {
   replace: (path) => history.replaceState(null, "", `#${path}`),
 };
 
-/** Paths prefixed with a locale segment, e.g. "/zh/analysis". */
+/**
+ * Paths prefixed with a locale segment and ending in a slash before any query, e.g.
+ * "/zh/analysis/?moves=…" (static hosting serves each page as a folder's index.html).
+ */
 export function prefixNav(prefix: string): Nav {
+  const href = (path: string) => {
+    const [p = "/", q] = path.split("?");
+    const withSlash = p.endsWith("/") ? p : `${p}/`;
+    return `${prefix}${withSlash}${q ? `?${q}` : ""}`;
+  };
   return {
-    href: (path) => `${prefix}${path}`,
+    href,
     params: () => new URLSearchParams(typeof location === "undefined" ? "" : location.search),
-    replace: (path) => history.replaceState(null, "", `${prefix}${path}`),
+    replace: (path) => history.replaceState(null, "", href(path)),
   };
 }
 

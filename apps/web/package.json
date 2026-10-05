@@ -1,0 +1,26 @@
+{
+  "name": "web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare-engine": "node scripts/copy-engine.mjs",
+    "dev": "node scripts/copy-engine.mjs && next dev --webpack --port 3000",
+    "build": "node scripts/copy-engine.mjs && next build --webpack",
+    "serve": "node scripts/serve.mjs"
+  },
+  "dependencies": {
+    "@xq/content": "workspace:*",
+    "@xq/engine": "workspace:*",
+    "@xq/lessons": "workspace:*",
+    "@xq/ui": "workspace:*",
+    "next": "16.3.8",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "7.0.2"
+  }
+}

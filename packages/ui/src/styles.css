@@ -250,3 +250,5 @@ a.button.primary { background: var(--accent); color: #fff; border-color: var(--a
 .settings { display: grid; grid-template-columns: minmax(0, 480px) minmax(280px, 420px); gap: 24px; justify-content: center; padding: 20px 16px; align-items: start; }
 @media (max-width: 860px) { .settings { grid-template-columns: minmax(0, 1fr); } }
 :focus-visible { outline: 3px solid #3c8cff; outline-offset: 2px; }
+.lesson-index, .lesson-text { max-width: 760px; margin: 24px auto; padding: 0 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.lesson-text h2 { color: var(--text); }

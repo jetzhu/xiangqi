@@ -25,7 +25,12 @@ function UnitIcon({ icon }: { icon: string }) {
   );
 }
 
-export function LearnPage() {
+export interface LearnPageProps {
+  /** On the website each lesson has its own URL; the playground opens lessons in place. */
+  lessonHref?: (id: string) => string;
+}
+
+export function LearnPage({ lessonHref }: LearnPageProps = {}) {
   const { lang } = useT();
   const [progress, setProgress] = useState<Progress>({});
   const [open, setOpen] = useState<string | null>(null);
@@ -41,6 +46,10 @@ export function LearnPage() {
   const lesson = open ? LESSONS.get(open) : undefined;
 
   const openLesson = (id: string) => {
+    if (lessonHref) {
+      location.href = lessonHref(id);
+      return;
+    }
     setOpen(id);
     void setStatus(id, "started").then(setProgress);
   };
