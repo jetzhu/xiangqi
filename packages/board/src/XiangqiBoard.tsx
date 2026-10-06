@@ -50,6 +50,8 @@ export interface XiangqiBoardProps {
   moveMethod?: "both" | "drag" | "click";
   showLegalMoves?: boolean;
   animation?: boolean;
+  /** Length of the move slide in ms (with `animation`). */
+  animationMs?: number;
   /** Allow right-click arrows and point marks drawn by the user. */
   drawable?: boolean;
   /** Text for screen readers, e.g. the last move in notation. */
@@ -112,6 +114,7 @@ export function XiangqiBoard({
   moveMethod = "both",
   showLegalMoves = true,
   animation = true,
+  animationMs = 180,
   drawable = true,
   announce = "",
   ariaLabel = "Xiangqi board",
@@ -404,6 +407,7 @@ export function XiangqiBoard({
       <svg
         ref={svgRef}
         viewBox={viewBox(showCoordinates)}
+        data-orientation={orientation}
         // A board without a label is decorative: hidden from assistive tech and the tab order.
         {...(ariaLabel
           ? { role: "application", "aria-label": ariaLabel, "aria-roledescription": "Xiangqi board", tabIndex: 0 }
@@ -467,7 +471,7 @@ export function XiangqiBoard({
             {...ptAttrs(toScreen(check, orientation))}
             r={0.62}
             fill={`url(#${uid}-check)`}
-            style={{ animation: `${uid}-pulse 1.2s ease-in-out infinite` }}
+            style={animation ? { animation: `${uid}-pulse 1.2s ease-in-out infinite` } : { opacity: 0.8 }}
           />
         )}
 
@@ -501,7 +505,7 @@ export function XiangqiBoard({
                     ? ({
                         "--dx": `${from.x - x}px`,
                         "--dy": `${from.y - y}px`,
-                        animation: `${uid}-slide 180ms ease-out`,
+                        animation: `${uid}-slide ${animationMs}ms ease-out`,
                       } as CSSProperties)
                     : undefined
                 }

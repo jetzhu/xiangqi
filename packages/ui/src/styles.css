@@ -287,3 +287,5 @@ a.button.primary { background: var(--accent); color: #fff; border-color: var(--a
 .key-moments { margin-top: 8px; }
 .moment { margin-top: 8px; padding: 8px 10px; border-left: 3px solid currentColor; background: var(--button); border-radius: 6px; }
 .moment p { color: var(--text); margin: 0 0 6px; font-size: 14px; }
+.confirm-move { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
+.play-clocks { display: flex; gap: 8px; margin: 10px 0; }

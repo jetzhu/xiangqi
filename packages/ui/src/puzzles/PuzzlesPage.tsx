@@ -9,7 +9,7 @@ import { DailyPuzzle } from "./DailyPuzzle.js";
 import { PuzzleRush } from "./PuzzleRush.js";
 import { Board } from "../Board.js";
 import { useNav } from "../nav.js";
-import { type Settings, useSettings, useSound, useT } from "../settings.js";
+import { type Settings, useOrientation, useSettings, useSound, useT } from "../settings.js";
 
 /** The first puzzles a new solver sees: the easiest mates in one. */
 const ONBOARDING = PUZZLES.filter((p) => p.themes.includes("mateIn1"))
@@ -169,6 +169,7 @@ function RatedPuzzles() {
 
   const solverRed = puzzle ? puzzle.fen.split(" ")[1] !== "b" : true;
   const solver = solverRed ? "red" : "black";
+  const orientation = useOrientation(solver);
   const position = useMemo(() => (fen ? Position.fromFen(fen) : null), [fen]);
   const checkSq = position && position.isInCheck(position.turn) ? squareName(position.kings[position.turn === 1 ? 0 : 1]) : null;
 
@@ -242,7 +243,7 @@ function RatedPuzzles() {
       <div className="board-col">
         <Board
           fen={fen}
-          orientation={solver}
+          orientation={orientation}
           movable={myTurn ? solver : "none"}
           legalMoves={myTurn ? new Game(fen).legalMoves().map(toIccs) : []}
           onMove={onMove}

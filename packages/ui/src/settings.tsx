@@ -20,6 +20,12 @@ export interface Settings {
   showLegalMoves: boolean;
   /** Rated puzzles aim this far above the solver's rating (see PuzzlesPage). */
   puzzleDifficulty: "standard" | "hard" | "extra";
+  /** Piece movement on the board; "off" also stops the pulsing check marker. */
+  animation: "slow" | "normal" | "fast" | "off";
+  /** Ask before a move is played (helps against misclicks). */
+  confirmMove: boolean;
+  /** Keep Red at the bottom even when playing or solving as Black. */
+  redAtBottom: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -32,7 +38,17 @@ export const DEFAULT_SETTINGS: Settings = {
   sound: true,
   showLegalMoves: true,
   puzzleDifficulty: "standard",
+  animation: "normal",
+  confirmMove: false,
+  redAtBottom: false,
 };
+
+export const ANIMATION_MS: Record<Settings["animation"], number> = { slow: 320, normal: 180, fast: 90, off: 0 };
+
+/** Board orientation for a player or solver of `side`, honouring "Red always at the bottom". */
+export function useOrientation(side: "red" | "black"): "red" | "black" {
+  return useContext(SettingsContext).settings.redAtBottom ? "red" : side;
+}
 
 const KEY = "xq:settings:v1";
 

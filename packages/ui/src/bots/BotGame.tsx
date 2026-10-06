@@ -22,7 +22,7 @@ import { recordActivity } from "../streak.js";
 import { useEngineInstance } from "./useEngineInstance.js";
 import { Board } from "../Board.js";
 import { useNav } from "../nav.js";
-import { useSettings, useSound } from "../settings.js";
+import { useOrientation, useSettings, useSound } from "../settings.js";
 
 const other = (c: Color): Color => (c === "red" ? "black" : "red");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -65,6 +65,7 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
   const playSound = useSound();
   const nav = useNav();
   const notation = useSettings().settings.notation;
+  const orientation = useOrientation(playerColor);
   const t = (x: Text) => x[lang];
   const tt = (en: string, zh: string) => (lang === "zh" ? zh : en);
   const a = settings.assists;
@@ -396,7 +397,7 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
               <EvalBar
                 value={evalNow ? scoreToBar(evalNow.score) : 0}
                 label={evalNow ? formatScore(evalNow.score) : ""}
-                orientation={playerColor}
+                orientation={orientation}
                 pending={!evalNow}
               />
             </div>
@@ -404,7 +405,7 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
           {focus && review?.moves ? (
             <Board
               fen={fenBefore(focus.index)}
-              orientation={playerColor}
+              orientation={orientation}
               movable={focus.retry ? playerColor : "none"}
               legalMoves={focus.retry ? new Game(fenBefore(focus.index)).legalMoves().map(toIccs) : []}
               onMove={(m) => {
@@ -417,7 +418,7 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
           ) : (
             <Board
               fen={fen}
-              orientation={playerColor}
+              orientation={orientation}
               movable={myTurn ? playerColor : "none"}
               legalMoves={myTurn ? game.legalMoves().map(toIccs) : []}
               onMove={onMove}
@@ -466,9 +467,16 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
                 {tt("Takeback", "悔棋")}
               </button>
             )}
-            <button type="button" className={confirmResign ? "primary" : ""} onClick={resign} onBlur={() => setConfirmResign(false)}>
-              {confirmResign ? tt("Confirm resign?", "确认认输？") : tt("Resign", "认输")}
-            </button>
+            {playerMoves === 0 ? (
+              // Before the player's first move the game can be called off; nothing is recorded.
+              <button type="button" onClick={onExit}>
+                {tt("Abort", "取消对局")}
+              </button>
+            ) : (
+              <button type="button" className={confirmResign ? "primary" : ""} onClick={resign} onBlur={() => setConfirmResign(false)}>
+                {confirmResign ? tt("Confirm resign?", "确认认输？") : tt("Resign", "认输")}
+              </button>
+            )}
           </div>
         )}
 

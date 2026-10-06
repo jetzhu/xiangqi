@@ -5,7 +5,7 @@ import { type Puzzle, goalOf, pickPuzzle, rushTarget } from "@xq/puzzles";
 import { useEffect, useRef, useState } from "react";
 import { Board } from "../Board.js";
 import { useNav } from "../nav.js";
-import { useSound, useT } from "../settings.js";
+import { useOrientation, useSound, useT } from "../settings.js";
 import { recordActivity } from "../streak.js";
 import { type RushMode, loadRushBest, saveRushScore } from "./modes.js";
 import { useSolver } from "./useSolver.js";
@@ -66,6 +66,8 @@ export function PuzzleRush() {
     // A short pause so the solver sees the last move land.
     setTimeout(() => setPuzzle(p), solved ? 300 : 600);
   });
+
+  const orientation = useOrientation(solver.solverRed ? "red" : "black");
 
   // The clock.
   useEffect(() => {
@@ -145,7 +147,7 @@ export function PuzzleRush() {
       <div className="board-col">
         <Board
           fen={solver.fen}
-          orientation={solverColor}
+          orientation={orientation}
           movable={solver.myTurn ? solverColor : "none"}
           legalMoves={solver.legalMoves}
           onMove={solver.onMove}

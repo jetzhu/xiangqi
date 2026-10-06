@@ -71,6 +71,15 @@ export function SettingsPage({ onLanguage }: SettingsPageProps) {
             </select>
           </label>
           <label>
+            {tt("Animation", "动画")}
+            <select value={settings.animation} onChange={(e) => set("animation", e.target.value as Settings["animation"])}>
+              <option value="slow">{tt("Slow", "慢")}</option>
+              <option value="normal">{tt("Normal", "正常")}</option>
+              <option value="fast">{tt("Fast", "快")}</option>
+              <option value="off">{tt("Off", "关闭")}</option>
+            </select>
+          </label>
+          <label>
             {tt("Move pieces by", "走子方式")}
             <select value={settings.moveMethod} onChange={(e) => set("moveMethod", e.target.value as Settings["moveMethod"])}>
               <option value="both">{tt("Drag or click", "拖动或点击")}</option>
@@ -87,6 +96,14 @@ export function SettingsPage({ onLanguage }: SettingsPageProps) {
           <label className="check">
             <input type="checkbox" checked={settings.sound} onChange={(e) => set("sound", e.target.checked)} />
             {tt("Sound", "声音")}
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={settings.confirmMove} onChange={(e) => set("confirmMove", e.target.checked)} />
+            {tt("Confirm each move", "走子前确认")}
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={settings.redAtBottom} onChange={(e) => set("redAtBottom", e.target.checked)} />
+            {tt("Red always at the bottom", "红方始终在下")}
           </label>
         </fieldset>
       </section>

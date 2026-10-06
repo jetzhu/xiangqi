@@ -5,7 +5,7 @@ import { dailyPuzzle, goalOf } from "@xq/puzzles";
 import { useEffect, useMemo, useState } from "react";
 import { Board } from "../Board.js";
 import { useNav } from "../nav.js";
-import { useT } from "../settings.js";
+import { useOrientation, useT } from "../settings.js";
 import { dayOf, recordActivity } from "../streak.js";
 import { loadDailySolved, markDailySolved } from "./modes.js";
 import { useSolver } from "./useSolver.js";
@@ -29,6 +29,7 @@ export function DailyPuzzle() {
   });
   useEffect(() => setHint(0), [solver.fen]);
 
+  const orientation = useOrientation(solver.solverRed ? "red" : "black");
   if (!puzzle) return null;
   const solverColor = solver.solverRed ? "red" : "black";
   const solving = phase === "solving";
@@ -42,7 +43,7 @@ export function DailyPuzzle() {
       <div className="board-col">
         <Board
           fen={solver.fen}
-          orientation={solverColor}
+          orientation={orientation}
           movable={solving && solver.myTurn ? solverColor : "none"}
           legalMoves={solving ? solver.legalMoves : []}
           onMove={solver.onMove}
