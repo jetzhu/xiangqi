@@ -18,8 +18,8 @@ export interface Settings {
   moveMethod: "both" | "drag" | "click";
   sound: boolean;
   showLegalMoves: boolean;
-  /** Rated puzzles aim this far above the solver's rating (see PuzzlesPage). */
-  puzzleDifficulty: "standard" | "hard" | "extra";
+  /** Rated puzzles: near the solver's rating ("auto"), or from one level. */
+  puzzleDifficulty: "auto" | "beginner" | "standard" | "hard" | "extraHard";
   /** Piece movement on the board; "off" also stops the pulsing check marker. */
   animation: "slow" | "normal" | "fast" | "off";
   /** Ask before a move is played (helps against misclicks). */
@@ -37,7 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   moveMethod: "both",
   sound: true,
   showLegalMoves: true,
-  puzzleDifficulty: "standard",
+  puzzleDifficulty: "auto",
   animation: "normal",
   confirmMove: false,
   redAtBottom: false,
@@ -68,10 +68,15 @@ export function useOrientation(side: "red" | "black"): "red" | "black" {
 
 const KEY = "xq:settings:v1";
 
+/** Older saved values: difficulty used to be an offset ("standard" meant "near my rating"). */
+const OLD_DIFFICULTY: Record<string, Settings["puzzleDifficulty"]> = { standard: "auto", extra: "extraHard" };
+
 function read(): Partial<Settings> {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Partial<Settings>) : {};
+    const saved = raw ? (JSON.parse(raw) as Partial<Settings> & { puzzleDifficulty?: string }) : {};
+    if (saved.puzzleDifficulty && saved.puzzleDifficulty in OLD_DIFFICULTY) saved.puzzleDifficulty = OLD_DIFFICULTY[saved.puzzleDifficulty]!;
+    return saved as Partial<Settings>;
   } catch {
     return {};
   }

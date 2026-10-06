@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NEW_PLAYER, type Puzzle, dailyPuzzle, goalOf, judge, pickPuzzle, rushTarget, updateRating, validatePuzzle } from "../src/index.js";
+import { NEW_PLAYER, type Puzzle, dailyPuzzle, goalOf, judge, levelOf, pickInLevel, pickPuzzle, rushTarget, updateRating, validatePuzzle } from "../src/index.js";
 
 const MATE: Puzzle = {
   id: "t-mate",
@@ -69,5 +69,30 @@ describe("daily puzzle and rush", () => {
   it("rush targets climb", () => {
     expect(rushTarget(0)).toBe(400);
     expect(rushTarget(10)).toBeGreaterThan(rushTarget(5));
+  });
+});
+
+describe("levels", () => {
+  const mk = (id: string, rating: number): Puzzle => ({ id, fen: "", solution: [], rating, themes: [], source: "test" });
+  const set = [mk("a", 600), mk("b", 900), mk("c", 1100), mk("d", 1300), mk("e", 1700)];
+  it("maps ratings to levels", () => {
+    expect(levelOf(600)).toBe("beginner");
+    expect(levelOf(800)).toBe("standard");
+    expect(levelOf(1599)).toBe("hard");
+    expect(levelOf(2000)).toBe("extraHard");
+  });
+  it("picks inside the chosen level, nearest the solver's rating", () => {
+    expect(pickInLevel(set, 600, "hard", new Set())!.id).toBe("d");
+    expect(pickInLevel(set, 1150, "standard", new Set(), () => 0)!.id).toBe("c");
+    expect(pickInLevel(set, 600, "extraHard", new Set(["e"]))!.id).toBe("e"); // all seen: repeats
+    expect(pickInLevel([mk("x", 600)], 600, "hard", new Set())).toBeNull();
+  });
+});
+
+describe("stalemate wins", () => {
+  it("explains the goal: in Xiangqi a side with no legal move loses", () => {
+    const p: Puzzle = { id: "s", fen: "", solution: ["a0a1", "a9a8", "a1a2"], rating: 1200, themes: ["stalemate"], source: "test" };
+    expect(goalOf(p).en).toBe("Win in 2 moves: leave the opponent with no legal move.");
+    expect(goalOf(p).zh).toContain("困毙");
   });
 });

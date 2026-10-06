@@ -10,7 +10,7 @@ const lessons = readdirSync(root("lessons"))
   .sort()
   .map((f) => JSON.parse(readFileSync(root(`lessons/${f}`), "utf8")));
 const bots = JSON.parse(readFileSync(root("bots/bots.json"), "utf8"));
-const puzzles = readFileSync(root("puzzles/generated.jsonl"), "utf8")
+const puzzles = readFileSync(root("puzzles/puzzles.jsonl"), "utf8")
   .split("\n")
   .filter(Boolean)
   .map((l) => JSON.parse(l));

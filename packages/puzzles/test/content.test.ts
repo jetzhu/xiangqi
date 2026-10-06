@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { type Puzzle, validatePuzzle } from "../src/index.js";
 
-const lines = readFileSync(new URL("../../../content/puzzles/generated.jsonl", import.meta.url), "utf8").split("\n").filter(Boolean);
+const lines = readFileSync(new URL("../../../content/puzzles/puzzles.jsonl", import.meta.url), "utf8").split("\n").filter(Boolean);
 const puzzles: Puzzle[] = lines.map((l) => JSON.parse(l));
 
 describe("puzzle content", () => {

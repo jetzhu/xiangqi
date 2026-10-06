@@ -10,7 +10,7 @@
 // 4. Difficulty: the shallowest depth at which the engine finds the first move, plus length.
 //
 // Usage:
-//   node scripts/generate.mjs --games 40 --workers 3 --seed 1 --out ../../content/puzzles/generated.jsonl
+//   node scripts/generate.mjs --games 40 --workers 3 --seed 1 --out ../../content/puzzles/puzzles.jsonl
 //   --hard: aim at harder puzzles — also mine positions where a forced mate in 2–7 has just
 //   appeared, allow solutions of up to 7 solver moves, search deeper, and skip one-movers.
 // Needs a native Pikafish binary + net (see spikes/engine/build-pikafish.sh); set PIKAFISH=path.
@@ -30,7 +30,7 @@ const arg = (name, def) => {
 const GAMES = Number(arg("games", 20));
 const WORKERS = Number(arg("workers", 2));
 const SEED = Number(arg("seed", 1));
-const OUT = arg("out", join(here, "../../../content/puzzles/generated.jsonl"));
+const OUT = arg("out", join(here, "../../../content/puzzles/puzzles.jsonl"));
 const HARD = process.argv.includes("--hard");
 const MAX_SOLVER_MOVES = HARD ? 7 : 3;
 const DEPTH = HARD ? 16 : 14;
@@ -187,6 +187,7 @@ async function buildPuzzle(engine, start) {
   const solution = [];
   let fen = start;
   let mate = null;
+  let stalemate = false;
   for (let k = 0; k < MAX_SOLVER_MOVES; k++) {
     const lines = await engine.analyze(fen, DEPTH, 2);
     const [best, second] = lines;
@@ -203,8 +204,11 @@ async function buildPuzzle(engine, start) {
     }
     solution.push(best.move);
     fen = play(fen, best.move);
-    if (new Game(fen).result) {
+    const end = new Game(fen).result;
+    if (end) {
       mate = Math.ceil(solution.length / 2);
+      // 困毙: leaving the opponent no legal move also wins in Xiangqi.
+      if (end.reason === "stalemate") stalemate = true;
       break;
     }
     // Opponent's best reply; continue only if the solver's next move is again unique.
@@ -263,7 +267,8 @@ async function buildPuzzle(engine, start) {
 
   // Themes.
   const themes = new Set();
-  if (mate) themes.add(`mateIn${solverMoves}`);
+  if (stalemate) themes.add("stalemate");
+  else if (mate) themes.add(`mateIn${solverMoves}`);
   else themes.add("advantage");
   themes.add(solverMoves === 1 ? "oneMove" : solverMoves === 2 ? "short" : "long");
   let f = start;

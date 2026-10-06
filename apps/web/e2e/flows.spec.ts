@@ -22,7 +22,7 @@ test("first lesson: read, answer the quizzes, finish", async ({ page }) => {
 
 test("first puzzle: the warm-up mate in one", async ({ page }) => {
   // The first warm-up is the easiest mate-in-one in the set (see PuzzlesPage ONBOARDING).
-  const puzzles = readFileSync(new URL("../../../content/puzzles/generated.jsonl", import.meta.url), "utf8")
+  const puzzles = readFileSync(new URL("../../../content/puzzles/puzzles.jsonl", import.meta.url), "utf8")
     .trim()
     .split("\n")
     .map((l) => JSON.parse(l) as { fen: string; solution: string[]; rating: number; themes: string[] });

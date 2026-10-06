@@ -1,5 +1,5 @@
 import { type Arrow, type Highlight } from "@xq/board";
-import { type Puzzle, goalOf, judge, pickPuzzle, updateRating } from "@xq/puzzles";
+import { LEVELS, type Puzzle, goalOf, judge, levelOf, pickInLevel, pickPuzzle, updateRating } from "@xq/puzzles";
 import { useEffect, useMemo, useState } from "react";
 import { Game, Position, explainIllegal, parseSquare, squareName, toIccs } from "xiangqi-core";
 import { PUZZLES } from "@xq/content";
@@ -20,6 +20,16 @@ const THEME_NAMES: Record<string, [string, string]> = {
   mateIn1: ["Mate in 1", "一步杀"],
   mateIn2: ["Mate in 2", "两步杀"],
   mateIn3: ["Mate in 3", "三步杀"],
+  mateIn4: ["Mate in 4", "四步杀"],
+  mateIn5: ["Mate in 5", "五步杀"],
+  mateIn6: ["Mate in 6", "六步杀"],
+  mateIn7: ["Mate in 7", "七步杀"],
+  quiet: ["Quiet move", "冷着"],
+  stalemate: ["Stalemate win", "困毙"],
+  decoy: ["Tempting wrong tries", "有迷惑着法"],
+  discoveredCheck: ["Discovered check", "抽将"],
+  cannonScreen: ["Cannon screen", "炮架"],
+  classical: ["Classical", "古谱"],
   advantage: ["Win material", "得子"],
   fork: ["Fork", "捉双"],
   sacrifice: ["Sacrifice", "弃子"],
@@ -37,11 +47,14 @@ const THEME_NAMES: Record<string, [string, string]> = {
 
 type Phase = "solving" | "solved" | "failed" | "review";
 
-/**
- * How far above the solver's rating each difficulty aims. chess.com offers the same three
- * levels but doesn't publish its numbers; these are ours.
- */
-const DIFFICULTY_OFFSET: Record<Settings["puzzleDifficulty"], number> = { standard: 0, hard: 150, extra: 300 };
+/** Difficulty choices: near the solver's rating, or one level (a rating band, see @xq/puzzles). */
+const DIFFICULTY_NAMES: Record<Settings["puzzleDifficulty"], [string, string]> = {
+  auto: ["Match my rating", "按我的等级分"],
+  beginner: ["Beginner", "入门"],
+  standard: ["Standard", "标准"],
+  hard: ["Hard", "较难"],
+  extraHard: ["Extra hard", "很难"],
+};
 
 type Mode = "rated" | "daily" | "rush";
 
@@ -140,7 +153,8 @@ function RatedPuzzles() {
     // The first puzzles are a warm-up: easy mates in one, not rated.
     if (s.history.length < ONBOARDING.length && onboarding) start(onboarding, false);
     else {
-      const p = pickPuzzle(PUZZLES, s.rating.rating + DIFFICULTY_OFFSET[difficulty], seen);
+      const p =
+        (difficulty !== "auto" && pickInLevel(PUZZLES, s.rating.rating, difficulty, seen)) || pickPuzzle(PUZZLES, s.rating.rating, seen);
       if (p) start(p, true);
     }
   };
@@ -288,13 +302,13 @@ function RatedPuzzles() {
               else setDifficultyNote(true);
             }}
           >
-            <option value="standard">{tt("Standard", "标准")}</option>
-            <option value="hard">{tt("Hard", "较难")}</option>
-            <option value="extra">{tt("Extra hard", "很难")}</option>
+            {(Object.keys(DIFFICULTY_NAMES) as Settings["puzzleDifficulty"][]).map((d) => (
+              <option key={d} value={d}>
+                {DIFFICULTY_NAMES[d][lang === "zh" ? 1 : 0]}
+                {d !== "auto" && ` (${LEVELS[d].min}${LEVELS[d].max < 9999 ? `–${LEVELS[d].max + 1}` : "+"})`}
+              </option>
+            ))}
           </select>
-          <span className="muted">
-            {tt("aims at", "目标")} {state.rating.rating + DIFFICULTY_OFFSET[settings.puzzleDifficulty]}
-          </span>
         </label>
         {difficultyNote && (
           <p className="muted small">
@@ -342,8 +356,13 @@ function RatedPuzzles() {
         </div>
         {phase !== "solving" && (
           <div className="themes">
+            {puzzle.name && (
+              <p className="classical">
+                {tt("Classical composition:", "古谱排局：")} {puzzle.name}
+              </p>
+            )}
             <span className="muted">
-              {tt("Puzzle", "题目")} {puzzle.rating} ·{" "}
+              {tt("Puzzle", "题目")} {puzzle.rating} · {DIFFICULTY_NAMES[levelOf(puzzle.rating)][lang === "zh" ? 1 : 0]} ·{" "}
             </span>
             {puzzle.themes.map((t) => (
               <span key={t} className="chip">

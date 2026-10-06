@@ -161,6 +161,30 @@ export function HelpPage({ version, issuesUrl }: HelpPageProps) {
         </section>
       )}
 
+      <section aria-labelledby="h-credits">
+        <h2 id="h-credits">{tt("Credits", "致谢")}</h2>
+        <ul>
+          <li>
+            {tt("Classical puzzles: positions from 适情雅趣 (1570) and the 江湖 street-endgame collection, via ", "古谱题目：局面出自《适情雅趣》（1570年）和江湖残局，取自 ")}
+            <a href="https://github.com/floatai/xiangqibench" target="_blank" rel="noreferrer">
+              XiangqiBench
+            </a>{" "}
+            {tt("(MIT licence, © 2026 FloatAI). Solutions are computed by our engine.", "（MIT 许可，© 2026 FloatAI）。解法由我们的引擎计算。")}
+          </li>
+          <li>
+            {tt("Analysis and bots: ", "分析与机器人：")}
+            <a href="https://github.com/fairy-stockfish/Fairy-Stockfish" target="_blank" rel="noreferrer">
+              Fairy-Stockfish
+            </a>{" "}
+            {tt("(GPL-3.0). Puzzles were generated and checked with ", "（GPL-3.0）。题目由以下引擎生成并验证：")}
+            <a href="https://github.com/official-pikafish/Pikafish" target="_blank" rel="noreferrer">
+              Pikafish
+            </a>{" "}
+            (GPL-3.0).
+          </li>
+        </ul>
+      </section>
+
       <p className="muted small">
         {tt("Version", "版本")} {version}
       </p>

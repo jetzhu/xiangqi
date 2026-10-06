@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { at, play } from "./helpers.js";
 
 type P = { id: string; fen: string; solution: string[]; rating: number; themes: string[] };
-const puzzles = readFileSync(new URL("../../../content/puzzles/generated.jsonl", import.meta.url), "utf8")
+const puzzles = readFileSync(new URL("../../../content/puzzles/puzzles.jsonl", import.meta.url), "utf8")
   .trim()
   .split("\n")
   .map((l) => JSON.parse(l) as P);
@@ -64,7 +64,7 @@ test("puzzle tabs switch modes and keep the address", async ({ page }) => {
   await expect(page.getByText("Warm-up 1/")).toBeVisible();
 });
 
-test("changing difficulty swaps an untouched rated puzzle for a harder one", async ({ page }) => {
+test("choosing a level swaps an untouched rated puzzle for one from that level", async ({ page }) => {
   // A player past the warm-up, rated 800.
   await page.goto(at("/en/"));
   const warmups = puzzles.filter((p) => p.themes.includes("mateIn1")).sort((a, b) => a.rating - b.rating).slice(0, 5);
@@ -87,8 +87,11 @@ test("changing difficulty swaps an untouched rated puzzle for a harder one", asy
   const panel = page.locator("aside[data-puzzle]");
   const before = Number(await panel.getAttribute("data-puzzle-rating"));
   expect(before).toBeLessThan(1000);
-  await page.getByLabel("Difficulty").selectOption("extra");
+  await page.getByLabel("Difficulty").selectOption("extraHard");
   await expect(panel).not.toHaveAttribute("data-puzzle-rating", String(before));
-  expect(Number(await panel.getAttribute("data-puzzle-rating"))).toBeGreaterThanOrEqual(1000);
-  await expect(page.locator(".difficulty")).toContainText("aims at 1100");
+  expect(Number(await panel.getAttribute("data-puzzle-rating"))).toBeGreaterThanOrEqual(1600);
+  await page.getByLabel("Difficulty").selectOption("standard");
+  const r = Number(await panel.getAttribute("data-puzzle-rating"));
+  expect(r).toBeGreaterThanOrEqual(800);
+  expect(r).toBeLessThan(1200);
 });

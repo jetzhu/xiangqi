@@ -296,3 +296,4 @@ a.button.primary { background: var(--accent); color: #fff; border-color: var(--a
 kbd { font-family: ui-monospace, monospace; font-size: 0.9em; padding: 1px 5px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--button); }
 .reset-progress { margin-top: 20px; }
 .update-banner { display: flex; gap: 12px; align-items: center; justify-content: center; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--border); font-size: 14px; }
+.classical { margin: 0 0 6px; font-size: 14px; }
