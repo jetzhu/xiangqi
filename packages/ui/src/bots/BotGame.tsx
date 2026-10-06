@@ -31,6 +31,7 @@ const GRADE_TEXT: Record<MoveGrade, Text> = {
   good: { en: "Good", zh: "不错" },
   inaccuracy: { en: "Inaccuracy", zh: "欠准" },
   mistake: { en: "Mistake", zh: "失误" },
+  miss: { en: "Miss", zh: "错失良机" },
   blunder: { en: "Blunder", zh: "败着" },
 };
 const CLOCKS: Record<string, { base: number; inc: number }> = {

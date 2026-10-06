@@ -20,4 +20,4 @@ export {
   toIccs,
   toRedView,
 } from "./uci.js";
-export { type MoveGrade, type ReviewedMove, type ReviewOptions, gradeCounts, gradeMove, reviewGame, winChance } from "./review.js";
+export { type MoveGrade, type ReviewedMove, type ReviewOptions, accuracy, gradeCounts, gradeMove, reviewGame, winChance } from "./review.js";
