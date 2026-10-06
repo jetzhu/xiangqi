@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { at, play } from "./helpers.js";
 
-type P = { id: string; fen: string; solution: string[]; rating: number };
+type P = { id: string; fen: string; solution: string[]; rating: number; themes: string[] };
 const puzzles = readFileSync(new URL("../../../content/puzzles/generated.jsonl", import.meta.url), "utf8")
   .trim()
   .split("\n")
@@ -62,4 +62,33 @@ test("puzzle tabs switch modes and keep the address", async ({ page }) => {
   await expect(page).toHaveURL(/mode=rush/);
   await page.getByRole("tab", { name: "Rated" }).click();
   await expect(page.getByText("Warm-up 1/")).toBeVisible();
+});
+
+test("changing difficulty swaps an untouched rated puzzle for a harder one", async ({ page }) => {
+  // A player past the warm-up, rated 800.
+  await page.goto(at("/en/"));
+  const warmups = puzzles.filter((p) => p.themes.includes("mateIn1")).sort((a, b) => a.rating - b.rating).slice(0, 5);
+  await page.evaluate(async (ids) => {
+    const db = await new Promise<IDBDatabase>((res, rej) => {
+      const r = indexedDB.open("xq-v1-puzzles");
+      r.onupgradeneeded = () => r.result.createObjectStore("puzzles");
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    const state = { rating: { rating: 800, rd: 120 }, history: ids.map((id) => ({ id, score: 1, ratingAfter: 800, at: "2026-10-01T00:00:00Z" })) };
+    await new Promise((res) => {
+      const tx = db.transaction("puzzles", "readwrite");
+      tx.objectStore("puzzles").put(state, "state");
+      tx.oncomplete = res;
+    });
+    db.close();
+  }, warmups.map((p) => p.id));
+  await page.goto(at("/en/puzzles/"));
+  const panel = page.locator("aside[data-puzzle]");
+  const before = Number(await panel.getAttribute("data-puzzle-rating"));
+  expect(before).toBeLessThan(1000);
+  await page.getByLabel("Difficulty").selectOption("extra");
+  await expect(panel).not.toHaveAttribute("data-puzzle-rating", String(before));
+  expect(Number(await panel.getAttribute("data-puzzle-rating"))).toBeGreaterThanOrEqual(1000);
+  await expect(page.locator(".difficulty")).toContainText("aims at 1100");
 });

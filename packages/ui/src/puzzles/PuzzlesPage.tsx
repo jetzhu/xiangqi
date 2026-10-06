@@ -103,6 +103,8 @@ function RatedPuzzles() {
   const [delta, setDelta] = useState<number | null>(null);
   /** A hint was used at some point in this puzzle (hint itself resets after each correct move). */
   const [hinted, setHinted] = useState(false);
+  /** Difficulty was changed mid-puzzle (or during the warm-up): say when it takes effect. */
+  const [difficultyNote, setDifficultyNote] = useState(false);
 
   useEffect(() => {
     void loadPuzzleState().then(setState);
@@ -119,6 +121,7 @@ function RatedPuzzles() {
     setSay(null);
     setDelta(null);
     setHinted(false);
+    setDifficultyNote(false);
   };
 
   /** A hint in a rated puzzle counts as a failed attempt; solving goes on, unrated. */
@@ -131,13 +134,13 @@ function RatedPuzzles() {
     setHint((h) => Math.min(2, h + 1));
   };
 
-  const next = (s: PuzzleState) => {
+  const next = (s: PuzzleState, difficulty: Settings["puzzleDifficulty"] = settings.puzzleDifficulty) => {
     const seen = new Set(s.history.map((h) => h.id));
     const onboarding = ONBOARDING.find((p) => !seen.has(p.id));
     // The first puzzles are a warm-up: easy mates in one, not rated.
     if (s.history.length < ONBOARDING.length && onboarding) start(onboarding, false);
     else {
-      const p = pickPuzzle(PUZZLES, s.rating.rating + DIFFICULTY_OFFSET[settings.puzzleDifficulty], seen);
+      const p = pickPuzzle(PUZZLES, s.rating.rating + DIFFICULTY_OFFSET[difficulty], seen);
       if (p) start(p, true);
     }
   };
@@ -231,6 +234,7 @@ function RatedPuzzles() {
 
   if (!state || !puzzle) return <p className="muted" style={{ padding: 24 }}>{tt("Loading puzzles…", "正在加载题目…")}</p>;
 
+  const untouched = phase === "solving" && ply === 0 && lastMove === null && !hinted;
   const solverMove = puzzle.solution[ply];
   const arrows: Arrow[] = hint >= 2 && solverMove && phase === "solving" ? [{ from: solverMove.slice(0, 2), to: solverMove.slice(2, 4), color: "green" }] : [];
   const highlights: Highlight[] = hint >= 1 && solverMove && phase === "solving" ? [{ square: solverMove.slice(0, 2), kind: "hint" }] : [];
@@ -257,7 +261,7 @@ function RatedPuzzles() {
           highlights={highlights}
         />
       </div>
-      <aside className="panel">
+      <aside className="panel" data-puzzle={puzzle.id} data-puzzle-rating={puzzle.rating}>
         <div className="puzzle-head">
           <div>
             <div className="muted">{tt("Puzzle rating", "解题等级分")}</div>
@@ -272,12 +276,33 @@ function RatedPuzzles() {
         </div>
         <label className="difficulty">
           {tt("Difficulty", "难度")}
-          <select value={settings.puzzleDifficulty} onChange={(e) => update({ puzzleDifficulty: e.target.value as Settings["puzzleDifficulty"] })}>
+          <select
+            value={settings.puzzleDifficulty}
+            onChange={(e) => {
+              const difficulty = e.target.value as Settings["puzzleDifficulty"];
+              update({ puzzleDifficulty: difficulty });
+              // An untouched rated puzzle is swapped at once for one at the new level. Once the
+              // solver has moved or asked for a hint, the change waits for the next puzzle, so a
+              // hard puzzle can't be dodged mid-solve.
+              if (rated && untouched) next(state, difficulty);
+              else setDifficultyNote(true);
+            }}
+          >
             <option value="standard">{tt("Standard", "标准")}</option>
             <option value="hard">{tt("Hard", "较难")}</option>
             <option value="extra">{tt("Extra hard", "很难")}</option>
           </select>
+          <span className="muted">
+            {tt("aims at", "目标")} {state.rating.rating + DIFFICULTY_OFFSET[settings.puzzleDifficulty]}
+          </span>
         </label>
+        {difficultyNote && (
+          <p className="muted small">
+            {state.history.length < ONBOARDING.length
+              ? tt("Difficulty applies once the warm-up is done.", "热身结束后难度生效。")
+              : tt("The new difficulty starts with the next puzzle.", "新难度从下一题开始。")}
+          </p>
+        )}
         {!rated && phase === "solving" && state.history.length < ONBOARDING.length && (
           <p className="muted">
             {tt(`Warm-up ${state.history.length + 1}/${ONBOARDING.length} (not rated)`, `热身 ${state.history.length + 1}/${ONBOARDING.length}（不计分）`)}
