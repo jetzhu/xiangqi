@@ -11,6 +11,8 @@
 //
 // Usage:
 //   node scripts/generate.mjs --games 40 --workers 3 --seed 1 --out ../../content/puzzles/generated.jsonl
+//   --hard: aim at harder puzzles — also mine positions where a forced mate in 2–7 has just
+//   appeared, allow solutions of up to 7 solver moves, search deeper, and skip one-movers.
 // Needs a native Pikafish binary + net (see spikes/engine/build-pikafish.sh); set PIKAFISH=path.
 
 import { spawn } from "node:child_process";
@@ -29,6 +31,9 @@ const GAMES = Number(arg("games", 20));
 const WORKERS = Number(arg("workers", 2));
 const SEED = Number(arg("seed", 1));
 const OUT = arg("out", join(here, "../../../content/puzzles/generated.jsonl"));
+const HARD = process.argv.includes("--hard");
+const MAX_SOLVER_MOVES = HARD ? 7 : 3;
+const DEPTH = HARD ? 16 : 14;
 const ENGINE = process.env.PIKAFISH ?? join(here, "../../../spikes/engine/vendor/pikafish-native/pikafish");
 
 // --- A small UCI client for a native engine ------------------------------------------------
@@ -111,6 +116,9 @@ function material(fen, red) {
   return m;
 }
 const sideRed = (fen) => fen.split(" ")[1] !== "b";
+// Mate scores are encoded as ±(30000 − 100·n), n = moves to mate.
+const isMate = (cp) => cp >= 29000 - 100 * 7;
+const mateIn = (cp) => Math.round((30000 - cp) / 100);
 const play = (fen, move) => {
   const p = Position.fromFen(fen);
   const m = parseIccs(p, move);
@@ -140,7 +148,10 @@ async function selfPlay(engine, r) {
   for (let ply = 0; ply < 160 && !g.result; ply++) {
     const lines = await engine.analyze(fen, 6, 5);
     if (!lines.length) break;
-    records.push({ fen, top: lines[0].cp });
+    let top = lines[0].cp;
+    // Hard mode: a big advantage may hide a forced mate the shallow search can't see.
+    if (HARD && top >= 600 && top < 29000 - 100 * 7) top = (await engine.analyze(fen, 14, 1))[0]?.cp ?? top;
+    records.push({ fen, top });
     let move;
     if (ply >= 6 && r() < 0.03) {
       const legal = g.legalMoves().map(toIccs);
@@ -161,6 +172,8 @@ async function selfPlay(engine, r) {
     const now = records[i].top; // side to move at i
     const before = -records[i - 1].top; // same side's view one ply earlier
     if (now >= 300 && before <= 100 && i >= 8) out.push(records[i].fen);
+    // Hard mode: the moment a forced mate in 2–7 appears (it wasn't there a move earlier).
+    else if (HARD && i >= 8 && isMate(now) && mateIn(now) >= 2 && !isMate(before)) out.push(records[i].fen);
   }
   return out;
 }
@@ -174,14 +187,16 @@ async function buildPuzzle(engine, start) {
   const solution = [];
   let fen = start;
   let mate = null;
-  for (let k = 0; k < 3; k++) {
-    const lines = await engine.analyze(fen, 14, 2);
+  for (let k = 0; k < MAX_SOLVER_MOVES; k++) {
+    const lines = await engine.analyze(fen, DEPTH, 2);
     const [best, second] = lines;
     if (!best) break;
+    // Unique: the only clearly winning move; for a mate, no other move mates as fast (a
+    // second mate at least two moves slower is fine).
     const unique =
       !second ||
-      (best.mate !== null && best.mate > 0 && !(second.mate !== null && second.mate > 0)) ||
-      best.cp - second.cp >= 250;
+      (isMate(best.cp) && (!isMate(second.cp) || mateIn(second.cp) >= mateIn(best.cp) + 2)) ||
+      (!isMate(best.cp) && best.cp - second.cp >= 250);
     if (!unique || best.cp < 250) {
       if (k === 0) STATS.notUnique++;
       break;
@@ -193,18 +208,21 @@ async function buildPuzzle(engine, start) {
       break;
     }
     // Opponent's best reply; continue only if the solver's next move is again unique.
-    const reply = (await engine.analyze(fen, 12, 1))[0];
+    const reply = (await engine.analyze(fen, DEPTH - 2, 1))[0];
     if (!reply) break;
     const afterReply = play(fen, reply.move);
-    const peek = await engine.analyze(afterReply, 14, 2);
+    const peek = await engine.analyze(afterReply, DEPTH, 2);
     const nextUnique =
       peek[0] &&
       peek[0].cp >= 250 &&
-      (!peek[1] || (peek[0].mate > 0 && !(peek[1].mate > 0)) || peek[0].cp - peek[1].cp >= 250);
+      (!peek[1] ||
+        (isMate(peek[0].cp) && (!isMate(peek[1].cp) || mateIn(peek[1].cp) >= mateIn(peek[0].cp) + 2)) ||
+        (!isMate(peek[0].cp) && peek[0].cp - peek[1].cp >= 250));
     const gained = material(afterReply, solverRed) - material(start, solverRed);
-    if (!nextUnique || (gained >= 3 && !(peek[0]?.mate > 0))) {
+    const mating = peek[0] !== undefined && isMate(peek[0].cp);
+    if (!nextUnique || (gained >= 3 && !mating)) {
       // Stop here, ending on the solver's move — but only if the win is real after the reply.
-      if (gained < 2 && !(peek[0]?.mate > 0)) {
+      if (gained < 2 && !mating) {
         STATS.noWin++;
         return null;
       }
@@ -227,6 +245,10 @@ async function buildPuzzle(engine, start) {
     else break;
   }
   const solverMoves = (solution.length + 1) / 2;
+  if (HARD && solverMoves < 2) {
+    STATS.oneMoveSkipped = (STATS.oneMoveSkipped ?? 0) + 1;
+    return null;
+  }
   const firstIsCapture = Position.fromFen(start).board["abcdefghi".indexOf(solution[0][2]) + 9 * Number(solution[0][3])] !== 0;
   const trivial = solverMoves === 1 && found <= 2 && firstIsCapture && !mate;
   // Keep only some of the "grab the hanging piece" puzzles so the set has a spread.
@@ -257,7 +279,7 @@ async function buildPuzzle(engine, start) {
     f = next;
   });
   const id = createHash("sha1").update(start).digest("hex").slice(0, 10);
-  return { id, fen: start, solution, rating, themes: [...themes], source: "pikafish-selfplay" };
+  return { id, fen: start, solution, rating, themes: [...themes], source: HARD ? "pikafish-selfplay-hard" : "pikafish-selfplay" };
 }
 
 // --- Run ---------------------------------------------------------------------------------
