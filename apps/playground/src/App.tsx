@@ -1,6 +1,7 @@
 import {
   AnalysisPage,
   BotsPage,
+  HelpPage,
   HomePage,
   LearnPage,
   NavProvider,
@@ -13,8 +14,8 @@ import {
 } from "@xq/ui";
 import { useEffect, useState } from "react";
 
-type Route = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings";
-const ROUTES: Route[] = ["learn", "puzzles", "bots", "analysis", "play", "settings"];
+type Route = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help";
+const ROUTES: Route[] = ["learn", "puzzles", "bots", "analysis", "play", "settings", "help"];
 const routeFromHash = (): Route => ROUTES.find((r) => location.hash.startsWith(`#/${r}`)) ?? "home";
 
 /** Dev playground: the site's pages under hash routes (#/learn, #/analysis?moves=…). */
@@ -33,6 +34,7 @@ export function App() {
     analysis: <AnalysisPage />,
     play: <PlayPage />,
     settings: <SettingsPage />,
+    help: <HelpPage version="playground" />,
   }[route];
   return (
     <SettingsProvider>

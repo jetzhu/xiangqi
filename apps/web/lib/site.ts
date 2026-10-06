@@ -13,10 +13,14 @@ export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://xiangqi.ex
 export const BASE_PATH = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
 export const withBase = (path: string) => `${BASE_PATH}${path}`;
 /** Hosts that cannot send COOP/COEP headers (GitHub Pages) get them from a service worker instead. */
+/** This build's identifier (see scripts/write-version.mjs). */
+export const BUILD = process.env.NEXT_PUBLIC_BUILD ?? "dev";
+/** Where bug reports go: a new GitHub issue on the project. */
+export const ISSUES_URL = process.env.NEXT_PUBLIC_ISSUES_URL ?? "https://github.com/jetzhu/xiangqi/issues/new";
 export const COI_SERVICE_WORKER = process.env.NEXT_PUBLIC_COI_SERVICE_WORKER === "1";
 export const SITE_NAME = { zh: "象棋学堂", en: "Xiangqi School" } as const;
 
-type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings";
+type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help";
 const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; description: Record<Locale, string> }> = {
   home: {
     path: "/",
@@ -53,6 +57,11 @@ const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; desc
     path: "/play",
     title: { zh: "双人对弈", en: "Two-player Xiangqi board" },
     description: { zh: "两人在同一屏幕上下象棋。", en: "Play Xiangqi with a friend on one screen." },
+  },
+  help: {
+    path: "/help",
+    title: { zh: "帮助", en: "Help" },
+    description: { zh: "键盘快捷键、无障碍说明、常见问题和问题反馈。", en: "Keyboard shortcuts, accessibility, troubleshooting and bug reports." },
   },
   settings: {
     path: "/settings",

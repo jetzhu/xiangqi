@@ -12,6 +12,7 @@ export const PuzzlesApp = dynamic(() => import("@xq/ui").then((m) => m.PuzzlesPa
 export const BotsApp = dynamic(() => import("@xq/ui").then((m) => m.BotsPage), { ssr: false, loading });
 export const AnalysisApp = dynamic(() => import("@xq/ui").then((m) => m.AnalysisPage), { ssr: false, loading });
 export const PlayApp = dynamic(() => import("@xq/ui").then((m) => m.PlayPage), { ssr: false, loading });
+export const HelpApp = dynamic(() => import("@xq/ui").then((m) => m.HelpPage), { ssr: false, loading });
 export const SettingsApp = dynamic(() => import("@xq/ui").then((m) => m.SettingsPage), { ssr: false, loading });
 
 /** The learn path with links to each lesson's own page. */

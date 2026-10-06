@@ -22,7 +22,7 @@ import { recordActivity } from "../streak.js";
 import { useEngineInstance } from "./useEngineInstance.js";
 import { Board } from "../Board.js";
 import { useNav } from "../nav.js";
-import { useOrientation, useSettings, useSound } from "../settings.js";
+import { announceMove, useOrientation, useSettings, useSound } from "../settings.js";
 
 const other = (c: Color): Color => (c === "red" ? "black" : "red");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -428,7 +428,7 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
               arrows={arrows}
               highlights={highlights}
               badges={badges}
-              announce={history.at(-1) ? `${history.at(-1)!.color === playerColor ? "You" : bot.name.en}: ${history.at(-1)!.wxf}` : ""}
+              announce={history.at(-1) ? announceMove(history.at(-1)!, notation, lang, history.at(-1)!.color === playerColor ? tt("You", "你") : t(bot.name)) : ""}
             />
           )}
         </div>

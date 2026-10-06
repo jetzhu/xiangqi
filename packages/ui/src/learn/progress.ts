@@ -28,3 +28,12 @@ export async function setStatus(lessonId: string, status: LessonStatus): Promise
   }
   return p;
 }
+
+/** Forget all lesson progress in this browser (Settings → Reset lesson progress). */
+export async function resetProgress(): Promise<void> {
+  try {
+    if (store) await set("progress", {}, store);
+  } catch {
+    // storage blocked: nothing was saved anyway
+  }
+}

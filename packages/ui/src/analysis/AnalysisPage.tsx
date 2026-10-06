@@ -9,7 +9,7 @@ import { type SavedAnalysis, deleteSaved, listSaved, saveAnalysis } from "./stor
 import { useEngine } from "./useEngine.js";
 import { Board } from "../Board.js";
 import { type Nav, useNav } from "../nav.js";
-import { type NotationStyle, useSettings, useSound, useT } from "../settings.js";
+import { type NotationStyle, announceMove, useSettings, useSound, useT } from "../settings.js";
 
 /** Read "?fen=…&moves=h2e2,h9g7" into a tree and the node at the end of the moves. */
 function fromUrl(nav: Nav): { tree: GameTree; node: TreeNode } {
@@ -187,7 +187,7 @@ export function AnalysisPage() {
           lastMove={current.move?.iccs ?? null}
           check={checkSquare}
           arrows={arrows}
-          announce={current.move ? current.move.wxf : ""}
+          announce={current.move ? announceMove(current.move, style, settings.lang) : ""}
         />
       </div>
 

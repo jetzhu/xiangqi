@@ -43,6 +43,22 @@ export const DEFAULT_SETTINGS: Settings = {
   redAtBottom: false,
 };
 
+/**
+ * What a screen reader says after a move, in the player's language and notation:
+ * "红方 炮二平五，将军" or "Red C2.5, check". `who` replaces the side name ("You", a bot).
+ */
+export function announceMove(
+  rec: { color: "red" | "black"; wxf: string; iccs: string; chinese: string; check?: boolean; captured?: unknown },
+  notation: NotationStyle,
+  lang: Lang,
+  who?: string,
+): string {
+  const side = who ?? (lang === "zh" ? (rec.color === "red" ? "红方" : "黑方") : rec.color === "red" ? "Red" : "Black");
+  const move = notation === "chinese" ? rec.chinese : notation === "iccs" ? rec.iccs : rec.wxf;
+  const extras = [rec.captured ? (lang === "zh" ? "吃子" : "capture") : "", rec.check ? (lang === "zh" ? "将军" : "check") : ""].filter(Boolean);
+  return `${side}${lang === "zh" ? "：" : ": "}${move}${extras.length ? (lang === "zh" ? "，" : ", ") + extras.join(lang === "zh" ? "，" : ", ") : ""}`;
+}
+
 export const ANIMATION_MS: Record<Settings["animation"], number> = { slow: 320, normal: 180, fast: 90, off: 0 };
 
 /** Board orientation for a player or solver of `side`, honouring "Red always at the bottom". */

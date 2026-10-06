@@ -1,4 +1,4 @@
-export type ThemeName = "wood" | "green" | "high-contrast";
+export type ThemeName = "wood" | "green" | "high-contrast" | "colorblind";
 
 export interface Theme {
   board: string;
@@ -21,6 +21,8 @@ export interface Theme {
   bad: string;
   cursor: string;
   lineWidth: number;
+  /** Arrow colours, when the theme replaces the default green / red / blue / orange. */
+  arrows?: { green: string; red: string; blue: string; orange: string };
 }
 
 const base = {
@@ -79,5 +81,31 @@ export const THEMES: Record<ThemeName, Theme> = {
     selected: "rgba(0, 90, 255, 0.6)",
     legal: "rgba(0, 120, 0, 0.9)",
     lineWidth: 0.05,
+  },
+  // Colour-blind safe: the sides differ by fill (light vs dark discs), not only by hue, and
+  // highlights and arrows use the Okabe-Ito palette (blue / orange / vermillion / sky blue),
+  // which stays distinct with red-green colour blindness.
+  colorblind: {
+    ...base,
+    board: "#f1e2c2",
+    line: "#4a3a28",
+    riverText: "#4a3a28",
+    coordinate: "#4a3a28",
+    pieceFace: "#fff8ea",
+    pieceEdge: "#4a3a28",
+    red: "#c84f00",
+    black: "#111111",
+    blackFace: "#262626",
+    blackText: "#ffffff",
+    lastMove: "rgba(240, 228, 66, 0.55)",
+    selected: "rgba(86, 180, 233, 0.6)",
+    legal: "rgba(0, 114, 178, 0.8)",
+    hint: "rgba(86, 180, 233, 0.6)",
+    check: "rgba(213, 94, 0, 0.8)",
+    good: "rgba(0, 114, 178, 0.5)",
+    bad: "rgba(213, 94, 0, 0.55)",
+    cursor: "rgba(0, 114, 178, 0.95)",
+    lineWidth: 0.04,
+    arrows: { green: "rgba(0, 114, 178, 0.85)", red: "rgba(213, 94, 0, 0.85)", blue: "rgba(86, 180, 233, 0.9)", orange: "rgba(230, 159, 0, 0.9)" },
   },
 };

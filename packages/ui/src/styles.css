@@ -289,3 +289,10 @@ a.button.primary { background: var(--accent); color: #fff; border-color: var(--a
 .moment p { color: var(--text); margin: 0 0 6px; font-size: 14px; }
 .confirm-move { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
 .play-clocks { display: flex; gap: 8px; margin: 10px 0; }
+.help { max-width: 760px; margin: 24px auto; padding: 0 16px; line-height: 1.6; }
+.help h2 { margin-top: 28px; }
+.keys { width: 100%; border-collapse: collapse; font-size: 14px; }
+.keys th, .keys td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+kbd { font-family: ui-monospace, monospace; font-size: 0.9em; padding: 1px 5px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--button); }
+.reset-progress { margin-top: 20px; }
+.update-banner { display: flex; gap: 12px; align-items: center; justify-content: center; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--border); font-size: 14px; }

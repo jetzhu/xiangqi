@@ -1,6 +1,8 @@
 "use client";
 import type { PieceSet, ThemeName } from "@xq/board";
+import { useState } from "react";
 import { Board } from "./Board.js";
+import { resetProgress } from "./learn/progress.js";
 import { type Lang, type NotationStyle, type Settings, useSettings, useT } from "./settings.js";
 
 /** The start position after 1. 炮二平五, used for decorative boards. */
@@ -14,6 +16,7 @@ export interface SettingsPageProps {
 export function SettingsPage({ onLanguage }: SettingsPageProps) {
   const { settings, update } = useSettings();
   const { tt } = useT();
+  const [resetStep, setResetStep] = useState<"idle" | "confirm" | "done">("idle");
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => update({ [k]: v } as Partial<Settings>);
 
   return (
@@ -60,6 +63,7 @@ export function SettingsPage({ onLanguage }: SettingsPageProps) {
               <option value="wood">{tt("Wood", "木纹")}</option>
               <option value="green">{tt("Green", "绿色")}</option>
               <option value="high-contrast">{tt("High contrast", "高对比度")}</option>
+              <option value="colorblind">{tt("Colour-blind safe", "色盲友好")}</option>
             </select>
           </label>
           <label>
@@ -106,6 +110,25 @@ export function SettingsPage({ onLanguage }: SettingsPageProps) {
             {tt("Red always at the bottom", "红方始终在下")}
           </label>
         </fieldset>
+        <div className="reset-progress">
+          <h2>{tt("Your progress", "学习进度")}</h2>
+          <p className="muted">{tt("Lesson progress is kept in this browser.", "课程进度保存在本浏览器中。")}</p>
+          {resetStep === "done" ? (
+            <p role="status">{tt("Lesson progress reset.", "课程进度已重置。")}</p>
+          ) : (
+            <button
+              type="button"
+              className={resetStep === "confirm" ? "primary" : ""}
+              onClick={() => {
+                if (resetStep === "idle") return setResetStep("confirm");
+                void resetProgress().then(() => setResetStep("done"));
+              }}
+              onBlur={() => resetStep === "confirm" && setResetStep("idle")}
+            >
+              {resetStep === "confirm" ? tt("Reset all lessons? Click again to confirm", "重置所有课程？再点一次确认") : tt("Reset lesson progress", "重置课程进度")}
+            </button>
+          )}
+        </div>
       </section>
     </div>
   );

@@ -4,8 +4,8 @@
   "type": "module",
   "scripts": {
     "prepare-engine": "node scripts/copy-engine.mjs",
-    "dev": "node scripts/copy-engine.mjs && next dev --webpack --port 3000",
-    "build": "node scripts/copy-engine.mjs && next build --webpack",
+    "dev": "node scripts/copy-engine.mjs && node scripts/write-version.mjs && next dev --webpack --port 3000",
+    "build": "node scripts/copy-engine.mjs && node scripts/write-version.mjs && next build --webpack",
     "serve": "node scripts/serve.mjs",
     "e2e": "playwright test",
     "budget": "node scripts/budget.mjs"

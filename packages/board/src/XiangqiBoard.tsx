@@ -392,7 +392,7 @@ export function XiangqiBoard({
         y1={p1.y + uy * 0.25}
         x2={p2.x - ux * 0.3}
         y2={p2.y - uy * 0.3}
-        stroke={ARROW_COLORS[color]}
+        stroke={(theme.arrows ?? ARROW_COLORS)[color]}
         strokeWidth={0.13}
         strokeLinecap="round"
         markerEnd={`url(#${uid}-head-${color})`}
@@ -428,7 +428,7 @@ export function XiangqiBoard({
         <defs>
           {(Object.keys(ARROW_COLORS) as ArrowColor[]).map((c) => (
             <marker key={c} id={`${uid}-head-${c}`} viewBox="0 0 10 10" refX="5" refY="5" markerWidth="2.6" markerHeight="2.6" orient="auto-start-reverse">
-              <path d="M0,0L10,5L0,10z" fill={ARROW_COLORS[c]} />
+              <path d="M0,0L10,5L0,10z" fill={(theme.arrows ?? ARROW_COLORS)[c]} />
             </marker>
           ))}
           <radialGradient id={`${uid}-check`}>

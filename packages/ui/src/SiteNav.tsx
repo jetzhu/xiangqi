@@ -2,7 +2,7 @@
 import { useNav } from "./nav.js";
 import { useT } from "./settings.js";
 
-export type Section = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings";
+export type Section = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help";
 
 const ITEMS: { id: Section; path: string; en: string; zh: string }[] = [
   { id: "learn", path: "/learn", en: "Learn", zh: "学习" },
@@ -34,6 +34,9 @@ export function SiteNav({ current, languageHref }: { current: Section; languageH
             {lang === "zh" ? "English" : "中文"}
           </a>
         )}
+        <a href={nav.href("/help")} aria-current={current === "help" ? "page" : undefined}>
+          {tt("Help", "帮助")}
+        </a>
         <a href={nav.href("/settings")} aria-current={current === "settings" ? "page" : undefined}>
           {tt("Settings", "设置")}
         </a>

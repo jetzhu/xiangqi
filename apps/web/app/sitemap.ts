@@ -5,7 +5,7 @@ import { LOCALES, urlOf } from "../lib/site";
 export const dynamic = "force-static";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const paths = ["/", "/learn", "/puzzles", "/bots", "/analysis", "/play", ...LESSONS.map((l) => `/learn/${l.id}`)];
+  const paths = ["/", "/learn", "/puzzles", "/bots", "/analysis", "/play", "/help", ...LESSONS.map((l) => `/learn/${l.id}`)];
   return paths.flatMap((path) =>
     LOCALES.map((locale) => ({
       url: urlOf(locale, path),

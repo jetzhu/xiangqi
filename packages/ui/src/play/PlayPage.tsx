@@ -2,7 +2,7 @@ import { type PieceSet, type ThemeName } from "@xq/board";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Game, type MoveRecord, explainIllegal, parseSquare, squareName, toIccs } from "xiangqi-core";
 import { Board } from "../Board.js";
-import { type NotationStyle as Notation, useSettings, useSound } from "../settings.js";
+import { type NotationStyle as Notation, announceMove, useSettings, useSound } from "../settings.js";
 
 const T = {
   en: {
@@ -178,7 +178,7 @@ export function PlayPage() {
           showCoordinates={coords !== "off"}
           coordinates={coords === "iccs" ? "iccs" : "wxf"}
           moveMethod={method}
-          announce={last ? `${last.color === "red" ? "Red" : "Black"} ${last.wxf}` : ""}
+          announce={last ? announceMove(last, notation, lang) : ""}
         />
       </section>
 
@@ -251,6 +251,7 @@ export function PlayPage() {
               <option value="wood">Wood</option>
               <option value="green">Green</option>
               <option value="high-contrast">High contrast</option>
+              <option value="colorblind">Colour-blind safe</option>
             </select>
           </label>
           <label>
