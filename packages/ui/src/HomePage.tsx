@@ -8,6 +8,7 @@ import { type Progress, loadProgress } from "./learn/progress.js";
 import { useNav } from "./nav.js";
 import { type PuzzleState, loadPuzzleState } from "./puzzles/store.js";
 import { useT } from "./settings.js";
+import { type Streak, computeStreak, dayOf, loadActivity } from "./streak.js";
 
 /** The start position after 1. 炮二平五, used for decorative boards. */
 const AFTER_CENTRAL_CANNON = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR b - - 1 1";
@@ -19,11 +20,13 @@ export function HomePage() {
   const [progress, setProgress] = useState<Progress>({});
   const [puzzles, setPuzzles] = useState<PuzzleState | null>(null);
   const [stars, setStars] = useState<Stars>({});
+  const [streak, setStreak] = useState<Streak>({ days: 0, today: false, missed: 0 });
 
   useEffect(() => {
     void loadProgress().then(setProgress);
     void loadPuzzleState().then(setPuzzles);
     void loadStars().then(setStars);
+    setStreak(computeStreak(loadActivity(), dayOf(new Date())));
   }, []);
 
   const mastered = LESSON_ORDER.filter((id) => progress[id] === "mastered").length;
@@ -85,6 +88,21 @@ export function HomePage() {
           <span className="muted">{tt("Engine, variations, PGN", "引擎、变化、棋谱")}</span>
         </a>
       </section>
+      <p className={`streak${streak.today ? " done" : ""}`}>
+        <strong>
+          {tt("Streak", "连续学习")}: {streak.days} {tt(streak.days === 1 ? "day" : "days", "天")}
+        </strong>{" "}
+        <span className="muted">
+          {streak.today
+            ? tt("Today counts. Come back tomorrow.", "今天已完成，明天再来。")
+            : streak.days > 0
+              ? tt(
+                  `Play a game, solve a puzzle or finish a lesson today to keep it${streak.missed ? ` (${streak.missed} of 2 rest days used)` : ""}.`,
+                  `今天下一盘棋、解一道题或学完一课即可保持${streak.missed ? `（已用 ${streak.missed}/2 天休息）` : ""}。`,
+                )
+              : tt("Play a game, solve a puzzle or finish a lesson to start one.", "下一盘棋、解一道题或学完一课即可开始。")}
+        </span>
+      </p>
       <p className="muted small center">
         {tt("Your progress is saved in this browser. Accounts to keep it across devices are coming.", "你的进度保存在本浏览器中。跨设备同步的账号功能即将推出。")}
       </p>

@@ -257,3 +257,5 @@ a.button.primary { background: var(--accent); color: #fff; border-color: var(--a
 .lesson-index, .lesson-text { max-width: 760px; margin: 24px auto; padding: 0 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
 .lesson-text h2 { color: var(--text); }
 .difficulty { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 14px; color: var(--muted); }
+.streak { text-align: center; margin: 16px auto 4px; font-size: 14px; }
+.streak.done strong { color: #e8762b; }

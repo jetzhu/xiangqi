@@ -17,6 +17,7 @@ import {
 import { Avatar } from "./Avatar.js";
 import type { GameSettings, Lang } from "./BotPicker.js";
 import { recordWin } from "./stars.js";
+import { recordActivity } from "../streak.js";
 import { useEngineInstance } from "./useEngineInstance.js";
 import { Board } from "../Board.js";
 import { useNav } from "../nav.js";
@@ -112,6 +113,7 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
   const finish = useCallback(
     (result: Over) => {
       setOver((prev) => prev ?? result);
+      recordActivity();
       setThinking(false);
       playSound("end");
       say(result.winner === null ? "draw" : result.winner === playerColor ? "lose" : "win");

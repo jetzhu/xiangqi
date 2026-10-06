@@ -1,5 +1,6 @@
 // Lesson progress in IndexedDB (per browser). Failures fall back to "nothing saved".
 import { createStore, get, set } from "idb-keyval";
+import { recordActivity } from "../streak.js";
 
 export type LessonStatus = "new" | "started" | "mastered";
 export type Progress = Record<string, LessonStatus>;
@@ -16,6 +17,7 @@ export async function loadProgress(): Promise<Progress> {
 }
 
 export async function setStatus(lessonId: string, status: LessonStatus): Promise<Progress> {
+  if (status === "mastered") recordActivity();
   const p = await loadProgress();
   if (p[lessonId] === "mastered" && status !== "mastered") return p; // never downgrade
   p[lessonId] = status;

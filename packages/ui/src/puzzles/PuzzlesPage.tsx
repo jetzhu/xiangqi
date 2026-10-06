@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Game, Position, explainIllegal, parseSquare, squareName, toIccs } from "xiangqi-core";
 import { PUZZLES } from "@xq/content";
 import { type PuzzleState, loadPuzzleState, savePuzzleState } from "./store.js";
+import { recordActivity } from "../streak.js";
 import { Board } from "../Board.js";
 import { useNav } from "../nav.js";
 import { type Settings, useSettings, useSound, useT } from "../settings.js";
@@ -107,6 +108,7 @@ export function PuzzlesPage() {
    */
   const finish = (score: 0 | 0.5 | 1) => {
     if (!state || !puzzle) return;
+    recordActivity();
     const seenBefore = state.history.some((h) => h.id === puzzle.id);
     const counts = rated && score !== 0.5;
     const rating = counts ? updateRating(state.rating, puzzle.rating, score) : state.rating;
