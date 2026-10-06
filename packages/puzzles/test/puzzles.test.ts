@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NEW_PLAYER, type Puzzle, goalOf, judge, pickPuzzle, updateRating, validatePuzzle } from "../src/index.js";
+import { NEW_PLAYER, type Puzzle, dailyPuzzle, goalOf, judge, pickPuzzle, rushTarget, updateRating, validatePuzzle } from "../src/index.js";
 
 const MATE: Puzzle = {
   id: "t-mate",
@@ -50,5 +50,24 @@ describe("puzzles", () => {
     expect(pickPuzzle(ps, 810, seen, () => 0)!.id).toBe("p2");
     expect(pickPuzzle(ps, 2000, new Set(), () => 0)!.id).toBe("p3"); // widens the window
     expect(pickPuzzle([], 800, seen)).toBeNull();
+  });
+});
+
+describe("daily puzzle and rush", () => {
+  const mk = (id: string, rating: number): Puzzle => ({ id, fen: "", solution: [], rating, themes: [], source: "test" });
+  const set = [mk("a", 500), mk("b", 700), mk("c", 900), mk("d", 1200), mk("e", 1500), mk("f", 2000)];
+  it("gives everyone the same puzzle on the same day, from the middle of the range", () => {
+    const p = dailyPuzzle(set, "2026-10-06")!;
+    expect(dailyPuzzle([...set].reverse(), "2026-10-06")!.id).toBe(p.id);
+    expect(p.rating).toBeGreaterThanOrEqual(600);
+    expect(p.rating).toBeLessThanOrEqual(1600);
+  });
+  it("changes from day to day", () => {
+    const ids = new Set(Array.from({ length: 14 }, (_, i) => dailyPuzzle(set, `2026-10-${String(i + 1).padStart(2, "0")}`)!.id));
+    expect(ids.size).toBeGreaterThan(1);
+  });
+  it("rush targets climb", () => {
+    expect(rushTarget(0)).toBe(400);
+    expect(rushTarget(10)).toBeGreaterThan(rushTarget(5));
   });
 });

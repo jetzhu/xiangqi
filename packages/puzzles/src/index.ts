@@ -90,6 +90,23 @@ export function pickPuzzle(puzzles: readonly Puzzle[], rating: number, seen: Rea
   return from[Math.floor(rng() * from.length)]!;
 }
 
+/**
+ * The daily puzzle for a calendar day (YYYY-MM-DD): the same for everyone, no server needed.
+ * Drawn from the middle of the range (600–1600) so most players can solve it, with a hash
+ * of the date so consecutive days don't step through the list in order.
+ */
+export function dailyPuzzle(puzzles: readonly Puzzle[], day: string): Puzzle | null {
+  const pool = puzzles.filter((p) => p.rating >= 600 && p.rating <= 1600).sort((a, b) => (a.id < b.id ? -1 : 1));
+  const from = pool.length ? pool : [...puzzles].sort((a, b) => (a.id < b.id ? -1 : 1));
+  if (from.length === 0) return null;
+  let h = 2166136261; // FNV-1a
+  for (const ch of day) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return from[(h >>> 0) % from.length]!;
+}
+
+/** Target rating for the n-th puzzle (from 0) of a Puzzle Rush: easy first, then harder. */
+export const rushTarget = (n: number) => 400 + 60 * n;
+
 // --- Validation ----------------------------------------------------------------------------
 
 export function validatePuzzle(p: Puzzle): string[] {

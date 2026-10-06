@@ -5,6 +5,8 @@ import { Game, Position, explainIllegal, parseSquare, squareName, toIccs } from 
 import { PUZZLES } from "@xq/content";
 import { type PuzzleState, loadPuzzleState, savePuzzleState } from "./store.js";
 import { recordActivity } from "../streak.js";
+import { DailyPuzzle } from "./DailyPuzzle.js";
+import { PuzzleRush } from "./PuzzleRush.js";
 import { Board } from "../Board.js";
 import { useNav } from "../nav.js";
 import { type Settings, useSettings, useSound, useT } from "../settings.js";
@@ -41,7 +43,49 @@ type Phase = "solving" | "solved" | "failed" | "review";
  */
 const DIFFICULTY_OFFSET: Record<Settings["puzzleDifficulty"], number> = { standard: 0, hard: 150, extra: 300 };
 
+type Mode = "rated" | "daily" | "rush";
+
+/** Puzzles: rated training, the daily puzzle and Puzzle Rush, as tabs. */
 export function PuzzlesPage() {
+  const { tt } = useT();
+  const nav = useNav();
+  const [mode, setMode] = useState<Mode | null>(null);
+  useEffect(() => {
+    const m = nav.params().get("mode");
+    setMode(m === "daily" || m === "rush" ? m : "rated");
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const tabs: [Mode, string][] = [
+    ["rated", tt("Rated", "计分练习")],
+    ["daily", tt("Daily puzzle", "每日一题")],
+    ["rush", tt("Puzzle Rush", "解题冲刺")],
+  ];
+  return (
+    <>
+      <div className="tabs" role="tablist" aria-label={tt("Puzzle modes", "解题模式")}>
+        {tabs.map(([m, label]) => (
+          <button
+            key={m}
+            type="button"
+            role="tab"
+            aria-selected={mode === m}
+            className={mode === m ? "active" : ""}
+            onClick={() => {
+              setMode(m);
+              nav.replace(m === "rated" ? "/puzzles" : `/puzzles?mode=${m}`);
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {mode === "rated" && <RatedPuzzles />}
+      {mode === "daily" && <DailyPuzzle />}
+      {mode === "rush" && <PuzzleRush />}
+    </>
+  );
+}
+
+function RatedPuzzles() {
   const { lang } = useT();
   const { settings, update } = useSettings();
   const playSound = useSound();

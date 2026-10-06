@@ -259,3 +259,19 @@ a.button.primary { background: var(--accent); color: #fff; border-color: var(--a
 .difficulty { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 14px; color: var(--muted); }
 .streak { text-align: center; margin: 16px auto 4px; font-size: 14px; }
 .streak.done strong { color: #e8762b; }
+.tabs { display: flex; gap: 4px; justify-content: center; margin: 12px auto 0; flex-wrap: wrap; }
+.tabs button { border-radius: 999px; }
+.tabs button.active { background: var(--accent); color: #fff; }
+.daily-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; list-style: none; padding: 0; margin: 8px 0; }
+.daily-calendar li { text-align: center; padding: 6px 0; border-radius: 6px; background: var(--button); font-size: 13px; color: var(--muted); }
+.daily-calendar li.solved { background: #3a7d44; color: #fff; font-weight: 600; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.rush-start { max-width: 560px; margin: 24px auto; }
+.rush-modes { display: grid; gap: 8px; margin-top: 12px; }
+.rush-mode { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 14px; text-align: left; }
+.rush-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 10px; }
+.rush-score { font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.strikes { display: flex; gap: 4px; font-weight: 700; }
+.strike { color: var(--border); }
+.strike.hit { color: #ca3431; }
+.rush-missed { padding-left: 18px; }
