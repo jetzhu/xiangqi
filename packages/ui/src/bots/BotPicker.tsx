@@ -48,12 +48,12 @@ interface Props {
   onSelect: (b: BotConfig) => void;
   settings: GameSettings;
   onSettings: (s: GameSettings) => void;
-  crowns: string[];
+  stars: Record<string, number>;
   lang: Lang;
   onPlay: () => void;
 }
 
-export function BotPicker({ bots, selected, onSelect, settings, onSettings, crowns, lang, onPlay }: Props) {
+export function BotPicker({ bots, selected, onSelect, settings, onSettings, stars, lang, onPlay }: Props) {
   const preset = (Object.keys(PRESETS) as (keyof typeof PRESETS)[]).find((k) =>
     (Object.keys(PRESETS[k]) as (keyof Assists)[]).every((a) => PRESETS[k][a] === settings.assists[a]),
   );
@@ -75,7 +75,7 @@ export function BotPicker({ bots, selected, onSelect, settings, onSettings, crow
                     onClick={() => onSelect(b)}
                     aria-pressed={b.id === selected.id}
                   >
-                    <Avatar bot={b} crown={crowns.includes(b.id)} />
+                    <Avatar bot={b} stars={stars[b.id] ?? 0} />
                     <span className="bot-name">{b.name[lang]}</span>
                     <span className="bot-rating">{b.ratingLabel}</span>
                   </button>
@@ -87,7 +87,7 @@ export function BotPicker({ bots, selected, onSelect, settings, onSettings, crow
 
       <aside className="panel bot-detail">
         <div className="bot-head">
-          <Avatar bot={selected} size={64} crown={crowns.includes(selected.id)} />
+          <Avatar bot={selected} size={64} stars={stars[selected.id] ?? 0} />
           <div>
             <h1>
               {selected.name[lang]} <span className="bot-rating">{selected.ratingLabel}</span>

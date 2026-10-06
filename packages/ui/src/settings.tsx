@@ -18,6 +18,8 @@ export interface Settings {
   moveMethod: "both" | "drag" | "click";
   sound: boolean;
   showLegalMoves: boolean;
+  /** Rated puzzles aim this far above the solver's rating (see PuzzlesPage). */
+  puzzleDifficulty: "standard" | "hard" | "extra";
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -29,6 +31,7 @@ export const DEFAULT_SETTINGS: Settings = {
   moveMethod: "both",
   sound: true,
   showLegalMoves: true,
+  puzzleDifficulty: "standard",
 };
 
 const KEY = "xq:settings:v1";

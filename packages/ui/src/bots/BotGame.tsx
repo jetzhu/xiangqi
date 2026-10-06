@@ -16,7 +16,7 @@ import {
 } from "xiangqi-core";
 import { Avatar } from "./Avatar.js";
 import type { GameSettings, Lang } from "./BotPicker.js";
-import { addCrown } from "./crowns.js";
+import { recordWin } from "./stars.js";
 import { useEngineInstance } from "./useEngineInstance.js";
 import { Board } from "../Board.js";
 import { useNav } from "../nav.js";
@@ -78,6 +78,9 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
   const [over, setOver] = useState<Over | null>(null);
   const [thinking, setThinking] = useState(false);
   const [hintStep, setHintStep] = useState(0);
+  /** Hints and takebacks used this game; decides the stars for a win. */
+  const helps = useRef(0);
+  const [earned, setEarned] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [confirmResign, setConfirmResign] = useState(false);
   const coach = useRef(new Map<string, CoachEval>());
@@ -112,7 +115,7 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
       setThinking(false);
       playSound("end");
       say(result.winner === null ? "draw" : result.winner === playerColor ? "lose" : "win");
-      if (result.winner === playerColor) void addCrown(bot.id);
+      if (result.winner === playerColor) void recordWin(bot.id, helps.current).then(setEarned);
     },
     [bot, playerColor], // eslint-disable-line react-hooks/exhaustive-deps
   );
@@ -305,6 +308,7 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
       if (r.color === playerColor) undonePlayer = true;
       if (undonePlayer && game.turn === playerColor) break;
     }
+    helps.current++;
     pendingFeedback.current = null;
     setFeedback(null);
     setHintStep(0);
@@ -413,7 +417,10 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
         {!over && (
           <div className="buttons">
             {a.hint && (
-              <button type="button" disabled={!myTurn || !best} onClick={() => setHintStep((s) => Math.min(2, s + 1))}>
+              <button type="button" disabled={!myTurn || !best} onClick={() => {
+                  helps.current++;
+                  setHintStep((s) => Math.min(2, s + 1));
+                }}>
                 {hintStep === 0 ? tt("Hint", "提示") : tt("More hint", "再提示")}
               </button>
             )}
@@ -432,6 +439,17 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
           <section className="gameover" aria-label="Game over">
             <h2>{over.winner === null ? tt("Draw", "和棋") : over.winner === playerColor ? tt("You won!", "你赢了！") : tt(`${bot.name.en} won`, `${bot.name.zh}获胜`)}</h2>
             <p className="muted">{t(over.text)}</p>
+            {earned !== null && (
+              <p className="earned">
+                <span className="stars-big" aria-label={tt(`${earned} of 3 stars`, `${earned}/3 星`)}>
+                  {"★".repeat(earned)}
+                  <span className="dim">{"★".repeat(3 - earned)}</span>
+                </span>{" "}
+                {earned === 3
+                  ? tt("Won without hints or takebacks.", "未用提示和悔棋取胜。")
+                  : tt("Win without hints or takebacks for 3 stars.", "不用提示和悔棋取胜可得 3 星。")}
+              </p>
+            )}
             {review && !review.counts && (
               <p className="muted">
                 {tt("Reviewing your moves…", "正在复盘你的着法…")} {review.done}/{review.total}

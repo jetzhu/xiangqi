@@ -6,7 +6,7 @@ import { PUZZLES } from "@xq/content";
 import { type PuzzleState, loadPuzzleState, savePuzzleState } from "./store.js";
 import { Board } from "../Board.js";
 import { useNav } from "../nav.js";
-import { useSound, useT } from "../settings.js";
+import { type Settings, useSettings, useSound, useT } from "../settings.js";
 
 /** The first puzzles a new solver sees: the easiest mates in one. */
 const ONBOARDING = PUZZLES.filter((p) => p.themes.includes("mateIn1"))
@@ -34,8 +34,15 @@ const THEME_NAMES: Record<string, [string, string]> = {
 
 type Phase = "solving" | "solved" | "failed" | "review";
 
+/**
+ * How far above the solver's rating each difficulty aims. chess.com offers the same three
+ * levels but doesn't publish its numbers; these are ours.
+ */
+const DIFFICULTY_OFFSET: Record<Settings["puzzleDifficulty"], number> = { standard: 0, hard: 150, extra: 300 };
+
 export function PuzzlesPage() {
   const { lang } = useT();
+  const { settings, update } = useSettings();
   const playSound = useSound();
   const nav = useNav();
   const tt = (en: string, zh: string) => (lang === "zh" ? zh : en);
@@ -49,6 +56,8 @@ export function PuzzlesPage() {
   const [hint, setHint] = useState(0);
   const [say, setSay] = useState<string | null>(null);
   const [delta, setDelta] = useState<number | null>(null);
+  /** A hint was used at some point in this puzzle (hint itself resets after each correct move). */
+  const [hinted, setHinted] = useState(false);
 
   useEffect(() => {
     void loadPuzzleState().then(setState);
@@ -64,6 +73,17 @@ export function PuzzlesPage() {
     setHint(0);
     setSay(null);
     setDelta(null);
+    setHinted(false);
+  };
+
+  /** A hint in a rated puzzle counts as a failed attempt; solving goes on, unrated. */
+  const askHint = () => {
+    if (rated && !hinted) {
+      finish(0);
+      setSay(tt("Hint used: this puzzle counts as missed. Keep going to see it through.", "使用了提示：本题记为未解出。可以继续解完。"));
+    }
+    setHinted(true);
+    setHint((h) => Math.min(2, h + 1));
   };
 
   const next = (s: PuzzleState) => {
@@ -72,7 +92,7 @@ export function PuzzlesPage() {
     // The first puzzles are a warm-up: easy mates in one, not rated.
     if (s.history.length < ONBOARDING.length && onboarding) start(onboarding, false);
     else {
-      const p = pickPuzzle(PUZZLES, s.rating.rating, seen);
+      const p = pickPuzzle(PUZZLES, s.rating.rating + DIFFICULTY_OFFSET[settings.puzzleDifficulty], seen);
       if (p) start(p, true);
     }
   };
@@ -81,7 +101,10 @@ export function PuzzlesPage() {
     if (state && !puzzle) next(state);
   }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Record the attempt. A solve that used a hint is recorded but doesn't change the rating. */
+  /**
+   * Record the attempt. In a rated puzzle the first hint already records a fail (as on
+   * chess.com), so only unrated puzzles reach here with a hinted solve (0.5, no rating change).
+   */
   const finish = (score: 0 | 0.5 | 1) => {
     if (!state || !puzzle) return;
     const seenBefore = state.history.some((h) => h.id === puzzle.id);
@@ -113,7 +136,7 @@ export function PuzzlesPage() {
     setLastMove(move);
     if (verdict === "complete") {
       setPhase("solved");
-      setSay(hint > 0 ? tt("Solved with a hint (not rated).", "借助提示解开（不计分）。") : tt("Solved!", "解开了！"));
+      setSay(hint > 0 || hinted ? tt("Solved with a hint.", "借助提示解开。") : tt("Solved!", "解开了！"));
       finish(hint > 0 ? 0.5 : 1);
       playSound("end");
     } else if (verdict === "correct") {
@@ -200,6 +223,14 @@ export function PuzzlesPage() {
             {solved} {tt("solved", "道已解")}
           </div>
         </div>
+        <label className="difficulty">
+          {tt("Difficulty", "难度")}
+          <select value={settings.puzzleDifficulty} onChange={(e) => update({ puzzleDifficulty: e.target.value as Settings["puzzleDifficulty"] })}>
+            <option value="standard">{tt("Standard", "标准")}</option>
+            <option value="hard">{tt("Hard", "较难")}</option>
+            <option value="extra">{tt("Extra hard", "很难")}</option>
+          </select>
+        </label>
         {!rated && phase === "solving" && state.history.length < ONBOARDING.length && (
           <p className="muted">
             {tt(`Warm-up ${state.history.length + 1}/${ONBOARDING.length} (not rated)`, `热身 ${state.history.length + 1}/${ONBOARDING.length}（不计分）`)}
@@ -212,7 +243,7 @@ export function PuzzlesPage() {
         {say && <div className={`say ${phase === "solved" ? "ok" : phase === "failed" ? "bad" : ""}`}>{say}</div>}
         <div className="buttons">
           {phase === "solving" && (
-            <button type="button" onClick={() => setHint((h) => Math.min(2, h + 1))}>
+            <button type="button" onClick={askHint}>
               {hint === 0 ? tt("Hint", "提示") : tt("More hint", "再提示")}
             </button>
           )}

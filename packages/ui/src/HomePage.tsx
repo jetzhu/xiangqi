@@ -3,7 +3,7 @@ import { BOTS, LESSON_ORDER, lessonById } from "@xq/content";
 import { learningRank } from "@xq/lessons";
 import { useEffect, useState } from "react";
 import { Board } from "./Board.js";
-import { loadCrowns } from "./bots/crowns.js";
+import { type Stars, loadStars } from "./bots/stars.js";
 import { type Progress, loadProgress } from "./learn/progress.js";
 import { useNav } from "./nav.js";
 import { type PuzzleState, loadPuzzleState } from "./puzzles/store.js";
@@ -18,21 +18,22 @@ export function HomePage() {
   const nav = useNav();
   const [progress, setProgress] = useState<Progress>({});
   const [puzzles, setPuzzles] = useState<PuzzleState | null>(null);
-  const [crowns, setCrowns] = useState<string[]>([]);
+  const [stars, setStars] = useState<Stars>({});
 
   useEffect(() => {
     void loadProgress().then(setProgress);
     void loadPuzzleState().then(setPuzzles);
-    void loadCrowns().then(setCrowns);
+    void loadStars().then(setStars);
   }, []);
 
   const mastered = LESSON_ORDER.filter((id) => progress[id] === "mastered").length;
   const nextId = LESSON_ORDER.find((id) => progress[id] !== "mastered");
   const next = nextId ? lessonById(nextId) : undefined;
   const { rank } = learningRank(mastered);
-  const nextBot = BOTS.find((b) => !crowns.includes(b.id)) ?? BOTS.at(-1)!;
+  const beaten = Object.keys(stars).length;
+  const nextBot = BOTS.find((b) => !stars[b.id]) ?? BOTS.at(-1)!;
   const solved = puzzles?.history.filter((h) => h.score > 0).length ?? 0;
-  const isNew = mastered === 0 && solved === 0 && crowns.length === 0;
+  const isNew = mastered === 0 && solved === 0 && beaten === 0;
 
   return (
     <div className="home">
@@ -75,7 +76,7 @@ export function HomePage() {
           <span className="card-kicker">{tt("Play a bot", "人机对弈")}</span>
           <strong>{t(nextBot.name)}</strong>
           <span className="muted">
-            {nextBot.ratingLabel} · {crowns.length}/{BOTS.length} {tt("beaten", "已战胜")}
+            {nextBot.ratingLabel} · {beaten}/{BOTS.length} {tt("beaten", "已战胜")}
           </span>
         </a>
         <a className="card" href={nav.href("/analysis")}>
