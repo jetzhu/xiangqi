@@ -41,6 +41,28 @@ test("bot game: the bot answers a move", async ({ page }) => {
   await expect(page.locator("ol.moves li").first().locator(".mv").nth(1)).not.toHaveText("", { timeout: 30_000 });
 });
 
+test("bot game review: accuracy, graph and key moments after resigning", async ({ page }) => {
+  await page.goto(at("/en/bots/"));
+  await page.locator("button.play").click();
+  await play(page, "h2e2");
+  await expect(page.locator("ol.moves li").first().locator(".mv").nth(1)).not.toHaveText("", { timeout: 30_000 });
+  // Throw the chariot forward into danger, then resign.
+  await play(page, "i0i1");
+  await expect(page.locator("ol.moves li").nth(1).locator(".mv").nth(1)).not.toHaveText("", { timeout: 30_000 });
+  await page.getByRole("button", { name: "Resign" }).click();
+  await page.getByRole("button", { name: "Confirm resign?" }).click();
+  await expect(page.locator(".accuracy")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".accuracy strong").first()).toHaveText(/^\d+\.\d$/);
+  await expect(page.locator(".eval-graph")).toBeVisible();
+  const keys = page.getByRole("button", { name: /Key moments/ });
+  if (await keys.count()) {
+    await keys.click();
+    await expect(page.locator(".moment")).toBeVisible();
+    await page.getByRole("button", { name: "Show best" }).click();
+    await expect(page.locator(".moment")).toContainText("Best was");
+  }
+});
+
 test("analysis: import a PGN, the engine analyses it", async ({ page }) => {
   await page.goto(at("/en/analysis/"));
   await page.getByLabel("FEN / PGN").fill('[Format "ICCS"]\n\n1. h2e2 h9g7 2. h0g2 i9h9 *');

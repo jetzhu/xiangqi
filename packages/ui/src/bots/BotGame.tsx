@@ -1,6 +1,6 @@
 import { type Arrow, type Badge, type BadgeIcon, EvalBar, type Highlight } from "@xq/board";
 import { type BotConfig, type ChatEvent, type Text, chatLine, chooseMove } from "@xq/bots";
-import { type MoveGrade, type Score, formatScore, gradeCounts, gradeMove, reviewGame, scoreToBar } from "@xq/engine";
+import { type MoveGrade, type ReviewedMove, type Score, formatScore, gradeCounts, gradeMove, reviewGame, scoreToBar } from "@xq/engine";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type Color,
@@ -15,6 +15,7 @@ import {
   toIccs,
 } from "xiangqi-core";
 import { Avatar } from "./Avatar.js";
+import { GameReview, type ReviewFocus } from "./GameReview.js";
 import type { GameSettings, Lang } from "./BotPicker.js";
 import { recordWin } from "./stars.js";
 import { recordActivity } from "../streak.js";
@@ -91,7 +92,9 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
   const pendingFeedback = useRef<{ prevFen: string; fen: string; square: string; moverIsRed: boolean; move: string; index: number } | null>(null);
   const clockCfg = CLOCKS[settings.time];
   const [clock, setClock] = useState<Record<Color, number> | null>(() => (clockCfg ? { red: clockCfg.base, black: clockCfg.base } : null));
-  const [review, setReview] = useState<{ done: number; total: number; counts?: Record<MoveGrade, number> } | null>(null);
+  const [review, setReview] = useState<{ done: number; total: number; counts?: Record<MoveGrade, number>; moves?: ReviewedMove[] } | null>(null);
+  /** A key moment picked in the review: the board shows the position before that move. */
+  const [focus, setFocus] = useState<ReviewFocus | null>(null);
 
   const fen = game.fen;
   const turn = game.turn;
@@ -270,7 +273,7 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
       depth: 8,
       isBook: (i) => standard && isBookMove(moves, i),
       onProgress: (done, total) => setReview((r) => (r && !r.counts ? { ...r, done, total } : r)),
-    }).then((rev) => setReview({ done: fens.length, total: fens.length, counts: gradeCounts(rev, playerColor === "red") }));
+    }).then((rev) => setReview({ done: fens.length, total: fens.length, counts: gradeCounts(rev, playerColor === "red"), moves: rev }));
   }, [over, botEng.engine]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Player actions -------------------------------------------------------------
@@ -347,6 +350,23 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
   const rows: [MoveRecord | undefined, MoveRecord | undefined][] = [];
   const list = history[0]?.color === "black" ? [undefined, ...history] : history;
   for (let i = 0; i < list.length; i += 2) rows.push([list[i], list[i + 1]]);
+  // Review helpers: the position before move i, the engine's best move there in the user's
+  // notation, and the arrows for a key moment (the move played in red, the best in green).
+  const notate = (r: MoveRecord) => (notation === "wxf" ? r.wxf : notation === "iccs" ? r.iccs : r.chinese);
+  const fenBefore = (i: number) => (i === 0 ? new Game().fen : history[i - 1]!.fen);
+  const bestText = (i: number) => {
+    const best = review?.moves?.[i]?.bestMove;
+    if (!best) return null;
+    const rec = new Game(fenBefore(i)).move(best);
+    return rec ? notate(rec) : best;
+  };
+  const reviewArrows = (f: ReviewFocus, rev: ReviewedMove[]): Arrow[] => {
+    const m = rev[f.index]!;
+    const out: Arrow[] = [{ from: m.move.slice(0, 2), to: m.move.slice(2, 4), color: "red" }];
+    if (f.showBest && m.bestMove) out.push({ from: m.bestMove.slice(0, 2), to: m.bestMove.slice(2, 4), color: "green" });
+    return out;
+  };
+
   const analyseLink = nav.href(`/analysis${moves.length ? `?moves=${moves.join(",")}` : ""}`);
   const status =
     botEng.status === "error"
@@ -381,20 +401,35 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
               />
             </div>
           )}
-          <Board
-            fen={fen}
-            orientation={playerColor}
-            movable={myTurn ? playerColor : "none"}
-            legalMoves={myTurn ? game.legalMoves().map(toIccs) : []}
-            onMove={onMove}
-            onIllegal={onIllegal}
-            lastMove={history.at(-1)?.iccs ?? null}
-            check={checkSquare}
-            arrows={arrows}
-            highlights={highlights}
-            badges={badges}
-            announce={history.at(-1) ? `${history.at(-1)!.color === playerColor ? "You" : bot.name.en}: ${history.at(-1)!.wxf}` : ""}
-          />
+          {focus && review?.moves ? (
+            <Board
+              fen={fenBefore(focus.index)}
+              orientation={playerColor}
+              movable={focus.retry ? playerColor : "none"}
+              legalMoves={focus.retry ? new Game(fenBefore(focus.index)).legalMoves().map(toIccs) : []}
+              onMove={(m) => {
+                const bestMove = review.moves![focus.index]!.bestMove;
+                setFocus({ ...focus, verdict: m === bestMove ? "best" : "other", showBest: focus.showBest || m === bestMove });
+              }}
+              lastMove={focus.index > 0 ? history[focus.index - 1]!.iccs : null}
+              arrows={reviewArrows(focus, review.moves)}
+            />
+          ) : (
+            <Board
+              fen={fen}
+              orientation={playerColor}
+              movable={myTurn ? playerColor : "none"}
+              legalMoves={myTurn ? game.legalMoves().map(toIccs) : []}
+              onMove={onMove}
+              onIllegal={onIllegal}
+              lastMove={history.at(-1)?.iccs ?? null}
+              check={checkSquare}
+              arrows={arrows}
+              highlights={highlights}
+              badges={badges}
+              announce={history.at(-1) ? `${history.at(-1)!.color === playerColor ? "You" : bot.name.en}: ${history.at(-1)!.wxf}` : ""}
+            />
+          )}
         </div>
         <div className="player-bar">
           <span className="avatar you" style={{ width: 40, height: 40, background: playerColor === "red" ? "#c0262d" : "#1d1d1d" }} aria-hidden>
@@ -468,6 +503,19 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
                   ))}
                 </tbody>
               </table>
+            )}
+            {review?.moves && (
+              <GameReview
+                reviewed={review.moves}
+                history={history}
+                playerColor={playerColor}
+                botName={t(bot.name)}
+                gradeText={GRADE_TEXT}
+                notate={notate}
+                bestText={bestText}
+                focus={focus}
+                onFocus={setFocus}
+              />
             )}
             <div className="buttons">
               <button type="button" className="primary" onClick={onRematch}>
