@@ -4,7 +4,7 @@
 // hydration mismatches.
 
 import { type PieceSet, type SoundKind, type ThemeName, playSound } from "@xq/board";
-import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 export type Lang = "en" | "zh";
 export type NotationStyle = "chinese" | "wxf" | "iccs";
@@ -84,9 +84,14 @@ function read(): Partial<Settings> {
 
 interface Ctx {
   settings: Settings;
-  update: (patch: Partial<Settings>) => void;
+  /** Changes settings; `from: "account"` marks values loaded from the player's account. */
+  update: (patch: Partial<Settings>, from?: "account") => void;
+  /** Calls `fn` with the saved settings after each change the player makes; returns an unsubscribe. */
+  onChange: (fn: (s: Settings) => void) => () => void;
+  /** How many changes the player has made so far (to tell whether one came in meanwhile). */
+  changes: () => number;
 }
-const SettingsContext = createContext<Ctx>({ settings: DEFAULT_SETTINGS, update: () => {} });
+const SettingsContext = createContext<Ctx>({ settings: DEFAULT_SETTINGS, update: () => {}, onChange: () => () => {}, changes: () => 0 });
 
 /**
  * `lang`, when given, is fixed by the page (e.g. the /en or /zh route) and overrides the
@@ -94,29 +99,42 @@ const SettingsContext = createContext<Ctx>({ settings: DEFAULT_SETTINGS, update:
  */
 export function SettingsProvider({ children, lang }: { children: ReactNode; lang?: Lang }) {
   const [stored, setStored] = useState<Settings>(DEFAULT_SETTINGS);
+  // The newest settings, so changes made in quick succession build on each other.
+  const latest = useRef<Settings>(DEFAULT_SETTINGS);
   useEffect(() => {
     const saved = read();
     const browserZh = typeof navigator !== "undefined" && navigator.language?.toLowerCase().startsWith("zh");
-    setStored({
+    latest.current = {
       ...DEFAULT_SETTINGS,
       // First visit: follow the browser's language, and its usual notation.
       ...(saved.lang ? {} : { lang: browserZh ? "zh" : "en", notation: browserZh ? "chinese" : "wxf" }),
       ...saved,
-    });
+    };
+    setStored(latest.current);
   }, []);
-  const update = useCallback((patch: Partial<Settings>) => {
-    setStored((s) => {
-      const next = { ...s, ...patch };
-      try {
-        localStorage.setItem(KEY, JSON.stringify(next));
-      } catch {
-        // storage blocked: settings last for this visit only
-      }
-      return next;
-    });
+  const listeners = useRef(new Set<(s: Settings) => void>());
+  const count = useRef(0);
+  const changes = useCallback(() => count.current, []);
+  const onChange = useCallback((fn: (s: Settings) => void) => {
+    listeners.current.add(fn);
+    return () => void listeners.current.delete(fn);
+  }, []);
+  const update = useCallback((patch: Partial<Settings>, from?: "account") => {
+    const next = { ...latest.current, ...patch };
+    latest.current = next;
+    setStored(next);
+    try {
+      localStorage.setItem(KEY, JSON.stringify(next));
+    } catch {
+      // storage blocked: settings last for this visit only
+    }
+    if (from === "account") return;
+    count.current++;
+    for (const fn of listeners.current) fn(next);
   }, []);
   const settings = useMemo(() => (lang ? { ...stored, lang } : stored), [stored, lang]);
-  return <SettingsContext.Provider value={{ settings, update }}>{children}</SettingsContext.Provider>;
+  const value = useMemo(() => ({ settings, update, onChange, changes }), [settings, update, onChange, changes]);
+  return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }
 
 export const useSettings = () => useContext(SettingsContext);

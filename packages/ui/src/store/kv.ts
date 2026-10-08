@@ -1,13 +1,17 @@
 // Key–value backends for the Store. Each namespace is a separate collection; the browser backend
 // keeps the database and localStorage names the site has used since v0.1, so saved guest
 // progress carries over.
-import { createStore as idbStore, del, entries, get, set, type UseStore } from "idb-keyval";
+import { clear, createStore as idbStore, del, entries, get, set, type UseStore } from "idb-keyval";
 
 export interface KV {
   get<T>(ns: Namespace, key: string): Promise<T | undefined>;
   set(ns: Namespace, key: string, value: unknown): Promise<void>;
   del(ns: Namespace, key: string): Promise<void>;
   entries<T>(ns: Namespace): Promise<[string, T][]>;
+}
+
+export interface ClearableKV extends KV {
+  clear(): Promise<void>;
 }
 
 export type Namespace = "lessons" | "bots" | "puzzles" | "analyses" | "games" | "ratings" | "local";
@@ -71,7 +75,7 @@ export function browserKV(): KV {
 }
 
 /** In memory, for tests (and as a fallback). Values are copied so callers can't share state. */
-export function memoryKV(): KV {
+export function memoryKV(): ClearableKV {
   const data = new Map<string, Map<string, unknown>>();
   const ns = (n: string) => data.get(n) ?? data.set(n, new Map()).get(n)!;
   const copy = <T>(v: T): T => (v === undefined ? v : (JSON.parse(JSON.stringify(v)) as T));
@@ -80,5 +84,51 @@ export function memoryKV(): KV {
     set: async (n, k, v) => void ns(n).set(k, copy(v)),
     del: async (n, k) => void ns(n).delete(k),
     entries: async (n) => [...ns(n).entries()].map(([k, v]) => [k, copy(v)]) as never,
+    clear: async () => data.clear(),
+  };
+}
+
+/**
+ * One IndexedDB database holding every namespace (keys are "<ns>/<key>"): an account's cache
+ * and the records kept on this device. Fails soft like browserKV.
+ */
+export function idbKV(dbName: string): ClearableKV {
+  let s: UseStore | undefined;
+  const db = () => {
+    if (typeof indexedDB === "undefined") return undefined;
+    return (s ??= idbStore(dbName, "kv"));
+  };
+  return {
+    async get<T>(ns: Namespace, key: string) {
+      try {
+        const d = db();
+        return d ? await get<T>(`${ns}/${key}`, d) : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+    async set(ns, key, value) {
+      const d = db();
+      if (!d) throw new Error("storage is not available in this browser");
+      await set(`${ns}/${key}`, value, d);
+    },
+    async del(ns, key) {
+      const d = db();
+      if (d) await del(`${ns}/${key}`, d);
+    },
+    async entries<T>(ns: Namespace) {
+      try {
+        const d = db();
+        if (!d) return [];
+        const prefix = `${ns}/`;
+        return (await entries<string, T>(d)).filter(([k]) => k.startsWith(prefix)).map(([k, v]) => [k.slice(prefix.length), v] as [string, T]);
+      } catch {
+        return [];
+      }
+    },
+    async clear() {
+      const d = db();
+      if (d) await clear(d);
+    },
   };
 }

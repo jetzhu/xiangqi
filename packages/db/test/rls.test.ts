@@ -76,6 +76,7 @@ beforeAll(async () => {
     );
     await db.query(`insert into public.puzzle_attempts (user_id, puzzle_id, score) values ($1, 'p1', 1)`, [u]);
     await db.query(`insert into public.ratings (user_id, kind, rating, rd) values ($1, 'bot', 800, 200)`, [u]);
+    await db.query(`insert into public.player_state (user_id, key, value) values ($1, 'stars', '{"xiaobing": 1}')`, [u]);
   }
 });
 
@@ -122,7 +123,7 @@ describe("sign-up", () => {
 });
 
 describe("row-level security", () => {
-  const OWN_TABLES = ["profiles", "settings", "lesson_progress", "analyses", "bot_games", "puzzle_attempts", "ratings"];
+  const OWN_TABLES = ["profiles", "settings", "lesson_progress", "analyses", "player_state", "bot_games", "puzzle_attempts", "ratings"];
 
   it("shows a user only their own rows in every table", async () => {
     const counts = await as(A, async (tx) => {
@@ -142,9 +143,10 @@ describe("row-level security", () => {
         await n(`update public.profiles set avatar = 'x' where user_id = $1`),
         await n(`delete from public.analyses where user_id = $1`),
         await n(`delete from public.settings where user_id = $1`),
+        await n(`update public.player_state set value = '{}' where user_id = $1`),
       ];
     });
-    expect(changed).toEqual([0, 0, 0, 0, 0]);
+    expect(changed).toEqual([0, 0, 0, 0, 0, 0]);
     const left = await db.query(`select 1 from public.analyses where user_id = $1`, [B]);
     expect(left.rows).toHaveLength(1);
   });
@@ -153,6 +155,7 @@ describe("row-level security", () => {
     expect(await failsAs(A, `insert into public.analyses (user_id, data) values ('${B}', '{}')`)).toMatch(/row-level security/);
     expect(await failsAs(A, `insert into public.lesson_progress (user_id, lesson_id, status) values ('${B}', 'x', 'new')`)).toMatch(/row-level security/);
     expect(await failsAs(A, `update public.settings set user_id = '${B}'`)).toMatch(/row-level security/);
+    expect(await failsAs(A, `insert into public.player_state (user_id, key, value) values ('${B}', 'rush', '{}')`)).toMatch(/row-level security/);
   });
 
   it("can write their own progress, settings and analyses", async () => {
@@ -189,6 +192,41 @@ describe("rules kept by the database", () => {
       return (await tx.query<{ status: string }>(`select status from public.lesson_progress where lesson_id = 'board'`)).rows[0]!.status;
     });
     expect(status).toBe("mastered");
+  });
+
+  it("merges stars, Rush bests and days sent from different devices", async () => {
+    const upsert = (key: string, value: unknown) =>
+      `insert into public.player_state (key, value) values ('${key}', '${JSON.stringify(value)}')
+       on conflict (user_id, key) do update set value = excluded.value`;
+    const merged = await as(A, async (tx) => {
+      await tx.exec(upsert("stars", { xiaobing: 3, afu: 1 }));
+      await tx.exec(upsert("stars", { xiaobing: 2, afu: 2, laochen: 1 }));
+      await tx.exec(upsert("rush", { three: 12 }));
+      await tx.exec(upsert("rush", { three: 9, five: 20 }));
+      await tx.exec(upsert("activity", ["2026-10-02", "2026-10-01"]));
+      await tx.exec(upsert("activity", ["2026-10-03", "2026-10-01"]));
+      const rows = (await tx.query<{ key: string; value: unknown }>(`select key, value from public.player_state order by key`)).rows;
+      return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    });
+    expect(merged).toEqual({
+      activity: ["2026-10-01", "2026-10-02", "2026-10-03"],
+      rush: { five: 20, three: 12 },
+      stars: { afu: 2, laochen: 1, xiaobing: 3 },
+    });
+  });
+
+  it("keeps the newest 400 days and refuses values of the wrong shape", async () => {
+    const days = (from: number, n: number) => Array.from({ length: n }, (_, i) => new Date(Date.UTC(2025, 0, from + i)).toISOString().slice(0, 10));
+    const kept = await as(A, async (tx) => {
+      await tx.query(`insert into public.player_state (key, value) values ('daily', $1)`, [JSON.stringify(days(1, 300))]);
+      await tx.query(`update public.player_state set value = $1 where key = 'daily'`, [JSON.stringify(days(301, 200))]);
+      return (await tx.query<{ value: string[] }>(`select value from public.player_state where key = 'daily'`)).rows[0]!.value;
+    });
+    expect(kept).toHaveLength(400);
+    expect(kept[0]).toBe(days(101, 1)[0]);
+    expect(kept.at(-1)).toBe(days(500, 1)[0]);
+    expect(await failsAs(A, `insert into public.player_state (key, value) values ('daily', '{}')`)).toMatch(/check constraint/);
+    expect(await failsAs(A, `insert into public.player_state (key, value) values ('rating', '{}')`)).toMatch(/check constraint/);
   });
 
   it("allows one username change every 90 days, to a free name", async () => {
@@ -239,7 +277,7 @@ describe("rules kept by the database", () => {
 
   it("deletes everything with the account", async () => {
     await db.query(`delete from auth.users where id = $1`, [B]);
-    for (const t of ["profiles", "settings", "lesson_progress", "analyses", "bot_games", "puzzle_attempts", "ratings"]) {
+    for (const t of ["profiles", "settings", "lesson_progress", "analyses", "player_state", "bot_games", "puzzle_attempts", "ratings"]) {
       const { rows } = await db.query(`select 1 from public.${t} where user_id = $1`, [B]);
       expect(rows, t).toHaveLength(0);
     }

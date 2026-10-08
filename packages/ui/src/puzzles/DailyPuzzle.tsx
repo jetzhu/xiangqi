@@ -19,7 +19,7 @@ function DailyPuzzleWith({ PUZZLES }: { PUZZLES: Puzzle[] }) {
   const [solvedDays, setSolvedDays] = useState<string[]>([]);
   const [phase, setPhase] = useState<"solving" | "solved" | "failed">("solving");
   const [hint, setHint] = useState(0);
-  useEffect(() => void store.daily.load().then(setSolvedDays), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => void store.daily.load().then(setSolvedDays), [store]);
 
   const solver = useSolver(puzzle, (solved) => {
     if (solved) {

@@ -41,7 +41,7 @@ export function StatsPage() {
     void store.puzzles.load().then(setPuzzles);
     void store.lessons.load().then(setProgress);
     void store.activity.load().then((d) => setStreak(computeStreak(d, dayOf(new Date()))));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [store]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const summary = useMemo(() => summarize(games ?? []), [games]);
   const from = period === "90" ? new Date(Date.now() - 90 * 864e5).toISOString() : null;

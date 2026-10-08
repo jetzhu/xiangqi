@@ -29,7 +29,7 @@ export function HomePage() {
     void store.puzzles.load().then(setPuzzles);
     void store.stars.load().then(setStars);
     void store.activity.load().then((days) => setStreak(computeStreak(days, dayOf(new Date()))));
-  }, []);
+  }, [store]);
 
   const mastered = LESSON_ORDER.filter((id) => progress[id] === "mastered").length;
   const nextId = LESSON_ORDER.find((id) => progress[id] !== "mastered");

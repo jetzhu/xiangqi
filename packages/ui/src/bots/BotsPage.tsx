@@ -25,7 +25,7 @@ export function BotsPage() {
     void store.stars.load().then(setStars);
     // Rated games left unfinished (tab closed, page left) count as losses before anything else.
     void settleAbandoned(store).then(() => store.botRating.load().then(setRating));
-  }, [game]);
+  }, [game, store]);
 
   const start = () => {
     const color: Color = settings.color === "random" ? (Math.random() < 0.5 ? "red" : "black") : settings.color;

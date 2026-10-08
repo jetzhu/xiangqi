@@ -14,4 +14,5 @@ export { StatsPage } from "./stats/StatsPage.js";
 export { LessonPage } from "./learn/LessonPage.js";
 export { StoreProvider, useStore, createStore, defaultStore, browserKV, memoryKV, type Store, type GameRecord, type KV } from "./store/index.js";
 export { AccountProvider, useAccount, type AccountConfig, type AccountState } from "./account/session.js";
+export { AccountStoreProvider, SyncNotice } from "./account/AccountStore.js";
 export { SignUpPage, LogInPage, ResetPasswordPage, AuthCallbackPage } from "./account/AuthPages.js";

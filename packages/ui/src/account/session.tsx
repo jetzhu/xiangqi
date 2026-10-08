@@ -47,6 +47,10 @@ export interface Account {
   providers: () => Promise<Provider[]>;
   /** Signs out on this device only. */
   signOut: () => Promise<void>;
+  /** The user id of the session stored in this browser, read without loading Supabase. */
+  storedUserId: () => string | null;
+  /** Runs `fn` before signing out (e.g. sending unsaved progress); returns an unsubscribe. */
+  beforeSignOut: (fn: () => Promise<unknown>) => () => void;
 }
 
 /** Where supabase-js keeps the session: "sb-<project ref>-auth-token" in localStorage. */
@@ -60,12 +64,28 @@ function hasStoredSession(config: AccountConfig): boolean {
   }
 }
 
+function storedUserId(config: AccountConfig | null): string | null {
+  if (!config) return null;
+  try {
+    const raw = localStorage.getItem(sessionKey(config.url));
+    const id = raw ? (JSON.parse(raw) as { user?: { id?: unknown } }).user?.id : undefined;
+    return typeof id === "string" ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Unsaved progress gets this long to reach the server before signing out goes ahead. */
+const SIGN_OUT_WAIT_MS = 3000;
+
 const OFF: Account = {
   state: { status: "off" },
   client: () => Promise.reject(new Error("Accounts are not configured")),
   refresh: async () => ({ status: "off" }),
   providers: async () => [],
   signOut: async () => {},
+  storedUserId: () => null,
+  beforeSignOut: () => () => {},
 };
 
 const AccountContext = createContext<Account>(OFF);
@@ -145,13 +165,24 @@ export function AccountProvider({ config, children }: { config: AccountConfig | 
     };
   }, [config, client, load]);
 
+  const hooks = useRef(new Set<() => Promise<unknown>>());
+  const beforeSignOut = useCallback((fn: () => Promise<unknown>) => {
+    hooks.current.add(fn);
+    return () => void hooks.current.delete(fn);
+  }, []);
+  const stored = useCallback(() => storedUserId(config), [config]);
+
   const signOut = useCallback(async () => {
+    const wait = new Promise((done) => setTimeout(done, SIGN_OUT_WAIT_MS));
+    await Promise.race([Promise.allSettled([...hooks.current].map((fn) => fn())), wait]);
     const sb = await client();
     await sb.auth.signOut({ scope: "local" });
     setState({ status: "guest" });
   }, [client]);
 
-  const value = useMemo<Account>(() => (config ? { state, client, refresh: load, providers, signOut } : OFF), [config, state, client, load, providers, signOut]);
+  const value = useMemo<Account>(() => (config ? { state, client, refresh: load, providers, signOut, storedUserId: stored, beforeSignOut } : OFF),
+    [config, state, client, load, providers, signOut, stored, beforeSignOut],
+  );
   return <AccountContext.Provider value={value}>{children}</AccountContext.Provider>;
 }
 

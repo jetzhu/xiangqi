@@ -40,7 +40,7 @@ export function LearnPage({ lessonHref }: LearnPageProps = {}) {
 
   useEffect(() => {
     void store.lessons.load().then(setProgress);
-  }, [open]);
+  }, [open, store]);
 
   const mastered = ORDER.filter((id) => progress[id] === "mastered").length;
   const { rank, next } = learningRank(mastered);

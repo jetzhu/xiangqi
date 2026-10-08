@@ -36,6 +36,31 @@ interface Calls {
   authorize: string[];
   profileUpdates: Record<string, unknown>[];
   unlinked: string[];
+  /** The account's synced rows, as the fake database holds them. */
+  tables: Tables;
+}
+
+/** The tables M11 syncs, one signed-in user's rows. */
+interface Tables {
+  lesson_progress: { lesson_id: string; status: string }[];
+  player_state: { key: string; value: unknown }[];
+  analyses: { id: string; title: string; data: unknown; updated_at: string }[];
+  settings: { data: Record<string, unknown> }[];
+}
+const KEYS: Record<keyof Tables, string[]> = { lesson_progress: ["lesson_id"], player_state: ["key"], analyses: ["id"], settings: [] };
+const RANK: Record<string, number> = { new: 0, started: 1, mastered: 2 };
+
+/** What the database does on an upsert (packages/db): keep the better lesson status, merge player_state. */
+function mergeRow(table: keyof Tables, old: Record<string, unknown>, row: Record<string, unknown>) {
+  if (table === "lesson_progress" && RANK[old.status as string]! > RANK[row.status as string]!) return { ...row, status: old.status };
+  if (table === "player_state") {
+    const [a, b] = [old.value, row.value];
+    if (Array.isArray(a) && Array.isArray(b)) return { ...row, value: [...new Set([...a, ...b])].sort() };
+    const value: Record<string, number> = { ...(a as Record<string, number>) };
+    for (const [k, v] of Object.entries(b as Record<string, number>)) value[k] = Math.max(value[k] ?? 0, v);
+    return { ...row, value };
+  }
+  return { ...old, ...row };
 }
 
 interface FakeOptions {
@@ -47,10 +72,13 @@ interface FakeOptions {
   profile?: { username: string; username_chosen: boolean };
   /** Who comes back from Google/Microsoft/GitHub. */
   oauthUser?: typeof USER;
+  /** What the account already holds (saved from another device). */
+  tables?: Partial<Tables>;
 }
 
 async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> {
-  const calls: Calls = { signup: [], verify: [], password: [], updateUser: [], logout: [], authorize: [], profileUpdates: [], unlinked: [] };
+  const tables: Tables = { lesson_progress: [], player_state: [], analyses: [], settings: [], ...structuredClone(opts.tables ?? {}) };
+  const calls: Calls = { signup: [], verify: [], password: [], updateUser: [], logout: [], authorize: [], profileUpdates: [], unlinked: [], tables };
   const profile = { ...(opts.profile ?? { username: "Alice_1", username_chosen: true }) };
   let user = { ...USER, identities: [...USER.identities] };
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, json: body, headers: { "access-control-allow-origin": "*" } });
@@ -104,6 +132,28 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
       case "/auth/v1/logout":
         calls.logout.push(url.searchParams.get("scope") ?? "");
         return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*" } });
+    }
+    const table = url.pathname.replace("/rest/v1/", "") as keyof Tables;
+    if (table in tables) {
+      const rows = tables[table] as Record<string, unknown>[];
+      const strip = ({ user_id: _u, ...r }: Record<string, unknown>) => r;
+      if (req.method() === "GET") return json(route, rows);
+      if (req.method() === "DELETE") {
+        const eq = [...url.searchParams].filter(([k, v]) => k !== "user_id" && v.startsWith("eq."));
+        const keep = rows.filter((r) => !eq.every(([k, v]) => String(r[k]) === v.slice(3)));
+        rows.splice(0, rows.length, ...keep);
+        return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*" } });
+      }
+      // An upsert: insert, or merge into the row with the same key.
+      const sent = (Array.isArray(body) ? body : [body]) as Record<string, unknown>[];
+      const out = sent.map((row) => {
+        const r = strip(row);
+        const i = rows.findIndex((x) => KEYS[table].every((k) => x[k] === r[k]));
+        if (i < 0) return rows[rows.push(r) - 1]!;
+        return (rows[i] = mergeRow(table, rows[i]!, r));
+      });
+      const single = req.headers()["accept"]?.includes("vnd.pgrst.object");
+      return json(route, single ? out[0] : out, 201);
     }
     if (url.pathname.startsWith("/auth/v1/user/identities/") && req.method() === "DELETE") {
       const id = url.pathname.split("/").pop()!;
@@ -276,4 +326,83 @@ test("a cancelled provider sign-in says so", async ({ page }) => {
   await fakeSupabase(page);
   await page.goto(at("/en/auth/callback/?error=access_denied&error_description=The+user+denied+the+request"));
   await expect(page.locator(".form-error")).toHaveText("Sign-in was cancelled.");
+});
+
+// M11: a signed-in browser syncs progress and settings with the account.
+
+/** Writes guest progress the way the site stores it (IndexedDB and localStorage). */
+async function seedGuest(page: Page) {
+  await page.evaluate(async () => {
+    const put = (db: string, store: string, key: string, value: unknown) =>
+      new Promise<void>((done, fail) => {
+        const r = indexedDB.open(db);
+        r.onupgradeneeded = () => r.result.createObjectStore(store);
+        r.onerror = () => fail(r.error);
+        r.onsuccess = () => {
+          const tx = r.result.transaction(store, "readwrite");
+          tx.objectStore(store).put(value, key);
+          tx.oncomplete = () => {
+            r.result.close();
+            done();
+          };
+        };
+      });
+    await put("xq-v1-lessons", "lessons", "progress", { "the-board": "mastered", "the-general": "started" });
+    await put("xq-v1-bots", "bots", "stars", { xiaobing: 2 });
+    localStorage.setItem("xq:daily:v1", JSON.stringify(["2026-10-01"]));
+  });
+}
+
+const lessonsMastered = (page: Page) => page.locator(".tick");
+
+test("signing in moves guest progress into the account; signing out leaves an empty guest", async ({ page }) => {
+  const calls = await fakeSupabase(page);
+  await page.goto(at("/en/learn/"));
+  await seedGuest(page);
+  await page.reload();
+  await expect(lessonsMastered(page)).toHaveCount(1);
+
+  await page.getByRole("link", { name: "Log in" }).click();
+  await page.getByLabel("Email").fill("alice@example.com");
+  await page.getByLabel("Password", { exact: true }).fill("correct-horse");
+  await page.getByRole("button", { name: "Log in" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Your progress from this browser is now saved to your account: 2 lessons." })).toBeVisible();
+  await expect(lessonsMastered(page)).toHaveCount(1);
+
+  await expect.poll(() => calls.tables.lesson_progress.map((r) => `${r.lesson_id}:${r.status}`).sort()).toEqual(["the-board:mastered", "the-general:started"]);
+  await expect.poll(() => Object.fromEntries(calls.tables.player_state.map((r) => [r.key, r.value]))).toEqual({ stars: { xiaobing: 2 }, daily: ["2026-10-01"] });
+  // A new account takes this browser's settings.
+  await expect.poll(() => calls.tables.settings[0]?.data).toMatchObject({ notation: "wxf" });
+
+  // Signed out: the account's progress is gone from this browser, and the guest copy was moved.
+  await page.getByRole("button", { name: /Alice_1/ }).click();
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page.getByRole("link", { name: "Log in" })).toBeVisible();
+  await page.reload();
+  await expect(page.locator(".learn-side")).toContainText("0/11 lessons mastered");
+  await expect(lessonsMastered(page)).toHaveCount(0);
+});
+
+test("a signed-in browser shows the account's progress and settings from another device", async ({ page }) => {
+  const calls = await fakeSupabase(page, {
+    tables: {
+      lesson_progress: [{ lesson_id: "the-horse", status: "mastered" }],
+      settings: [{ data: { notation: "iccs", pieceSet: "icons" } }],
+    },
+  });
+  await page.goto(at("/en/auth/callback/?token_hash=abc123&type=signup"));
+  await expect(page.getByText(/signed in as Alice_1/)).toBeVisible();
+  // Nothing to import: no welcome note.
+  await page.goto(at("/en/learn/"));
+  await expect(page.getByRole("button", { name: /Alice_1/ })).toBeVisible();
+  await expect(lessonsMastered(page)).toHaveCount(1);
+  await expect(page.locator(".sync-notice")).toHaveCount(0);
+
+  await page.goto(at("/en/settings/"));
+  const notation = page.getByLabel("Notation");
+  await expect(notation).toHaveValue("iccs");
+  await expect(page.getByRole("combobox", { name: /^Pieces/ })).toHaveValue("icons");
+  // A change here follows the account to other devices.
+  await notation.selectOption("wxf");
+  await expect.poll(() => calls.tables.settings[0]?.data).toMatchObject({ notation: "wxf", pieceSet: "icons" });
 });

@@ -118,7 +118,7 @@ function RatedPuzzlesWith({ PUZZLES }: { PUZZLES: Puzzle[] }) {
 
   useEffect(() => {
     void store.puzzles.load().then(setState);
-  }, []);
+  }, [store]);
 
   const start = (p: Puzzle, isRated: boolean) => {
     setPuzzle(p);

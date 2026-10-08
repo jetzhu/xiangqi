@@ -36,7 +36,7 @@ function PuzzleRushWith({ PUZZLES }: { PUZZLES: Puzzle[] }) {
   const [now, setNow] = useState(Date.now());
   const runRef = useRef(run);
   runRef.current = run;
-  useEffect(() => void store.rush.load().then(setBest), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => void store.rush.load().then(setBest), [store]);
 
   const end = (r: Run) => {
     playSound("end");

@@ -103,7 +103,7 @@ export function AnalysisPage() {
 
   useEffect(() => {
     store.analyses.list().then(setSaved, () => setSaved([]));
-  }, []);
+  }, [store]);
 
   const onMove = (move: string) => {
     const n = t.play(current, move);
