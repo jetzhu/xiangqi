@@ -305,3 +305,26 @@ kbd { font-family: ui-monospace, monospace; font-size: 0.9em; padding: 1px 5px; 
 .rating-line { margin: 6px 0; font-size: 14px; }
 .rating-line .up { color: #3a7d44; }
 .rating-line .down { color: #ca3431; }
+.stats { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+.stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 16px 0; }
+.stat-card { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+.stat-card strong { font-size: 26px; font-variant-numeric: tabular-nums; }
+.stats-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.chart { margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; }
+.chart figcaption { font-size: 14px; margin-bottom: 4px; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart-grid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart-label { font-size: 10px; fill: var(--muted); }
+.chart-line { fill: none; stroke: var(--accent); stroke-width: 2; }
+.chart-dot { fill: var(--accent); }
+.results, .game-list { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0; }
+.results th, .results td, .game-list th, .game-list td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.game-list .opponent { white-space: nowrap; }
+.game-list .opponent .avatar { vertical-align: middle; }
+.game-list .up, .results .up { color: #3a7d44; }
+.game-list .down { color: #ca3431; }
+.filters { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; font-size: 14px; }
+.filters label { display: flex; align-items: center; gap: 6px; }
+@media (max-width: 640px) { .game-list th:nth-child(5), .game-list td:nth-child(5), .game-list th:nth-child(6), .game-list td:nth-child(6) { display: none; } }
+.stats .tabs { justify-content: flex-start; margin-left: 0; }

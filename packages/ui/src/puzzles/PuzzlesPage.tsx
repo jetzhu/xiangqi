@@ -2,7 +2,7 @@ import { type Arrow, type Highlight } from "@xq/board";
 import { LEVELS, type Puzzle, goalOf, judge, levelOf, pickInLevel, pickPuzzle, updateRating } from "@xq/puzzles";
 import { useEffect, useMemo, useState } from "react";
 import { Game, Position, explainIllegal, parseSquare, squareName, toIccs } from "xiangqi-core";
-import { PUZZLES } from "@xq/content";
+import { onboardingOf, usePuzzles } from "./data.js";
 import type { PuzzleState } from "./store.js";
 import { useStore } from "../store/index.js";
 import { DailyPuzzle } from "./DailyPuzzle.js";
@@ -10,11 +10,6 @@ import { PuzzleRush } from "./PuzzleRush.js";
 import { Board } from "../Board.js";
 import { useNav } from "../nav.js";
 import { type Settings, useOrientation, useSettings, useSound, useT } from "../settings.js";
-
-/** The first puzzles a new solver sees: the easiest mates in one. */
-const ONBOARDING = PUZZLES.filter((p) => p.themes.includes("mateIn1"))
-  .sort((a, b) => a.rating - b.rating)
-  .slice(0, 5);
 
 const THEME_NAMES: Record<string, [string, string]> = {
   mateIn1: ["Mate in 1", "一步杀"],
@@ -98,7 +93,8 @@ export function PuzzlesPage() {
   );
 }
 
-function RatedPuzzles() {
+function RatedPuzzlesWith({ PUZZLES }: { PUZZLES: Puzzle[] }) {
+  const ONBOARDING = useMemo(() => onboardingOf(PUZZLES), [PUZZLES]);
   const store = useStore();
   const { lang } = useT();
   const { settings, update } = useSettings();
@@ -376,4 +372,12 @@ function RatedPuzzles() {
       </aside>
     </div>
   );
+}
+
+/** Waits for the puzzle set (loaded on first use), then shows RatedPuzzles. */
+function RatedPuzzles() {
+  const puzzles = usePuzzles();
+  const { tt } = useT();
+  if (!puzzles) return <p className="muted" style={{ padding: 24 }}>{tt("Loading puzzles…", "正在加载题目…")}</p>;
+  return <RatedPuzzlesWith PUZZLES={puzzles} />;
 }

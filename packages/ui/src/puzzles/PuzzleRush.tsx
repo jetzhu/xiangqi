@@ -1,6 +1,6 @@
 // Puzzle Rush, as on chess.com: solve as many as you can; puzzles get harder as you go and
 // three wrong answers end the run. 3 minutes, 5 minutes, or Survival (no clock). Unrated.
-import { PUZZLES } from "@xq/content";
+import { usePuzzles } from "./data.js";
 import { type Puzzle, goalOf, pickPuzzle, rushTarget } from "@xq/puzzles";
 import { useEffect, useRef, useState } from "react";
 import { Board } from "../Board.js";
@@ -25,7 +25,7 @@ interface Run {
   newBest: boolean;
 }
 
-export function PuzzleRush() {
+function PuzzleRushWith({ PUZZLES }: { PUZZLES: Puzzle[] }) {
   const { lang, tt } = useT();
   const nav = useNav();
   const store = useStore();
@@ -188,4 +188,12 @@ export function PuzzleRush() {
       </aside>
     </div>
   );
+}
+
+/** Waits for the puzzle set (loaded on first use), then shows PuzzleRush. */
+export function PuzzleRush() {
+  const puzzles = usePuzzles();
+  const { tt } = useT();
+  if (!puzzles) return <p className="muted" style={{ padding: 24 }}>{tt("Loading puzzles…", "正在加载题目…")}</p>;
+  return <PuzzleRushWith PUZZLES={puzzles} />;
 }

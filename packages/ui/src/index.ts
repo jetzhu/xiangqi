@@ -10,5 +10,6 @@ export { HomePage } from "./HomePage.js";
 export { SettingsPage, type SettingsPageProps } from "./SettingsPage.js";
 export { SiteNav } from "./SiteNav.js";
 export { HelpPage, type HelpPageProps } from "./HelpPage.js";
+export { StatsPage } from "./stats/StatsPage.js";
 export { LessonPage } from "./learn/LessonPage.js";
 export { StoreProvider, useStore, createStore, defaultStore, browserKV, memoryKV, type Store, type GameRecord, type KV } from "./store/index.js";

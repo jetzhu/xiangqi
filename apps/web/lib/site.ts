@@ -20,7 +20,7 @@ export const ISSUES_URL = process.env.NEXT_PUBLIC_ISSUES_URL ?? "https://github.
 export const COI_SERVICE_WORKER = process.env.NEXT_PUBLIC_COI_SERVICE_WORKER === "1";
 export const SITE_NAME = { zh: "象棋学堂", en: "Xiangqi School" } as const;
 
-type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help";
+type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats";
 const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; description: Record<Locale, string> }> = {
   home: {
     path: "/",
@@ -57,6 +57,11 @@ const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; desc
     path: "/play",
     title: { zh: "双人对弈", en: "Two-player Xiangqi board" },
     description: { zh: "两人在同一屏幕上下象棋。", en: "Play Xiangqi with a friend on one screen." },
+  },
+  stats: {
+    path: "/stats",
+    title: { zh: "我的统计", en: "My stats" },
+    description: { zh: "你的等级分、战绩和对局记录。", en: "Your ratings, results and game history." },
   },
   help: {
     path: "/help",

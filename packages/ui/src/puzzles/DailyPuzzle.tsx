@@ -1,7 +1,7 @@
 // The daily puzzle: the same for everyone today, unrated, retry as often as you like.
 import { type Arrow, type Highlight } from "@xq/board";
-import { PUZZLES } from "@xq/content";
-import { dailyPuzzle, goalOf } from "@xq/puzzles";
+import { type Puzzle, dailyPuzzle, goalOf } from "@xq/puzzles";
+import { usePuzzles } from "./data.js";
 import { useEffect, useMemo, useState } from "react";
 import { Board } from "../Board.js";
 import { useNav } from "../nav.js";
@@ -10,7 +10,7 @@ import { useStore } from "../store/index.js";
 import { dayOf } from "../streak.js";
 import { useSolver } from "./useSolver.js";
 
-export function DailyPuzzle() {
+function DailyPuzzleWith({ PUZZLES }: { PUZZLES: Puzzle[] }) {
   const { lang, tt } = useT();
   const nav = useNav();
   const store = useStore();
@@ -104,4 +104,12 @@ export function DailyPuzzle() {
       </aside>
     </div>
   );
+}
+
+/** Waits for the puzzle set (loaded on first use), then shows DailyPuzzle. */
+export function DailyPuzzle() {
+  const puzzles = usePuzzles();
+  const { tt } = useT();
+  if (!puzzles) return <p className="muted" style={{ padding: 24 }}>{tt("Loading puzzles…", "正在加载题目…")}</p>;
+  return <DailyPuzzleWith PUZZLES={puzzles} />;
 }

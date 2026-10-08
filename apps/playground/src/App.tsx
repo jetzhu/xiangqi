@@ -10,12 +10,13 @@ import {
   SettingsPage,
   SettingsProvider,
   SiteNav,
+  StatsPage,
   hashNav,
 } from "@xq/ui";
 import { useEffect, useState } from "react";
 
-type Route = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help";
-const ROUTES: Route[] = ["learn", "puzzles", "bots", "analysis", "play", "settings", "help"];
+type Route = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats";
+const ROUTES: Route[] = ["learn", "puzzles", "bots", "analysis", "play", "settings", "help", "stats"];
 const routeFromHash = (): Route => ROUTES.find((r) => location.hash.startsWith(`#/${r}`)) ?? "home";
 
 /** Dev playground: the site's pages under hash routes (#/learn, #/analysis?moves=…). */
@@ -35,6 +36,7 @@ export function App() {
     play: <PlayPage />,
     settings: <SettingsPage />,
     help: <HelpPage version="playground" />,
+    stats: <StatsPage />,
   }[route];
   return (
     <SettingsProvider>

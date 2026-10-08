@@ -41,3 +41,32 @@ test("closing a rated game in progress counts as a loss", async ({ page }) => {
   // The bots page settles the abandoned game: the rating shown is below the starting 800.
   await expect(page.locator(".rated-choice")).toContainText(/now 7\d\d\?/);
 });
+
+test("the stats page shows the rated game, the rating and the history", async ({ page }) => {
+  await ratedGameToFourPlies(page);
+  await page.getByRole("button", { name: "Resign" }).click();
+  await page.getByRole("button", { name: "Confirm resign?" }).click();
+  await expect(page.locator(".rating-line")).toContainText("Bot rating 800 →");
+  await page.goto(at("/en/stats/"));
+  const card = page.locator(".stat-card").first();
+  await expect(card).toContainText("Bot rating");
+  await expect(card).toContainText(/7\d\d\?/);
+  await expect(card).toContainText("1 rated games");
+  await expect(page.locator(".results")).toContainText("Little Soldier");
+  await page.getByRole("tab", { name: "Games (1)" }).click();
+  await expect(page).toHaveURL(/tab=games/);
+  const row = page.locator(".game-list tbody tr");
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText("Lost");
+  await expect(row).toContainText("resigned");
+  await expect(row.getByRole("link", { name: "Review" })).toHaveAttribute("href", /analysis\/\?moves=h2e2,/);
+  await page.getByLabel("Type").selectOption("casual");
+  await expect(page.getByText("No games match these filters.")).toBeVisible();
+});
+
+test("the stats page invites a new player to play", async ({ page }) => {
+  await page.goto(at("/en/stats/"));
+  await expect(page.getByRole("heading", { name: "My stats" })).toBeVisible();
+  await expect(page.getByText("No rated bot games yet.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Play a bot" })).toBeVisible();
+});
