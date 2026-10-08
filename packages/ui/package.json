@@ -21,6 +21,7 @@
     "react": "^19.0.0"
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.117.2",
     "@xq/board": "workspace:*",
     "@xq/bots": "workspace:*",
     "@xq/content": "workspace:*",

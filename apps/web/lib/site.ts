@@ -18,9 +18,17 @@ export const BUILD = process.env.NEXT_PUBLIC_BUILD ?? "dev";
 /** Where bug reports go: a new GitHub issue on the project. */
 export const ISSUES_URL = process.env.NEXT_PUBLIC_ISSUES_URL ?? "https://github.com/jetzhu/xiangqi/issues/new";
 export const COI_SERVICE_WORKER = process.env.NEXT_PUBLIC_COI_SERVICE_WORKER === "1";
+/**
+ * Supabase project for accounts. Both values are public (the key is the publishable one;
+ * row-level security guards the data). Without them the site runs guest-only.
+ */
+export const ACCOUNTS =
+  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_KEY
+    ? { url: process.env.NEXT_PUBLIC_SUPABASE_URL, key: process.env.NEXT_PUBLIC_SUPABASE_KEY }
+    : null;
 export const SITE_NAME = { zh: "象棋学堂", en: "Xiangqi School" } as const;
 
-type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats";
+type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "signup" | "login" | "resetPassword" | "authCallback";
 const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; description: Record<Locale, string> }> = {
   home: {
     path: "/",
@@ -62,6 +70,26 @@ const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; desc
     path: "/stats",
     title: { zh: "我的统计", en: "My stats" },
     description: { zh: "你的等级分、战绩和对局记录。", en: "Your ratings, results and game history." },
+  },
+  signup: {
+    path: "/signup",
+    title: { zh: "注册", en: "Sign up" },
+    description: { zh: "免费注册象棋学堂账号，在所有设备上保存进度。", en: "Create a free Xiangqi School account to keep your progress on every device." },
+  },
+  login: {
+    path: "/login",
+    title: { zh: "登录", en: "Log in" },
+    description: { zh: "登录象棋学堂。", en: "Log in to Xiangqi School." },
+  },
+  resetPassword: {
+    path: "/reset-password",
+    title: { zh: "重设密码", en: "Reset password" },
+    description: { zh: "通过邮件重设密码。", en: "Reset your password by email." },
+  },
+  authCallback: {
+    path: "/auth/callback",
+    title: { zh: "账号", en: "Account" },
+    description: { zh: "确认邮箱或设置新密码。", en: "Confirm your email or choose a new password." },
   },
   help: {
     path: "/help",

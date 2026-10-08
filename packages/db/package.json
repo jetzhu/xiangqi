@@ -1,0 +1,18 @@
+{
+  "name": "@xq/db",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Supabase project: database migrations, auth settings and email templates, with access-rule tests",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "apply": "node scripts/apply.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "@types/node": "26.6.4",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  }
+}

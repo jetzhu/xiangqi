@@ -14,6 +14,10 @@ export const AnalysisApp = dynamic(() => import("@xq/ui").then((m) => m.Analysis
 export const PlayApp = dynamic(() => import("@xq/ui").then((m) => m.PlayPage), { ssr: false, loading });
 export const StatsApp = dynamic(() => import("@xq/ui").then((m) => m.StatsPage), { ssr: false, loading });
 export const HelpApp = dynamic(() => import("@xq/ui").then((m) => m.HelpPage), { ssr: false, loading });
+export const SignUpApp = dynamic(() => import("@xq/ui").then((m) => m.SignUpPage), { ssr: false, loading });
+export const LogInApp = dynamic(() => import("@xq/ui").then((m) => m.LogInPage), { ssr: false, loading });
+export const ResetPasswordApp = dynamic(() => import("@xq/ui").then((m) => m.ResetPasswordPage), { ssr: false, loading });
+export const AuthCallbackApp = dynamic(() => import("@xq/ui").then((m) => m.AuthCallbackPage), { ssr: false, loading });
 export const SettingsApp = dynamic(() => import("@xq/ui").then((m) => m.SettingsPage), { ssr: false, loading });
 
 /** The learn path with links to each lesson's own page. */

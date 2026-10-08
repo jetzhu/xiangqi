@@ -1,0 +1,218 @@
+// Runs the migrations in an in-memory Postgres (PGlite) with a stand-in for the parts of
+// Supabase they rely on: the anon/authenticated roles, auth.users and auth.uid(), and
+// Supabase's default grants on new tables. Then checks one user can't reach another's rows.
+import { readFileSync, readdirSync } from "node:fs";
+import { PGlite, type Transaction } from "@electric-sql/pglite";
+import { beforeAll, describe, expect, it } from "vitest";
+
+const SUPABASE_STANDIN = `
+  create role anon nologin;
+  create role authenticated nologin;
+  create role service_role nologin bypassrls;
+  grant usage on schema public to anon, authenticated, service_role;
+  -- As on Supabase: new tables in public are open to every API role until a migration says otherwise.
+  alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+  alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
+  create schema auth;
+  grant usage on schema auth to anon, authenticated, service_role;
+  create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}');
+  create function auth.uid() returns uuid language sql stable as
+    $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+`;
+
+const migrations = new URL("../supabase/migrations/", import.meta.url);
+const A = "00000000-0000-4000-8000-00000000000a";
+const B = "00000000-0000-4000-8000-00000000000b";
+
+let db: PGlite;
+
+/** Runs `fn` as a signed-in user (or the anonymous visitor), then rolls everything back. */
+async function as<T>(user: string | null, fn: (tx: Transaction) => Promise<T>): Promise<T> {
+  let out!: T;
+  await db
+    .transaction(async (tx) => {
+      await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [user ?? ""]);
+      await tx.exec(`set local role ${user ? "authenticated" : "anon"}`);
+      out = await fn(tx);
+      await tx.rollback();
+    })
+    .catch((e: unknown) => {
+      if (!(e instanceof Error && /rollback/i.test(e.message))) throw e;
+    });
+  return out;
+}
+
+/** Same as `as`, but expects the statements to fail and returns the error message. */
+const failsAs = (user: string | null, sql: string) =>
+  as(user, async (tx) => {
+    try {
+      await tx.exec(sql);
+    } catch (e) {
+      return (e as Error).message;
+    }
+    return "no error";
+  });
+
+const signUp = (id: string, meta: object) =>
+  db.query(`insert into auth.users (id, email, raw_user_meta_data) values ($1, $2, $3)`, [id, `${id.slice(-1)}@example.com`, JSON.stringify(meta)]);
+
+beforeAll(async () => {
+  db = new PGlite();
+  await db.exec(SUPABASE_STANDIN);
+  for (const f of readdirSync(migrations).filter((f) => f.endsWith(".sql")).sort()) {
+    await db.exec(readFileSync(new URL(f, migrations), "utf8"));
+  }
+  await signUp(A, { username: "Alice_1", lang: "en" });
+  await signUp(B, { username: "bob-xq" });
+  // Rows the server functions would write, one set per user.
+  for (const u of [A, B]) {
+    await db.query(`insert into public.settings (user_id, data) values ($1, '{"notation":"wxf"}')`, [u]);
+    await db.query(`insert into public.lesson_progress (user_id, lesson_id, status) values ($1, 'board', 'started')`, [u]);
+    await db.query(`insert into public.analyses (user_id, title, data) values ($1, 'mine', '{}')`, [u]);
+    await db.query(
+      `insert into public.bot_games (user_id, bot_id, bot_rating, player_color, moves, result, rated, started_at)
+       values ($1, 'laochen', 800, 'red', '{h2e2,h7e7}', 'win', true, now())`,
+      [u],
+    );
+    await db.query(`insert into public.puzzle_attempts (user_id, puzzle_id, score) values ($1, 'p1', 1)`, [u]);
+    await db.query(`insert into public.ratings (user_id, kind, rating, rd) values ($1, 'bot', 800, 200)`, [u]);
+  }
+});
+
+describe("sign-up", () => {
+  it("makes a profile with the chosen username and language", async () => {
+    const { rows } = await db.query<{ username: string; lang: string }>(`select username, lang from public.profiles order by username`);
+    expect(rows).toEqual([
+      { username: "Alice_1", lang: "en" },
+      { username: "bob-xq", lang: "zh" },
+    ]);
+  });
+
+  it("falls back to a placeholder when the name is taken, reserved or malformed", async () => {
+    const ids = ["c", "d", "e", "f"].map((c) => `00000000-0000-4000-8000-00000000000${c}`);
+    await signUp(ids[0]!, { username: "ALICE_1" });
+    await signUp(ids[1]!, { username: "Admin" });
+    await signUp(ids[2]!, { username: "-x" });
+    await signUp(ids[3]!, {});
+    const { rows } = await db.query<{ username: string }>(`select username from public.profiles where user_id = any($1)`, [ids]);
+    expect(rows).toHaveLength(4);
+    for (const r of rows) expect(r.username).toMatch(/^player-\d{7}$/);
+    await db.query(`delete from auth.users where id = any($1)`, [ids]);
+  });
+
+  it("explains why a username can't be used, to anyone", async () => {
+    const problems = await as(null, async (tx) => {
+      const names = ["ok_name", "alice_1", "xiaobing", "12345", "ab", "a".repeat(21), "bad name", "_lead", "中文名字"];
+      const out: Record<string, string | null> = {};
+      for (const n of names) out[n] = (await tx.query<{ p: string | null }>(`select public.username_problem($1) as p`, [n])).rows[0]!.p;
+      return out;
+    });
+    expect(problems).toEqual({
+      ok_name: null,
+      alice_1: "taken",
+      xiaobing: "reserved",
+      "12345": "digits",
+      ab: "format",
+      ["a".repeat(21)]: "format",
+      "bad name": "format",
+      _lead: "format",
+      中文名字: "format",
+    });
+  });
+});
+
+describe("row-level security", () => {
+  const OWN_TABLES = ["profiles", "settings", "lesson_progress", "analyses", "bot_games", "puzzle_attempts", "ratings"];
+
+  it("shows a user only their own rows in every table", async () => {
+    const counts = await as(A, async (tx) => {
+      const out: Record<string, string[]> = {};
+      for (const t of OWN_TABLES) out[t] = (await tx.query<{ user_id: string }>(`select distinct user_id from public.${t}`)).rows.map((r) => r.user_id);
+      return out;
+    });
+    for (const t of OWN_TABLES) expect(counts[t], t).toEqual([A]);
+  });
+
+  it("can't change or delete another user's rows", async () => {
+    const changed = await as(A, async (tx) => {
+      const n = async (sql: string) => (await tx.query(sql, [B])).affectedRows ?? 0;
+      return [
+        await n(`update public.settings set data = '{}' where user_id = $1`),
+        await n(`update public.lesson_progress set status = 'mastered' where user_id = $1`),
+        await n(`update public.profiles set avatar = 'x' where user_id = $1`),
+        await n(`delete from public.analyses where user_id = $1`),
+        await n(`delete from public.settings where user_id = $1`),
+      ];
+    });
+    expect(changed).toEqual([0, 0, 0, 0, 0]);
+    const left = await db.query(`select 1 from public.analyses where user_id = $1`, [B]);
+    expect(left.rows).toHaveLength(1);
+  });
+
+  it("can't write rows owned by someone else", async () => {
+    expect(await failsAs(A, `insert into public.analyses (user_id, data) values ('${B}', '{}')`)).toMatch(/row-level security/);
+    expect(await failsAs(A, `insert into public.lesson_progress (user_id, lesson_id, status) values ('${B}', 'x', 'new')`)).toMatch(/row-level security/);
+    expect(await failsAs(A, `update public.settings set user_id = '${B}'`)).toMatch(/row-level security/);
+  });
+
+  it("can write their own progress, settings and analyses", async () => {
+    const id = await as(A, async (tx) => {
+      await tx.exec(`insert into public.lesson_progress (user_id, lesson_id, status) values ('${A}', 'horse', 'mastered')`);
+      await tx.exec(`update public.settings set data = '{"notation":"chinese"}'`);
+      return (await tx.query<{ user_id: string }>(`insert into public.analyses (data) values ('{}') returning user_id`)).rows[0]!.user_id;
+    });
+    expect(id).toBe(A);
+  });
+
+  it("leaves ratings, games and puzzle attempts to the server", async () => {
+    expect(await failsAs(A, `update public.ratings set rating = 3000`)).toMatch(/permission denied/);
+    expect(await failsAs(A, `insert into public.ratings (user_id, kind, rating, rd) values ('${A}', 'puzzle', 3000, 50)`)).toMatch(/permission denied/);
+    expect(await failsAs(A, `delete from public.bot_games`)).toMatch(/permission denied/);
+    expect(await failsAs(A, `insert into public.puzzle_attempts (user_id, puzzle_id, score) values ('${A}', 'p', 1)`)).toMatch(/permission denied/);
+    expect(await failsAs(A, `insert into public.profiles (user_id, username) values ('${A}', 'another')`)).toMatch(/permission denied/);
+    expect(await failsAs(A, `update public.profiles set created_at = now() - interval '9 years'`)).toMatch(/permission denied/);
+  });
+
+  it("shows the anonymous visitor nothing", async () => {
+    for (const t of [...OWN_TABLES, "reserved_usernames"]) {
+      expect(await failsAs(null, `select * from public.${t}`), t).toMatch(/permission denied/);
+    }
+    expect(await failsAs(A, `select * from public.reserved_usernames`)).toMatch(/permission denied/);
+  });
+});
+
+describe("rules kept by the database", () => {
+  it("never lowers a lesson's status", async () => {
+    const status = await as(A, async (tx) => {
+      await tx.exec(`update public.lesson_progress set status = 'mastered' where lesson_id = 'board'`);
+      await tx.exec(`update public.lesson_progress set status = 'new' where lesson_id = 'board'`);
+      return (await tx.query<{ status: string }>(`select status from public.lesson_progress where lesson_id = 'board'`)).rows[0]!.status;
+    });
+    expect(status).toBe("mastered");
+  });
+
+  it("allows one username change every 90 days, to a free name", async () => {
+    expect(await failsAs(A, `update public.profiles set username = 'BOB-XQ'`)).toMatch(/taken/);
+    expect(await failsAs(A, `update public.profiles set username = 'x y'`)).toMatch(/format/);
+    const second = await as(A, async (tx) => {
+      await tx.exec(`update public.profiles set username = 'alice_2'`);
+      try {
+        await tx.exec(`update public.profiles set username = 'alice_3'`);
+      } catch (e) {
+        return (e as Error).message;
+      }
+      return "no error";
+    });
+    expect(second).toMatch(/90 days/);
+    // Changing only the letter case of the current name, or other columns, is not blocked.
+    expect(await failsAs(A, `update public.profiles set avatar = 'horse', country = 'GB'`)).toBe("no error");
+  });
+
+  it("deletes everything with the account", async () => {
+    await db.query(`delete from auth.users where id = $1`, [B]);
+    for (const t of ["profiles", "settings", "lesson_progress", "analyses", "bot_games", "puzzle_attempts", "ratings"]) {
+      const { rows } = await db.query(`select 1 from public.${t} where user_id = $1`, [B]);
+      expect(rows, t).toHaveLength(0);
+    }
+  });
+});

@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+<body style="font-family: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; color: #222; line-height: 1.5; max-width: 520px; margin: 0 auto; padding: 24px;">
+<p style="font-size: 20px; margin: 0 0 16px;"><strong>象棋学堂 · Xiangqi School</strong></p>
+{{ if eq (printf "%v" .Data.lang) "en" }}
+<p>Someone asked to reset the password for your Xiangqi School account. Choose a new password here (the link works for one hour):</p>
+{{ else }}
+<p>有人申请重设你的象棋学堂账号密码。点击下面的按钮设置新密码（链接一小时内有效）：</p>
+{{ end }}
+<p><a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery" style="display: inline-block; background: #b5302e; color: #fff; padding: 10px 18px; border-radius: 6px; text-decoration: none;">{{ if eq (printf "%v" .Data.lang) "en" }}Choose a new password{{ else }}设置新密码{{ end }}</a></p>
+{{ if eq (printf "%v" .Data.lang) "en" }}
+<p>If it wasn't you, ignore this email: your password stays the same.</p>
+{{ else }}
+<p>如果不是你本人操作，请忽略这封邮件，密码不会改变。</p>
+{{ end }}
+<p style="color: #777; font-size: 13px; margin-top: 32px;">{{ if eq (printf "%v" .Data.lang) "en" }}Xiangqi School — learn and play Chinese chess.{{ else }}象棋学堂——学象棋，下象棋。{{ end }}</p>
+</body>
+</html>

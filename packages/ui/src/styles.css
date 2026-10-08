@@ -328,3 +328,44 @@ kbd { font-family: ui-monospace, monospace; font-size: 0.9em; padding: 1px 5px; 
 .filters label { display: flex; align-items: center; gap: 6px; }
 @media (max-width: 640px) { .game-list th:nth-child(5), .game-list td:nth-child(5), .game-list th:nth-child(6), .game-list td:nth-child(6) { display: none; } }
 .stats .tabs { justify-content: flex-start; margin-left: 0; }
+
+/* --- Accounts: header menu and sign-in pages --- */
+.topnav-right { align-items: center; }
+.account-links { display: flex; gap: 12px; align-items: center; }
+.topnav a.small-button { color: #fff; font-size: 14px; padding: 5px 12px; }
+.account-menu { position: relative; }
+.account-button { display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: 18px; }
+.account-avatar {
+  width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;
+}
+.account-dropdown {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; min-width: 200px; list-style: none; margin: 0; padding: 6px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.15);
+}
+.account-dropdown li > a, .account-dropdown li > button {
+  display: block; width: 100%; text-align: left; padding: 7px 10px; border: 0; border-radius: 6px; background: none; color: var(--text); font-size: 14px;
+}
+.account-dropdown li > a:hover, .account-dropdown li > button:hover { background: var(--button-hover); }
+.account-dropdown .account-email { padding: 6px 10px 8px; font-size: 13px; border-bottom: 1px solid var(--border); margin-bottom: 4px; overflow-wrap: anywhere; }
+
+.auth { max-width: 440px; margin: 40px auto; padding: 0 16px; }
+.auth .panel { padding: 24px; }
+.auth h1 { font-size: 24px; margin-bottom: 10px; }
+.auth form { margin-top: 16px; }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.field label { font-size: 14px; font-weight: 600; }
+.field-input { display: flex; gap: 6px; }
+.field input {
+  flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 9px 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg, var(--panel)); color: var(--text);
+}
+.field input[aria-invalid="true"] { border-color: var(--accent); }
+.field-hint { font-size: 13px; }
+.field-error, .form-error { color: var(--accent); font-size: 13px; margin: 0; }
+.form-error { font-size: 14px; margin-bottom: 12px; }
+.field-aside { margin: -6px 0 14px; font-size: 14px; }
+.link-button { background: none; border-color: transparent; color: var(--muted); }
+button.wide { width: 100%; padding: 10px; font-size: 16px; }
+.auth-alt { margin: 18px 0 0; font-size: 14px; text-align: center; }
+.check-email p { margin: 0 0 10px; }

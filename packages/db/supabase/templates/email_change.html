@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+<body style="font-family: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; color: #222; line-height: 1.5; max-width: 520px; margin: 0 auto; padding: 24px;">
+<p style="font-size: 20px; margin: 0 0 16px;"><strong>象棋学堂 · Xiangqi School</strong></p>
+{{ if eq (printf "%v" .Data.lang) "en" }}
+<p>Confirm that you want to change your Xiangqi School email from {{ .Email }} to {{ .NewEmail }}:</p>
+{{ else }}
+<p>请确认将象棋学堂账号邮箱从 {{ .Email }} 改为 {{ .NewEmail }}：</p>
+{{ end }}
+<p><a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email_change" style="display: inline-block; background: #b5302e; color: #fff; padding: 10px 18px; border-radius: 6px; text-decoration: none;">{{ if eq (printf "%v" .Data.lang) "en" }}Confirm the change{{ else }}确认修改{{ end }}</a></p>
+{{ if eq (printf "%v" .Data.lang) "en" }}
+<p>If you didn't ask for this, ignore this email and sign in to check your account.</p>
+{{ else }}
+<p>如果不是你本人操作，请忽略这封邮件，并登录检查你的账号。</p>
+{{ end }}
+<p style="color: #777; font-size: 13px; margin-top: 32px;">{{ if eq (printf "%v" .Data.lang) "en" }}Xiangqi School — learn and play Chinese chess.{{ else }}象棋学堂——学象棋，下象棋。{{ end }}</p>
+</body>
+</html>

@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+<body style="font-family: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; color: #222; line-height: 1.5; max-width: 520px; margin: 0 auto; padding: 24px;">
+<p style="font-size: 20px; margin: 0 0 16px;"><strong>象棋学堂 · Xiangqi School</strong></p>
+{{ if eq (printf "%v" .Data.lang) "en" }}
+<p>Hi {{ .Data.username }}, thanks for signing up. Confirm this is your email to start saving your progress:</p>
+{{ else }}
+<p>{{ .Data.username }}，你好！感谢注册。请确认这是你的邮箱，确认后即可保存学习进度：</p>
+{{ end }}
+<p><a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=signup" style="display: inline-block; background: #b5302e; color: #fff; padding: 10px 18px; border-radius: 6px; text-decoration: none;">{{ if eq (printf "%v" .Data.lang) "en" }}Confirm my email{{ else }}确认邮箱{{ end }}</a></p>
+{{ if eq (printf "%v" .Data.lang) "en" }}
+<p>If you didn't sign up, ignore this email and no account will be made.</p>
+{{ else }}
+<p>如果你没有注册，请忽略这封邮件，不会创建账号。</p>
+{{ end }}
+<p style="color: #777; font-size: 13px; margin-top: 32px;">{{ if eq (printf "%v" .Data.lang) "en" }}Xiangqi School — learn and play Chinese chess.{{ else }}象棋学堂——学象棋，下象棋。{{ end }}</p>
+</body>
+</html>

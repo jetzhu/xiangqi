@@ -1,8 +1,10 @@
 "use client";
+import { AccountMenu } from "./account/AccountMenu.js";
+import { useAccount } from "./account/session.js";
 import { useNav } from "./nav.js";
 import { useT } from "./settings.js";
 
-export type Section = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats";
+export type Section = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "account";
 
 const ITEMS: { id: Section; path: string; en: string; zh: string }[] = [
   { id: "learn", path: "/learn", en: "Learn", zh: "学习" },
@@ -16,6 +18,8 @@ const ITEMS: { id: Section; path: string; en: string; zh: string }[] = [
 export function SiteNav({ current, languageHref }: { current: Section; languageHref?: string }) {
   const nav = useNav();
   const { tt, lang } = useT();
+  // Signed in, My stats and Settings move into the account menu.
+  const signedIn = useAccount().state.status === "signedIn";
   return (
     <nav className="topnav" aria-label={tt("Main", "主菜单")}>
       <a className="brand" href={nav.href("/")}>
@@ -34,15 +38,20 @@ export function SiteNav({ current, languageHref }: { current: Section; languageH
             {lang === "zh" ? "English" : "中文"}
           </a>
         )}
-        <a href={nav.href("/stats")} aria-current={current === "stats" ? "page" : undefined}>
-          {tt("My stats", "我的统计")}
-        </a>
+        {!signedIn && (
+          <a href={nav.href("/stats")} aria-current={current === "stats" ? "page" : undefined}>
+            {tt("My stats", "我的统计")}
+          </a>
+        )}
         <a href={nav.href("/help")} aria-current={current === "help" ? "page" : undefined}>
           {tt("Help", "帮助")}
         </a>
-        <a href={nav.href("/settings")} aria-current={current === "settings" ? "page" : undefined}>
-          {tt("Settings", "设置")}
-        </a>
+        {!signedIn && (
+          <a href={nav.href("/settings")} aria-current={current === "settings" ? "page" : undefined}>
+            {tt("Settings", "设置")}
+          </a>
+        )}
+        <AccountMenu />
       </div>
     </nav>
   );
