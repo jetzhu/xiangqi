@@ -376,6 +376,13 @@ export function SignUpPage() {
           hint={tt(`At least ${MIN_PASSWORD} characters.`, `至少 ${MIN_PASSWORD} 位。`)}
         />
         <FormError text={error} />
+        <p className="muted field-aside">
+          {tt("By signing up you agree to the ", "注册即表示你同意")}
+          <a href={nav.href("/terms")}>{tt("terms of use", "使用条款")}</a>
+          {tt(" and the ", "和")}
+          <a href={nav.href("/privacy")}>{tt("privacy policy", "隐私政策")}</a>
+          {tt(".", "。")}
+        </p>
         <button type="submit" className="primary wide" disabled={busy}>
           {busy ? "…" : tt("Sign up", "注册")}
         </button>

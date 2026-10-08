@@ -4,7 +4,7 @@ import { useAccount } from "./account/session.js";
 import { useNav } from "./nav.js";
 import { useT } from "./settings.js";
 
-export type Section = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "account";
+export type Section = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "account" | "privacy" | "terms";
 
 const ITEMS: { id: Section; path: string; en: string; zh: string }[] = [
   { id: "learn", path: "/learn", en: "Learn", zh: "学习" },

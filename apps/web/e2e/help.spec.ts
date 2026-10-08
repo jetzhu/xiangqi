@@ -42,3 +42,17 @@ test("colour-blind theme can be chosen", async ({ page }) => {
   await page.goto(at("/en/play/"));
   await expect(page.getByLabel("Theme")).toHaveValue("colorblind");
 });
+
+test("privacy policy and terms are plain pages, readable without JavaScript", async ({ request }) => {
+  const privacy = await (await request.get(at("/en/privacy/"))).text();
+  expect(privacy).toContain("Google API Services User Data Policy");
+  expect(privacy).toContain("United States");
+  const terms = await (await request.get(at("/zh/terms/"))).text();
+  expect(terms).toContain("使用条款");
+});
+
+test("sign-up links to the terms and privacy policy", async ({ page }) => {
+  await page.goto(at("/en/signup/"));
+  await expect(page.getByRole("link", { name: "privacy policy" })).toHaveAttribute("href", /\/en\/privacy\/$/);
+  await expect(page.getByRole("link", { name: "terms of use" })).toHaveAttribute("href", /\/en\/terms\/$/);
+});

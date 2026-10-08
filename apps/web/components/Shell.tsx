@@ -5,7 +5,7 @@ import { type ReactNode, useMemo } from "react";
 import { ACCOUNTS, BASE_PATH } from "../lib/site";
 import { UpdateBanner } from "./UpdateBanner";
 
-type Section = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "account";
+type Section = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "account" | "privacy" | "terms";
 const ACCOUNT_PAGES = ["signup", "login", "reset-password", "auth"];
 
 /** Providers and header for a locale; the language link points to the same page in the other locale. */

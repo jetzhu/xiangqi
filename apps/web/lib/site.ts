@@ -28,7 +28,7 @@ export const ACCOUNTS =
     : null;
 export const SITE_NAME = { zh: "象棋学堂", en: "Xiangqi School" } as const;
 
-type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "signup" | "login" | "resetPassword" | "authCallback";
+type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "signup" | "login" | "resetPassword" | "authCallback" | "privacy" | "terms";
 const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; description: Record<Locale, string> }> = {
   home: {
     path: "/",
@@ -70,6 +70,16 @@ const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; desc
     path: "/stats",
     title: { zh: "我的统计", en: "My stats" },
     description: { zh: "你的等级分、战绩和对局记录。", en: "Your ratings, results and game history." },
+  },
+  privacy: {
+    path: "/privacy",
+    title: { zh: "隐私政策", en: "Privacy policy" },
+    description: { zh: "象棋学堂保存哪些信息、存在哪里以及用途。", en: "What Xiangqi School keeps about you, where, and why." },
+  },
+  terms: {
+    path: "/terms",
+    title: { zh: "使用条款", en: "Terms of use" },
+    description: { zh: "使用象棋学堂的条款。", en: "The terms for using Xiangqi School." },
   },
   signup: {
     path: "/signup",
