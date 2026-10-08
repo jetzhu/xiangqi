@@ -486,7 +486,7 @@ function NewPasswordForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-type CallbackStep = { kind: "working" } | { kind: "confirmed" } | { kind: "newPassword" } | { kind: "passwordSaved" } | { kind: "failed"; message: string };
+type CallbackStep = { kind: "working" } | { kind: "confirmed" } | { kind: "otherBrowser" } | { kind: "newPassword" } | { kind: "passwordSaved" } | { kind: "failed"; message: string };
 
 /** Where links in our emails land: confirms the email, or lets the player choose a new password. */
 export function AuthCallbackPage() {
@@ -517,11 +517,14 @@ export function AuthCallbackPage() {
         await account.refresh();
         setStep(otpType === "recovery" ? { kind: "newPassword" } : { kind: "confirmed" });
       } else if (code) {
-        // Google, Apple and GitHub sign-in (from M10) come back with a code.
-        const { error } = await sb.auth.exchangeCodeForSession(code);
+        // Supabase's default emails, and Google/Apple/GitHub sign-in (M10), come back with a
+        // code that only the browser which asked for it can use.
+        const { data, error } = await sb.auth.exchangeCodeForSession(code);
+        if (error?.code === "pkce_code_verifier_not_found") return setStep({ kind: "otherBrowser" });
         if (error) return setStep({ kind: "failed", message: authErrorText(error, tt) });
         await account.refresh();
-        setStep({ kind: "confirmed" });
+        // redirectType is returned at runtime but missing from the published types.
+        setStep((data as { redirectType?: string | null }).redirectType === "recovery" ? { kind: "newPassword" } : { kind: "confirmed" });
       } else {
         setStep({ kind: "failed", message: tt("This link is incomplete. Open it again from the email.", "链接不完整，请从邮件中重新打开。") });
       }
@@ -550,6 +553,28 @@ export function AuthCallbackPage() {
             </a>
             <a className="button" href={nav.href("/learn")}>
               {tt("Start learning", "开始学习")}
+            </a>
+          </p>
+        </AuthShell>
+      );
+    case "otherBrowser":
+      return (
+        <AuthShell title={tt("Open the link in the same browser", "请在同一浏览器中打开链接")}>
+          <p role="status">
+            {tt(
+              "This link was opened in a different browser from the one you used on the site. If you were confirming your email, it is confirmed: log in here to continue.",
+              "这个链接是在另一个浏览器中打开的。如果你是在确认邮箱，邮箱已经确认，请在这里登录即可。",
+            )}
+          </p>
+          <p className="muted">
+            {tt("If you were resetting your password, ask for a new link from this browser.", "如果你是在重设密码，请在这个浏览器中重新获取链接。")}
+          </p>
+          <p className="buttons">
+            <a className="button primary" href={nav.href("/login")}>
+              {tt("Log in", "登录")}
+            </a>
+            <a className="button" href={nav.href("/reset-password")}>
+              {tt("Reset password", "重设密码")}
             </a>
           </p>
         </AuthShell>

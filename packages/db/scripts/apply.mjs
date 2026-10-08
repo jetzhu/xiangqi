@@ -81,7 +81,13 @@ for (const file of files) {
 const current = await api("GET", "/config/auth");
 const unknown = Object.keys(AUTH).filter((k) => !(k in current));
 if (unknown.length) throw new Error(`Unknown auth settings: ${unknown.join(", ")}`);
-const changes = Object.fromEntries(Object.entries(AUTH).filter(([k, v]) => current[k] !== v));
+// Supabase's built-in email sender (no smtp_host) doesn't allow custom templates on the free
+// plan: keep its default English emails until a custom sender is configured.
+const builtInSender = !current.smtp_host;
+if (builtInSender) console.log("! built-in email sender: email templates and subjects skipped until a custom SMTP sender is set");
+const changes = Object.fromEntries(
+  Object.entries(AUTH).filter(([k, v]) => current[k] !== v && !(builtInSender && k.startsWith("mailer_") && /subjects|templates/.test(k))),
+);
 for (const k of Object.keys(changes)) console.log(`${dryRun ? "would set" : "~"} auth.${k}${k.includes("content") ? "" : ` = ${JSON.stringify(changes[k])}`}`);
 if (!dryRun && Object.keys(changes).length) await api("PATCH", "/config/auth", changes);
 console.log(dryRun ? "Dry run: nothing changed." : `Project ${ref} is up to date.`);

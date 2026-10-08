@@ -58,6 +58,7 @@ async function fakeSupabase(page: Page, opts: { takenNames?: string[]; password?
         calls.verify.push(body ?? {});
         return json(route, session());
       case "/auth/v1/token":
+        if (url.searchParams.get("grant_type") === "pkce") return json(route, session());
         calls.password.push(body ?? {});
         return body?.password === (opts.password ?? "correct-horse")
           ? json(route, session())
@@ -164,4 +165,25 @@ test("an expired email link explains itself", async ({ page }) => {
   await page.goto(at("/en/auth/callback/#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired"));
   await expect(page.locator(".form-error")).toHaveText("This link has expired or was already used.");
   await expect(page.getByRole("link", { name: "Reset password" })).toBeVisible();
+});
+
+// Supabase's default emails (used until a custom sender allows our templates) come back with
+// ?code=, which only the browser that asked for the email can use.
+const VERIFIER_KEY = "sb-cxawhlamdwgojfzzgvqy-auth-token-code-verifier";
+
+test("a default-email password reset link leads to choosing a new password", async ({ page }) => {
+  const calls = await fakeSupabase(page);
+  await page.addInitScript((key) => localStorage.setItem(key, JSON.stringify("verifier123/recovery")), VERIFIER_KEY);
+  await page.goto(at("/en/auth/callback/?code=c1"));
+  await page.getByLabel("New password").fill("a-new-password");
+  await page.getByRole("button", { name: "Save new password" }).click();
+  await expect(page.getByRole("heading", { name: "Password saved" })).toBeVisible();
+  expect(calls.updateUser).toMatchObject([{ password: "a-new-password" }]);
+});
+
+test("a default-email link opened in another browser says what to do", async ({ page }) => {
+  await fakeSupabase(page);
+  await page.goto(at("/en/auth/callback/?code=c2"));
+  await expect(page.getByRole("heading", { name: "Open the link in the same browser" })).toBeVisible();
+  await expect(page.getByText(/it is confirmed: log in here/)).toBeVisible();
 });
