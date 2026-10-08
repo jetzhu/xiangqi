@@ -55,9 +55,13 @@ async function api(method, path, body) {
 const sql = (query) => api("POST", "/database/query", { query });
 
 // Migrations, recorded where the Supabase CLI records them, so either tool can be used later.
-await sql(`create schema if not exists supabase_migrations;
-  create table if not exists supabase_migrations.schema_migrations (version text primary key, statements text[], name text);`);
-const applied = new Set((await sql("select version from supabase_migrations.schema_migrations")).map((r) => r.version));
+// A dry run only reads: it doesn't create the history table if it's missing.
+const [{ has_history }] = await sql(`select to_regclass('supabase_migrations.schema_migrations') is not null as has_history`);
+if (!has_history && !dryRun) {
+  await sql(`create schema if not exists supabase_migrations;
+    create table if not exists supabase_migrations.schema_migrations (version text primary key, statements text[], name text);`);
+}
+const applied = new Set(has_history || !dryRun ? (await sql("select version from supabase_migrations.schema_migrations")).map((r) => r.version) : []);
 const files = readdirSync(here("supabase/migrations")).filter((f) => f.endsWith(".sql")).sort();
 for (const file of files) {
   const [, version, name] = file.match(/^(\d+)_(.+)\.sql$/);
