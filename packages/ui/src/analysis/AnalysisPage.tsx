@@ -5,7 +5,8 @@ import { GameTree, Position, START_FEN, type TreeNode, explainIllegal, parseSqua
 import { EnginePanel } from "./EnginePanel.js";
 import { MoveTreeView } from "./MoveTreeView.js";
 import { PositionEditor } from "./PositionEditor.js";
-import { type SavedAnalysis, deleteSaved, listSaved, saveAnalysis } from "./storage.js";
+import type { SavedAnalysis } from "./storage.js";
+import { useStore } from "../store/index.js";
 import { useEngine } from "./useEngine.js";
 import { Board } from "../Board.js";
 import { type Nav, useNav } from "../nav.js";
@@ -42,6 +43,7 @@ const LINE_COLORS: ArrowColor[] = ["green", "blue", "orange"];
 
 export function AnalysisPage() {
   const nav = useNav();
+  const store = useStore();
   const playSound = useSound();
   const { settings, update } = useSettings();
   const { tt } = useT();
@@ -100,7 +102,7 @@ export function AnalysisPage() {
   }, [current, go, t]);
 
   useEffect(() => {
-    listSaved().then(setSaved, () => setSaved([]));
+    store.analyses.list().then(setSaved, () => setSaved([]));
   }, []);
 
   const onMove = (move: string) => {
@@ -281,7 +283,7 @@ export function AnalysisPage() {
           onSubmit={async (e) => {
             e.preventDefault();
             try {
-              const item = await saveAnalysis(title, t.toPgn({ Event: title || "Analysis" }));
+              const item = await store.analyses.save(title, t.toPgn({ Event: title || "Analysis" }));
               setSaved((s) => [item, ...s]);
               setTitle("");
               setMessage(tt("Saved in this browser.", "已保存在本浏览器中。"));
@@ -315,7 +317,7 @@ export function AnalysisPage() {
                   className="link danger"
                   aria-label={`Delete ${s.title}`}
                   onClick={async () => {
-                    await deleteSaved(s.id);
+                    await store.analyses.remove(s.id);
                     setSaved((all) => all.filter((x) => x.id !== s.id));
                   }}
                 >

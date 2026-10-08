@@ -1,9 +1,6 @@
-// Daily streak, kept per browser. As on chess.com: a game, a puzzle, a finished lesson or a
-// game review keeps the day; up to 2 missed days in a row are forgiven (they pause the
-// streak without adding to it), and a third missed day resets it to 0.
-
-const KEY = "xq:activity:v1";
-const KEEP = 400; // days of history kept
+// Daily streak rules; the active days are stored through the Store. As on chess.com: a game,
+// a puzzle, a finished lesson or a game review keeps the day; up to 2 missed days in a row are
+// forgiven (they pause the streak without adding to it), and a third missed day resets it to 0.
 
 /** Local calendar day as YYYY-MM-DD. */
 export function dayOf(d: Date): string {
@@ -31,24 +28,4 @@ export function computeStreak(activeDays: readonly string[], today: string): Str
   let run = 1;
   for (let i = 1; i < days.length && days[i - 1]! - days[i]! - 1 <= 2; i++) run++;
   return { days: run, today: last === t, missed: last === t ? 0 : t - last - 1 };
-}
-
-export function loadActivity(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem(KEY) ?? "[]") as string[];
-  } catch {
-    return [];
-  }
-}
-
-/** Note that the player did something that counts toward the streak today. */
-export function recordActivity(now = new Date()): void {
-  const today = dayOf(now);
-  const days = loadActivity();
-  if (days.includes(today)) return;
-  try {
-    localStorage.setItem(KEY, JSON.stringify([...days, today].slice(-KEEP)));
-  } catch {
-    // storage blocked: the streak just isn't remembered
-  }
 }

@@ -6,8 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { Board } from "../Board.js";
 import { useNav } from "../nav.js";
 import { useOrientation, useSound, useT } from "../settings.js";
-import { recordActivity } from "../streak.js";
-import { type RushMode, loadRushBest, saveRushScore } from "./modes.js";
+import { useStore } from "../store/index.js";
+import type { RushMode } from "./modes.js";
 import { useSolver } from "./useSolver.js";
 
 const STRIKES = 3;
@@ -28,6 +28,7 @@ interface Run {
 export function PuzzleRush() {
   const { lang, tt } = useT();
   const nav = useNav();
+  const store = useStore();
   const playSound = useSound();
   const [best, setBest] = useState<Partial<Record<RushMode, number>>>({});
   const [run, setRun] = useState<Run | null>(null);
@@ -35,14 +36,16 @@ export function PuzzleRush() {
   const [now, setNow] = useState(Date.now());
   const runRef = useRef(run);
   runRef.current = run;
-  useEffect(() => setBest(loadRushBest()), []);
+  useEffect(() => void store.rush.load().then(setBest), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const end = (r: Run) => {
-    const newBest = saveRushScore(r.mode, r.score);
-    recordActivity();
     playSound("end");
-    setBest(loadRushBest());
-    setRun({ ...r, over: true, newBest });
+    setRun({ ...r, over: true, newBest: false });
+    void store.activity.record();
+    void store.rush.save(r.mode, r.score).then((newBest) => {
+      setRun((cur) => (cur && cur.over ? { ...cur, newBest } : cur));
+      return store.rush.load().then(setBest);
+    });
   };
 
   const start = (mode: RushMode) => {

@@ -3,8 +3,8 @@ import { LEVELS, type Puzzle, goalOf, judge, levelOf, pickInLevel, pickPuzzle, u
 import { useEffect, useMemo, useState } from "react";
 import { Game, Position, explainIllegal, parseSquare, squareName, toIccs } from "xiangqi-core";
 import { PUZZLES } from "@xq/content";
-import { type PuzzleState, loadPuzzleState, savePuzzleState } from "./store.js";
-import { recordActivity } from "../streak.js";
+import type { PuzzleState } from "./store.js";
+import { useStore } from "../store/index.js";
 import { DailyPuzzle } from "./DailyPuzzle.js";
 import { PuzzleRush } from "./PuzzleRush.js";
 import { Board } from "../Board.js";
@@ -99,6 +99,7 @@ export function PuzzlesPage() {
 }
 
 function RatedPuzzles() {
+  const store = useStore();
   const { lang } = useT();
   const { settings, update } = useSettings();
   const playSound = useSound();
@@ -120,7 +121,7 @@ function RatedPuzzles() {
   const [difficultyNote, setDifficultyNote] = useState(false);
 
   useEffect(() => {
-    void loadPuzzleState().then(setState);
+    void store.puzzles.load().then(setState);
   }, []);
 
   const start = (p: Puzzle, isRated: boolean) => {
@@ -169,7 +170,7 @@ function RatedPuzzles() {
    */
   const finish = (score: 0 | 0.5 | 1) => {
     if (!state || !puzzle) return;
-    recordActivity();
+    void store.activity.record();
     const seenBefore = state.history.some((h) => h.id === puzzle.id);
     const counts = rated && score !== 0.5;
     const rating = counts ? updateRating(state.rating, puzzle.rating, score) : state.rating;
@@ -181,7 +182,7 @@ function RatedPuzzles() {
     setDelta(counts ? rating.rating - state.rating.rating : null);
     setState(s);
     setRated(false);
-    void savePuzzleState(s);
+    void store.puzzles.save(s);
   };
 
   const solverRed = puzzle ? puzzle.fen.split(" ")[1] !== "b" : true;

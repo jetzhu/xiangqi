@@ -17,8 +17,7 @@ import {
 import { Avatar } from "./Avatar.js";
 import { GameReview, type ReviewFocus } from "./GameReview.js";
 import type { GameSettings, Lang } from "./BotPicker.js";
-import { recordWin } from "./stars.js";
-import { recordActivity } from "../streak.js";
+import { useStore } from "../store/index.js";
 import { useEngineInstance } from "./useEngineInstance.js";
 import { Board } from "../Board.js";
 import { useNav } from "../nav.js";
@@ -65,6 +64,7 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
   const playSound = useSound();
   const nav = useNav();
   const notation = useSettings().settings.notation;
+  const store = useStore();
   const orientation = useOrientation(playerColor);
   const t = (x: Text) => x[lang];
   const tt = (en: string, zh: string) => (lang === "zh" ? zh : en);
@@ -117,11 +117,11 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
   const finish = useCallback(
     (result: Over) => {
       setOver((prev) => prev ?? result);
-      recordActivity();
+      void store.activity.record();
       setThinking(false);
       playSound("end");
       say(result.winner === null ? "draw" : result.winner === playerColor ? "lose" : "win");
-      if (result.winner === playerColor) void recordWin(bot.id, helps.current).then(setEarned);
+      if (result.winner === playerColor) void store.stars.recordWin(bot.id, helps.current).then(setEarned);
     },
     [bot, playerColor], // eslint-disable-line react-hooks/exhaustive-deps
   );

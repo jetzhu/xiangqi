@@ -2,7 +2,7 @@
 import type { PieceSet, ThemeName } from "@xq/board";
 import { useState } from "react";
 import { Board } from "./Board.js";
-import { resetProgress } from "./learn/progress.js";
+import { useStore } from "./store/index.js";
 import { type Lang, type NotationStyle, type Settings, useSettings, useT } from "./settings.js";
 
 /** The start position after 1. 炮二平五, used for decorative boards. */
@@ -15,6 +15,7 @@ export interface SettingsPageProps {
 
 export function SettingsPage({ onLanguage }: SettingsPageProps) {
   const { settings, update } = useSettings();
+  const store = useStore();
   const { tt } = useT();
   const [resetStep, setResetStep] = useState<"idle" | "confirm" | "done">("idle");
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => update({ [k]: v } as Partial<Settings>);
@@ -121,7 +122,7 @@ export function SettingsPage({ onLanguage }: SettingsPageProps) {
               className={resetStep === "confirm" ? "primary" : ""}
               onClick={() => {
                 if (resetStep === "idle") return setResetStep("confirm");
-                void resetProgress().then(() => setResetStep("done"));
+                void store.lessons.reset().then(() => setResetStep("done"));
               }}
               onBlur={() => resetStep === "confirm" && setResetStep("idle")}
             >

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NEW_PLAYER, type Puzzle, dailyPuzzle, goalOf, judge, levelOf, pickInLevel, pickPuzzle, rushTarget, updateRating, validatePuzzle } from "../src/index.js";
+import { NEW_PLAYER, type Puzzle, ageRating, dailyPuzzle, goalOf, judge, levelOf, pickInLevel, pickPuzzle, rushTarget, updateRating, updateVs, validatePuzzle } from "../src/index.js";
 
 const MATE: Puzzle = {
   id: "t-mate",
@@ -94,5 +94,26 @@ describe("stalemate wins", () => {
     const p: Puzzle = { id: "s", fen: "", solution: ["a0a1", "a9a8", "a1a2"], rating: 1200, themes: ["stalemate"], source: "test" };
     expect(goalOf(p).en).toBe("Win in 2 moves: leave the opponent with no legal move.");
     expect(goalOf(p).zh).toContain("困毙");
+  });
+});
+
+describe("ratings against fixed opponents", () => {
+  it("moves less when the result was expected", () => {
+    const r = { rating: 800, rd: 100 };
+    const beatWeak = updateVs(r, 400, 0, 1).rating - 800;
+    const beatEqual = updateVs(r, 800, 0, 1).rating - 800;
+    const beatStrong = updateVs(r, 1200, 0, 1).rating - 800;
+    expect(beatWeak).toBeLessThan(beatEqual);
+    expect(beatEqual).toBeLessThan(beatStrong);
+    expect(updateVs(r, 800, 0, 0).rating).toBeLessThan(800);
+    expect(updateVs(r, 800, 0, 0.5).rating).toBe(800);
+  });
+  it("puzzle updates are the same function with the puzzle deviation", () => {
+    expect(updateRating(NEW_PLAYER, 900, 1)).toEqual(updateVs(NEW_PLAYER, 900, 80, 1));
+  });
+  it("uncertainty grows while away, up to a new player's", () => {
+    expect(ageRating({ rating: 1000, rd: 50 }, 0).rd).toBe(50);
+    expect(ageRating({ rating: 1000, rd: 50 }, 30).rd).toBeGreaterThan(50);
+    expect(ageRating({ rating: 1000, rd: 50 }, 1000).rd).toBe(NEW_PLAYER.rd);
   });
 });

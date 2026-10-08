@@ -6,25 +6,26 @@ import { useEffect, useMemo, useState } from "react";
 import { Board } from "../Board.js";
 import { useNav } from "../nav.js";
 import { useOrientation, useT } from "../settings.js";
-import { dayOf, recordActivity } from "../streak.js";
-import { loadDailySolved, markDailySolved } from "./modes.js";
+import { useStore } from "../store/index.js";
+import { dayOf } from "../streak.js";
 import { useSolver } from "./useSolver.js";
 
 export function DailyPuzzle() {
   const { lang, tt } = useT();
   const nav = useNav();
+  const store = useStore();
   const today = dayOf(new Date());
   const puzzle = useMemo(() => dailyPuzzle(PUZZLES, today), [today]);
   const [solvedDays, setSolvedDays] = useState<string[]>([]);
   const [phase, setPhase] = useState<"solving" | "solved" | "failed">("solving");
   const [hint, setHint] = useState(0);
-  useEffect(() => setSolvedDays(loadDailySolved()), []);
+  useEffect(() => void store.daily.load().then(setSolvedDays), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const solver = useSolver(puzzle, (solved) => {
     if (solved) {
       setPhase("solved");
-      setSolvedDays(markDailySolved(today));
-      recordActivity();
+      void store.daily.mark(today).then(setSolvedDays);
+      void store.activity.record();
     } else setPhase("failed");
   });
   useEffect(() => setHint(0), [solver.fen]);

@@ -5,7 +5,8 @@ import { type CSSProperties, useEffect, useState } from "react";
 import type { PieceType } from "xiangqi-core";
 import { useT } from "../settings.js";
 import { LessonPlayer } from "./LessonPlayer.js";
-import { type Progress, loadProgress, setStatus } from "./progress.js";
+import type { Progress } from "./progress.js";
+import { useStore } from "../store/index.js";
 
 const LESSONS = new Map(LESSON_LIST.map((l) => [l.id, l] as const));
 const ORDER = LESSON_ORDER;
@@ -31,13 +32,14 @@ export interface LearnPageProps {
 }
 
 export function LearnPage({ lessonHref }: LearnPageProps = {}) {
+  const store = useStore();
   const { lang } = useT();
   const [progress, setProgress] = useState<Progress>({});
   const [open, setOpen] = useState<string | null>(null);
   const tt = (en: string, zh: string) => (lang === "zh" ? zh : en);
 
   useEffect(() => {
-    void loadProgress().then(setProgress);
+    void store.lessons.load().then(setProgress);
   }, [open]);
 
   const mastered = ORDER.filter((id) => progress[id] === "mastered").length;
@@ -51,7 +53,7 @@ export function LearnPage({ lessonHref }: LearnPageProps = {}) {
       return;
     }
     setOpen(id);
-    void setStatus(id, "started").then(setProgress);
+    void store.lessons.setStatus(id, "started").then(setProgress);
   };
 
   if (lesson) {
@@ -62,7 +64,7 @@ export function LearnPage({ lessonHref }: LearnPageProps = {}) {
         key={lesson.id}
         lesson={lesson}
         lang={lang}
-        onDone={() => void setStatus(lesson.id, "mastered").then(setProgress)}
+        onDone={() => void store.lessons.setStatus(lesson.id, "mastered").then(setProgress)}
         onExit={() => setOpen(null)}
         hasNext={!!following}
         onNext={() => following && openLesson(following)}

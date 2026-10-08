@@ -3,12 +3,13 @@ import { BOTS, LESSON_ORDER, lessonById } from "@xq/content";
 import { learningRank } from "@xq/lessons";
 import { useEffect, useState } from "react";
 import { Board } from "./Board.js";
-import { type Stars, loadStars } from "./bots/stars.js";
-import { type Progress, loadProgress } from "./learn/progress.js";
+import type { Stars } from "./bots/stars.js";
+import type { Progress } from "./learn/progress.js";
 import { useNav } from "./nav.js";
-import { type PuzzleState, loadPuzzleState } from "./puzzles/store.js";
+import type { PuzzleState } from "./puzzles/store.js";
 import { useT } from "./settings.js";
-import { type Streak, computeStreak, dayOf, loadActivity } from "./streak.js";
+import { useStore } from "./store/index.js";
+import { type Streak, computeStreak, dayOf } from "./streak.js";
 
 /** The start position after 1. 炮二平五, used for decorative boards. */
 const AFTER_CENTRAL_CANNON = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RNBAKABNR b - - 1 1";
@@ -17,16 +18,17 @@ const AFTER_CENTRAL_CANNON = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/
 export function HomePage() {
   const { tt, t } = useT();
   const nav = useNav();
+  const store = useStore();
   const [progress, setProgress] = useState<Progress>({});
   const [puzzles, setPuzzles] = useState<PuzzleState | null>(null);
   const [stars, setStars] = useState<Stars>({});
   const [streak, setStreak] = useState<Streak>({ days: 0, today: false, missed: 0 });
 
   useEffect(() => {
-    void loadProgress().then(setProgress);
-    void loadPuzzleState().then(setPuzzles);
-    void loadStars().then(setStars);
-    setStreak(computeStreak(loadActivity(), dayOf(new Date())));
+    void store.lessons.load().then(setProgress);
+    void store.puzzles.load().then(setPuzzles);
+    void store.stars.load().then(setStars);
+    void store.activity.load().then((days) => setStreak(computeStreak(days, dayOf(new Date()))));
   }, []);
 
   const mastered = LESSON_ORDER.filter((id) => progress[id] === "mastered").length;

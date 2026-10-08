@@ -5,10 +5,12 @@ import type { Color } from "xiangqi-core";
 import { BOTS } from "@xq/content";
 import { BotGame } from "./BotGame.js";
 import { BotPicker, type GameSettings, PRESETS } from "./BotPicker.js";
-import { type Stars, loadStars } from "./stars.js";
+import type { Stars } from "./stars.js";
+import { useStore } from "../store/index.js";
 
 
 export function BotsPage() {
+  const store = useStore();
   const [selected, setSelected] = useState<BotConfig>(BOTS[0]!);
   const [settings, setSettings] = useState<GameSettings>({ color: "red", time: "none", assists: PRESETS.learn });
   const { lang } = useT();
@@ -16,7 +18,7 @@ export function BotsPage() {
   const [game, setGame] = useState<{ key: number; color: Color } | null>(null);
 
   useEffect(() => {
-    if (!game) void loadStars().then(setStars);
+    if (!game) void store.stars.load().then(setStars);
   }, [game]);
 
   const start = () => {
