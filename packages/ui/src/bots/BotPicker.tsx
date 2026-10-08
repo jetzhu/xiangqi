@@ -18,6 +18,8 @@ export interface GameSettings {
   color: "red" | "black" | "random";
   time: TimeControl;
   assists: Assists;
+  /** Rated games change the bot rating and turn every assist off. */
+  rated: boolean;
 }
 
 export const PRESETS: Record<"learn" | "fair" | "challenge", Assists> = {
@@ -49,11 +51,13 @@ interface Props {
   settings: GameSettings;
   onSettings: (s: GameSettings) => void;
   stars: Record<string, number>;
+  /** The player's bot rating, shown beside the Rated choice. */
+  rating: { rating: number; provisional: boolean } | null;
   lang: Lang;
   onPlay: () => void;
 }
 
-export function BotPicker({ bots, selected, onSelect, settings, onSettings, stars, lang, onPlay }: Props) {
+export function BotPicker({ bots, selected, onSelect, settings, onSettings, stars, rating, lang, onPlay }: Props) {
   const preset = (Object.keys(PRESETS) as (keyof typeof PRESETS)[]).find((k) =>
     (Object.keys(PRESETS[k]) as (keyof Assists)[]).every((a) => PRESETS[k][a] === settings.assists[a]),
   );
@@ -96,6 +100,24 @@ export function BotPicker({ bots, selected, onSelect, settings, onSettings, star
           </div>
         </div>
 
+        <div className="rated-choice" role="radiogroup" aria-label={zh ? "对局类型" : "Game type"}>
+          {([false, true] as const).map((r) => (
+            <label key={String(r)} className={`choice${settings.rated === r ? " active" : ""}`}>
+              <input type="radio" name="rated" checked={settings.rated === r} onChange={() => onSettings({ ...settings, rated: r })} />
+              <strong>{r ? (zh ? "计分" : "Rated") : zh ? "休闲" : "Casual"}</strong>
+              <span className="muted">
+                {r
+                  ? zh
+                    ? `无辅助，计入人机等级分${rating ? `（当前 ${rating.rating}${rating.provisional ? "?" : ""}）` : ""}`
+                    : `No help; counts for your bot rating${rating ? ` (now ${rating.rating}${rating.provisional ? "?" : ""})` : ""}`
+                  : zh
+                    ? "可用提示、悔棋等辅助，不计分"
+                    : "Hints, takebacks and other help; not rated"}
+              </span>
+            </label>
+          ))}
+        </div>
+
         <div className="options">
           <label>
             {zh ? "我执" : "I play"}
@@ -117,7 +139,8 @@ export function BotPicker({ bots, selected, onSelect, settings, onSettings, star
           <label>
             {zh ? "辅助" : "Help"}
             <select
-              value={preset ?? "custom"}
+              disabled={settings.rated}
+              value={settings.rated ? "challenge" : (preset ?? "custom")}
               onChange={(e) => e.target.value !== "custom" && onSettings({ ...settings, assists: PRESETS[e.target.value as keyof typeof PRESETS] })}
             >
               <option value="learn">{zh ? "学习（全部辅助）" : "Learn (all help)"}</option>
@@ -132,7 +155,8 @@ export function BotPicker({ bots, selected, onSelect, settings, onSettings, star
             <label key={a} className="check">
               <input
                 type="checkbox"
-                checked={settings.assists[a]}
+                disabled={settings.rated}
+                checked={!settings.rated && settings.assists[a]}
                 onChange={(e) => onSettings({ ...settings, assists: { ...settings.assists, [a]: e.target.checked } })}
               />
               {ASSIST_LABELS[a][lang]}

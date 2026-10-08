@@ -1,6 +1,6 @@
 import { type Arrow, type Badge, type BadgeIcon, EvalBar, type Highlight } from "@xq/board";
 import { type BotConfig, type ChatEvent, type Text, chatLine, chooseMove } from "@xq/bots";
-import { type MoveGrade, type ReviewedMove, type Score, formatScore, gradeCounts, gradeMove, reviewGame, scoreToBar } from "@xq/engine";
+import { type MoveGrade, type ReviewedMove, type Score, accuracy, formatScore, gradeCounts, gradeMove, reviewGame, scoreToBar } from "@xq/engine";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type Color,
@@ -17,7 +17,9 @@ import {
 import { Avatar } from "./Avatar.js";
 import { GameReview, type ReviewFocus } from "./GameReview.js";
 import type { GameSettings, Lang } from "./BotPicker.js";
-import { useStore } from "../store/index.js";
+import { type GameRecord, useStore } from "../store/index.js";
+import { MIN_PLIES, ratingNote } from "./rating.js";
+import { claimGame, finishGame } from "./records.js";
 import { useEngineInstance } from "./useEngineInstance.js";
 import { Board } from "../Board.js";
 import { useNav } from "../nav.js";
@@ -44,6 +46,8 @@ const CLOCKS: Record<string, { base: number; inc: number }> = {
 interface Over {
   winner: Color | null;
   text: Text;
+  /** How it ended, for the game record: a rules reason, "resign", "timeout" or "abandoned". */
+  reason: string;
 }
 interface CoachEval {
   score: Score;
@@ -65,6 +69,27 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
   const nav = useNav();
   const notation = useSettings().settings.notation;
   const store = useStore();
+  // The game record: created at the start, saved in progress while rated (so leaving counts),
+  // and closed by finish().
+  const record = useRef<GameRecord>({
+    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `g${Date.now()}`,
+    botId: bot.id,
+    botRating: bot.ratingLabel,
+    playerColor,
+    moves: [],
+    result: null,
+    reason: null,
+    rated: settings.rated,
+    ratingBefore: null,
+    ratingAfter: null,
+    helps: 0,
+    stars: null,
+    startedAt: new Date().toISOString(),
+    endedAt: null,
+    accuracy: null,
+  });
+  const [finalRecord, setFinalRecord] = useState<GameRecord | null>(null);
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const orientation = useOrientation(playerColor);
   const t = (x: Text) => x[lang];
   const tt = (en: string, zh: string) => (lang === "zh" ? zh : en);
@@ -121,7 +146,15 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
       setThinking(false);
       playSound("end");
       say(result.winner === null ? "draw" : result.winner === playerColor ? "lose" : "win");
-      if (result.winner === playerColor) void store.stars.recordWin(bot.id, helps.current).then(setEarned);
+      const outcome = result.winner === null ? "draw" : result.winner === playerColor ? "win" : "loss";
+      claimGame(record.current.id);
+      void (async () => {
+        const stars = outcome === "win" ? await store.stars.recordWin(bot.id, helps.current) : null;
+        if (stars) setEarned(stars);
+        const rec = { ...record.current, moves: gameRef.current.history.map((r) => r.iccs), helps: helps.current, stars };
+        record.current = await finishGame(store, rec, outcome, result.reason);
+        setFinalRecord(record.current);
+      })();
     },
     [bot, playerColor], // eslint-disable-line react-hooks/exhaustive-deps
   );
@@ -141,7 +174,12 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
 
   // Game over from the rules (mate, stalemate, repetition, move limit).
   useEffect(() => {
-    if (!over && game.result) finish({ winner: game.result.winner, text: game.result.text });
+    if (!over && game.result) finish({ winner: game.result.winner, text: game.result.text, reason: game.result.reason });
+    // A rated game is saved while in progress, so leaving it can be counted (see records.ts).
+    else if (!over && record.current.rated && game.history.length >= MIN_PLIES) {
+      record.current = { ...record.current, moves: game.history.map((r) => r.iccs), helps: helps.current };
+      void store.games.put(record.current);
+    }
   }, [version]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The bot's move.
@@ -254,6 +292,7 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
                 loser === playerColor
                   ? { en: "You lost on time", zh: "你超时判负" }
                   : { en: `${bot.name.en} lost on time`, zh: `${bot.name.zh}超时判负` },
+              reason: "timeout",
             }),
           );
           return { ...c, [turn]: 0 };
@@ -274,7 +313,15 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
       depth: 8,
       isBook: (i) => standard && isBookMove(moves, i),
       onProgress: (done, total) => setReview((r) => (r && !r.counts ? { ...r, done, total } : r)),
-    }).then((rev) => setReview({ done: fens.length, total: fens.length, counts: gradeCounts(rev, playerColor === "red"), moves: rev }));
+    }).then((rev) => {
+      setReview({ done: fens.length, total: fens.length, counts: gradeCounts(rev, playerColor === "red"), moves: rev });
+      // Keep the player's accuracy with the saved game.
+      const acc = accuracy(rev, playerColor === "red");
+      if (acc !== null && record.current.endedAt && record.current.moves.length >= MIN_PLIES) {
+        record.current = { ...record.current, accuracy: Math.round(acc * 10) / 10 };
+        void store.games.put(record.current);
+      }
+    });
   }, [over, botEng.engine]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Player actions -------------------------------------------------------------
@@ -329,7 +376,7 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
       return;
     }
     setConfirmResign(false);
-    finish({ winner: botColor, text: { en: "You resigned", zh: "你认输了" } });
+    finish({ winner: botColor, text: { en: "You resigned", zh: "你认输了" }, reason: "resign" });
   };
 
   // --- Display ----------------------------------------------------------------------
@@ -484,6 +531,7 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
           <section className="gameover" aria-label="Game over">
             <h2>{over.winner === null ? tt("Draw", "和棋") : over.winner === playerColor ? tt("You won!", "你赢了！") : tt(`${bot.name.en} won`, `${bot.name.zh}获胜`)}</h2>
             <p className="muted">{t(over.text)}</p>
+            <RatingLine record={finalRecord} plies={history.length} rated={settings.rated} lang={lang} />
             {earned !== null && (
               <p className="earned">
                 <span className="stars-big" aria-label={tt(`${earned} of 3 stars`, `${earned}/3 星`)}>
@@ -554,11 +602,40 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
           </ol>
         )}
         {!over && (
-          <button type="button" className="link" onClick={onExit}>
-            {tt("← Back to bots", "← 返回选择对手")}
+          <button
+            type="button"
+            className="link"
+            onBlur={() => setConfirmLeave(false)}
+            onClick={() => {
+              // Leaving a rated game that counts (both sides have moved, long enough) is a loss.
+              const counts = settings.rated && history.length >= MIN_PLIES;
+              if (counts && !confirmLeave) return setConfirmLeave(true);
+              if (counts) finish({ winner: botColor, text: { en: "You left the game", zh: "你离开了对局" }, reason: "abandoned" });
+              onExit();
+            }}
+          >
+            {confirmLeave
+              ? tt("Leave? A rated game counts as a loss — click again", "离开？计分对局将判负——再点一次")
+              : tt("← Back to bots", "← 返回选择对手")}
           </button>
         )}
       </aside>
     </div>
+  );
+}
+
+/** The result screen's rating line: the change, or why there was none. */
+function RatingLine({ record, plies, rated, lang }: { record: GameRecord | null; plies: number; rated: boolean; lang: Lang }) {
+  const tt = (en: string, zh: string) => (lang === "zh" ? zh : en);
+  const note = ratingNote(rated, plies);
+  if (note === "short") return <p className="rating-line">{tt("Too short to count: fewer than 4 moves were played.", "对局太短（少于4步），不计分也不保存。")}</p>;
+  if (note === "casual") return <p className="rating-line">{tt("Casual game: your rating is unchanged.", "休闲对局：等级分不变。")}</p>;
+  if (!record || record.ratingBefore === null || record.ratingAfter === null) return null;
+  const d = record.ratingAfter - record.ratingBefore;
+  return (
+    <p className="rating-line">
+      {tt("Bot rating", "人机等级分")} {record.ratingBefore} → <strong>{record.ratingAfter}</strong>{" "}
+      <span className={d >= 0 ? "up" : "down"}>({d >= 0 ? `+${d}` : d})</span>
+    </p>
   );
 }
