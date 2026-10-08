@@ -208,6 +208,35 @@ describe("rules kept by the database", () => {
     expect(await failsAs(A, `update public.profiles set avatar = 'horse', country = 'GB'`)).toBe("no error");
   });
 
+  it("asks Google/Microsoft/GitHub sign-ups to choose a name, without starting the 90-day wait", async () => {
+    const C = "00000000-0000-4000-8000-0000000000c1";
+    await signUp(C, { full_name: "Carol Example", provider_id: "123" });
+    const before = await db.query<{ username: string; username_chosen: boolean }>(`select username, username_chosen from public.profiles where user_id = $1`, [C]);
+    expect(before.rows[0]!.username).toMatch(/^player-\d{7}$/);
+    expect(before.rows[0]!.username_chosen).toBe(false);
+    const after = await as(C, async (tx) => {
+      await tx.exec(`update public.profiles set username = 'carol_xq'`);
+      const row = (await tx.query<{ username_chosen: boolean; username_changed_at: string | null }>(`select username_chosen, username_changed_at from public.profiles`)).rows[0]!;
+      // One real change is still allowed, then the wait applies.
+      await tx.exec(`update public.profiles set username = 'carol_2'`);
+      let third = "no error";
+      try {
+        await tx.exec(`update public.profiles set username = 'carol_3'`);
+      } catch (e) {
+        third = (e as Error).message;
+      }
+      return { ...row, third };
+    });
+    expect(after).toEqual({ username_chosen: true, username_changed_at: null, third: expect.stringMatching(/90 days/) });
+    expect(await failsAs(C, `update public.profiles set username_chosen = true`)).toMatch(/permission denied/);
+    await db.query(`delete from auth.users where id = $1`, [C]);
+  });
+
+  it("marks a name picked at email sign-up as chosen", async () => {
+    const { rows } = await db.query<{ username_chosen: boolean }>(`select username_chosen from public.profiles where user_id = $1`, [A]);
+    expect(rows[0]!.username_chosen).toBe(true);
+  });
+
   it("deletes everything with the account", async () => {
     await db.query(`delete from auth.users where id = $1`, [B]);
     for (const t of ["profiles", "settings", "lesson_progress", "analyses", "bot_games", "puzzle_attempts", "ratings"]) {

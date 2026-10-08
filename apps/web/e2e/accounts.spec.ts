@@ -33,10 +33,26 @@ interface Calls {
   password: Record<string, unknown>[];
   updateUser: Record<string, unknown>[];
   logout: string[];
+  authorize: string[];
+  profileUpdates: Record<string, unknown>[];
+  unlinked: string[];
 }
 
-async function fakeSupabase(page: Page, opts: { takenNames?: string[]; password?: string } = {}): Promise<Calls> {
-  const calls: Calls = { signup: [], verify: [], password: [], updateUser: [], logout: [] };
+interface FakeOptions {
+  takenNames?: string[];
+  password?: string;
+  /** Sign-in providers switched on in the fake project. */
+  providers?: string[];
+  /** The profile the site reads after signing in. */
+  profile?: { username: string; username_chosen: boolean };
+  /** Who comes back from Google/Microsoft/GitHub. */
+  oauthUser?: typeof USER;
+}
+
+async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> {
+  const calls: Calls = { signup: [], verify: [], password: [], updateUser: [], logout: [], authorize: [], profileUpdates: [], unlinked: [] };
+  const profile = { ...(opts.profile ?? { username: "Alice_1", username_chosen: true }) };
+  let user = { ...USER, identities: [...USER.identities] };
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, json: body, headers: { "access-control-allow-origin": "*" } });
   await page.route(`${SUPABASE}/**`, async (route) => {
     const req = route.request();
@@ -50,7 +66,26 @@ async function fakeSupabase(page: Page, opts: { takenNames?: string[]; password?
         return json(route, opts.takenNames?.map((n) => n.toLowerCase()).includes(name) ? "taken" : null);
       }
       case "/rest/v1/profiles":
-        return json(route, [{ username: "Alice_1" }]);
+        if (req.method() === "PATCH") {
+          calls.profileUpdates.push(body ?? {});
+          Object.assign(profile, body, { username_chosen: true });
+          return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*" } });
+        }
+        return json(route, [profile]);
+      case "/auth/v1/settings":
+        return json(route, { external: Object.fromEntries((opts.providers ?? []).map((p) => [p, true])) });
+      case "/auth/v1/authorize": {
+        // The browser leaves for the provider, which sends it straight back with a code.
+        calls.authorize.push(url.searchParams.get("provider") ?? "");
+        if (opts.oauthUser) user = opts.oauthUser;
+        return route.fulfill({ status: 302, headers: { location: `${url.searchParams.get("redirect_to")}?code=oauth1` } });
+      }
+      case "/auth/v1/user/identities/authorize": {
+        const provider = url.searchParams.get("provider") ?? "";
+        calls.authorize.push(`link:${provider}`);
+        user = { ...user, identities: [...user.identities, { id: `i-${provider}`, provider, identity_id: `i-${provider}`, identity_data: { email: "alice@users.example" } } as never] };
+        return json(route, { url: `${url.searchParams.get("redirect_to")}?code=link1` });
+      }
       case "/auth/v1/signup":
         calls.signup.push({ body: body ?? {}, url: req.url() });
         return json(route, { ...USER, email_confirmed_at: null, confirmation_sent_at: new Date().toISOString() });
@@ -58,17 +93,23 @@ async function fakeSupabase(page: Page, opts: { takenNames?: string[]; password?
         calls.verify.push(body ?? {});
         return json(route, session());
       case "/auth/v1/token":
-        if (url.searchParams.get("grant_type") === "pkce") return json(route, session());
+        if (url.searchParams.get("grant_type") === "pkce") return json(route, { ...session(), user });
         calls.password.push(body ?? {});
         return body?.password === (opts.password ?? "correct-horse")
           ? json(route, session())
           : json(route, { code: "invalid_credentials", error_code: "invalid_credentials", msg: "Invalid login credentials" }, 400);
       case "/auth/v1/user":
         if (req.method() === "PUT") calls.updateUser.push(body ?? {});
-        return json(route, USER);
+        return json(route, user);
       case "/auth/v1/logout":
         calls.logout.push(url.searchParams.get("scope") ?? "");
         return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*" } });
+    }
+    if (url.pathname.startsWith("/auth/v1/user/identities/") && req.method() === "DELETE") {
+      const id = url.pathname.split("/").pop()!;
+      calls.unlinked.push(id);
+      user = { ...user, identities: user.identities.filter((i) => (i as { identity_id?: string; id: string }).identity_id !== id && i.id !== id) };
+      return json(route, {});
     }
     return json(route, { message: `unexpected ${req.method()} ${url.pathname}` }, 500);
   });
@@ -186,4 +227,53 @@ test("a default-email link opened in another browser says what to do", async ({ 
   await page.goto(at("/en/auth/callback/?code=c2"));
   await expect(page.getByRole("heading", { name: "Open the link in the same browser" })).toBeVisible();
   await expect(page.getByText(/it is confirmed: log in here/)).toBeVisible();
+});
+
+test("first GitHub sign-in: choose a username, then back to the page", async ({ page }) => {
+  const github = {
+    ...USER,
+    id: "22222222-2222-4333-8444-555555555555",
+    email: "octo@example.com",
+    user_metadata: { user_name: "octocat", full_name: "The Octocat" } as never,
+    app_metadata: { provider: "github", providers: ["github"] },
+    identities: [{ id: "g1", provider: "github" }],
+  };
+  const calls = await fakeSupabase(page, { providers: ["github", "google"], profile: { username: "player-4821936", username_chosen: false }, oauthUser: github, takenNames: ["octocat"] });
+  await page.goto(at("/en/bots/"));
+  await page.getByRole("link", { name: "Log in" }).click();
+  // Only the providers switched on in the project, in a fixed order.
+  await expect(page.locator(".providers .provider")).toHaveText(["Continue with Google", "Continue with GitHub"]);
+  await page.getByRole("button", { name: "Continue with GitHub" }).click();
+  await expect(page.getByRole("heading", { name: "Choose your username" })).toBeVisible();
+  expect(calls.authorize).toEqual(["github"]);
+  // "octocat" is taken, so a variant is suggested.
+  await expect(page.getByLabel("Username")).toHaveValue(/^octocat\d{3}$/);
+  await page.getByLabel("Username").fill("octo_xq");
+  await page.getByRole("button", { name: "Save username" }).click();
+  await expect(page).toHaveURL(/\/en\/bots\/$/);
+  await expect(page.getByRole("button", { name: /octo_xq/ })).toBeVisible();
+  expect(calls.profileUpdates).toEqual([{ username: "octo_xq" }]);
+});
+
+test("settings: connect and disconnect a sign-in method", async ({ page }) => {
+  const calls = await fakeSupabase(page, { providers: ["github", "azure"] });
+  await page.goto(at("/en/auth/callback/?token_hash=abc&type=signup"));
+  await expect(page.getByText(/signed in as Alice_1/)).toBeVisible();
+  await page.goto(at("/en/settings/"));
+  const linked = page.locator(".linked-sign-ins");
+  await expect(linked.locator("li")).toHaveText([/Email and password/, /Microsoft\s*Connect/, /GitHub\s*Connect/]);
+  await linked.locator("li", { hasText: "GitHub" }).getByRole("button", { name: "Connect" }).click();
+  // Back on Settings after the provider, now connected.
+  await expect(page).toHaveURL(/\/en\/settings\/$/);
+  await expect(linked.locator("li", { hasText: "GitHub" })).toContainText("alice@users.example");
+  expect(calls.authorize).toEqual(["link:github"]);
+  await linked.locator("li", { hasText: "GitHub" }).getByRole("button", { name: "Disconnect" }).click();
+  await expect(linked.locator("li", { hasText: "GitHub" }).getByRole("button", { name: "Connect" })).toBeVisible();
+  expect(calls.unlinked).toEqual(["i-github"]);
+});
+
+test("a cancelled provider sign-in says so", async ({ page }) => {
+  await fakeSupabase(page);
+  await page.goto(at("/en/auth/callback/?error=access_denied&error_description=The+user+denied+the+request"));
+  await expect(page.locator(".form-error")).toHaveText("Sign-in was cancelled.");
 });

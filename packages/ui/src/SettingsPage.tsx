@@ -1,6 +1,7 @@
 "use client";
 import type { PieceSet, ThemeName } from "@xq/board";
 import { useState } from "react";
+import { LinkedSignIns } from "./account/LinkedSignIns.js";
 import { Board } from "./Board.js";
 import { useStore } from "./store/index.js";
 import { type Lang, type NotationStyle, type Settings, useSettings, useT } from "./settings.js";
@@ -130,6 +131,7 @@ export function SettingsPage({ onLanguage }: SettingsPageProps) {
             </button>
           )}
         </div>
+        <LinkedSignIns />
       </section>
     </div>
   );

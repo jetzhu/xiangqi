@@ -24,6 +24,8 @@ const AUTH = {
   mailer_autoconfirm: false, // email sign-ups stay guests until they click the link
   mailer_secure_email_change_enabled: true, // an email change is confirmed from both addresses
   password_min_length: 8,
+  // Players connect Google, Microsoft or GitHub to their account in Settings (linkIdentity).
+  security_manual_linking_enabled: true,
   smtp_max_frequency: 60, // seconds between emails to one address
   // Emails in both languages: each template picks English or Chinese from the language saved
   // with the account at sign-up (.Data.lang; Chinese unless it is "en").

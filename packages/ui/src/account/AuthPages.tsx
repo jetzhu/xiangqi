@@ -5,7 +5,7 @@
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useNav } from "../nav.js";
 import { useT } from "../settings.js";
-import { useAccount } from "./session.js";
+import { type Account, PROVIDERS, type Provider, useAccount } from "./session.js";
 
 export const USERNAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{1,18}[A-Za-z0-9]$/;
 export const MIN_PASSWORD = 8;
@@ -53,6 +53,15 @@ export function authErrorText(e: { code?: string | undefined; message?: string; 
       return tt("This link has expired or was already used.", "该链接已过期或已被使用。");
     case "signup_disabled":
       return tt("Sign-up is closed for now.", "暂不开放注册。");
+    case "access_denied":
+      return tt("Sign-in was cancelled.", "登录已取消。");
+    case "identity_already_exists":
+      return tt("That account is already connected to another Xiangqi School account.", "该账号已关联到另一个象棋学堂账号。");
+    case "single_identity_not_deletable":
+      return tt("This is your only way to sign in, so it can't be removed.", "这是你唯一的登录方式，不能移除。");
+    case "manual_linking_disabled":
+    case "provider_disabled":
+      return tt("This sign-in method isn't available right now.", "该登录方式暂不可用。");
   }
   if (e.status === 0 || /fetch|network/i.test(e.message ?? "")) return tt("Can't reach the server. Check your connection and try again.", "无法连接服务器，请检查网络后重试。");
   if (/Database error saving new user/i.test(e.message ?? "")) return tt("That username was just taken. Please choose another.", "该用户名刚被占用，请换一个。");
@@ -67,6 +76,103 @@ function callbackUrl(href: (p: string) => string): string {
 /** A same-site path to return to after logging in ("/bots"), or "/" for anything else. */
 export function safeNext(next: string | null): string {
   return next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/";
+}
+
+const NEXT_KEY = "xq:auth-next";
+
+/** Remembers where to go after a sign-in that leaves the site (Google, Microsoft, GitHub). */
+function rememberNext(next: string) {
+  try {
+    sessionStorage.setItem(NEXT_KEY, safeNext(next));
+  } catch {}
+}
+function takeNext(): string | null {
+  try {
+    const next = sessionStorage.getItem(NEXT_KEY);
+    sessionStorage.removeItem(NEXT_KEY);
+    return next;
+  } catch {
+    return null;
+  }
+}
+
+/** A username built from a provider's name or email: "Carol Example" → "Carol_Example". */
+export function suggestUsername(...sources: (string | undefined)[]): string {
+  for (const source of sources) {
+    if (!source) continue;
+    let name = source
+      .split("@")[0]!
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, "_")
+      .replace(/[^A-Za-z0-9_-]/g, "")
+      .replace(/^[_-]+|[_-]+$/g, "")
+      .slice(0, 20)
+      .replace(/[_-]+$/, "");
+    if (/^[0-9]+$/.test(name)) name = `p${name}`.slice(0, 20);
+    if (!usernameFormatProblem(name)) return name;
+  }
+  return "";
+}
+
+/** Checks a username as it is typed: format here, reserved or taken on the server. */
+function useUsernameProblem(account: Account, username: string, ownId?: string): [UsernameProblem | null, (p: UsernameProblem | null) => void] {
+  const [problem, setProblem] = useState<UsernameProblem | null>(null);
+  useEffect(() => {
+    setProblem(null);
+    if (!username) return;
+    const local = usernameFormatProblem(username);
+    const t = setTimeout(
+      () => {
+        if (local) return setProblem(local);
+        void account
+          .client()
+          .then((sb) => sb.rpc("username_problem", ownId ? { name: username, for_user: ownId } : { name: username }))
+          .then(({ data }) => setProblem((data as UsernameProblem | null) ?? null))
+          .catch(() => {});
+      },
+      local ? 600 : 350,
+    );
+    return () => clearTimeout(t);
+  }, [username, account.client, ownId]); // eslint-disable-line react-hooks/exhaustive-deps
+  return [problem, setProblem];
+}
+
+/** "Continue with Google / Microsoft / GitHub", for the providers switched on in Supabase. */
+function ProviderButtons({ next }: { next: string }) {
+  const { tt } = useT();
+  const nav = useNav();
+  const account = useAccount();
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    void account.providers().then(setProviders);
+  }, [account.providers]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!providers.length) return null;
+  const go = async (provider: Provider) => {
+    setError(null);
+    rememberNext(next);
+    const sb = await account.client();
+    // A full-page redirect: pop-ups can't talk back to a cross-origin-isolated page.
+    const { error } = await sb.auth.signInWithOAuth({
+      provider,
+      options: provider === "azure" ? { redirectTo: callbackUrl(nav.href), scopes: "email" } : { redirectTo: callbackUrl(nav.href) },
+    });
+    if (error) setError(authErrorText(error, tt));
+  };
+  return (
+    <div className="providers">
+      {PROVIDERS.filter((p) => providers.includes(p.id)).map((p) => (
+        <button key={p.id} type="button" className={`provider provider-${p.id}`} onClick={() => void go(p.id)}>
+          {tt(`Continue with ${p.name}`, `使用 ${p.name} 继续`)}
+        </button>
+      ))}
+      <FormError text={error} />
+      <p className="or" aria-hidden>
+        <span>{tt("or with email", "或使用邮箱")}</span>
+      </p>
+    </div>
+  );
 }
 
 function AuthShell({ title, children }: { title: string; children: ReactNode }) {
@@ -201,33 +307,10 @@ export function SignUpPage() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [problem, setProblem] = useState<UsernameProblem | null>(null);
+  const [problem, setProblem] = useUsernameProblem(account, username);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
-  const checked = useRef("");
-
-  // Check the name as it is typed: format here, reserved or taken on the server.
-  useEffect(() => {
-    setProblem(null);
-    if (!username) return;
-    const local = usernameFormatProblem(username);
-    const t = setTimeout(
-      () => {
-        if (local) return setProblem(local);
-        void account
-          .client()
-          .then((sb) => sb.rpc("username_problem", { name: username }))
-          .then(({ data }) => {
-            checked.current = username;
-            setProblem((data as UsernameProblem | null) ?? null);
-          })
-          .catch(() => {});
-      },
-      local ? 600 : 350,
-    );
-    return () => clearTimeout(t);
-  }, [username, account]);
 
   if (account.state.status === "off") return <Unavailable />;
   if (account.state.status === "signedIn") return <SignedInAlready />;
@@ -268,6 +351,7 @@ export function SignUpPage() {
           "免费注册。账号将在所有设备上保存你的进度、等级分和对局。账号功能刚刚上线：目前进度仍保存在本浏览器，下一步会把它转入你的账号。",
         )}
       </p>
+      <ProviderButtons next="/" />
       <form onSubmit={(e) => void submit(e)} noValidate={false}>
         <Field
           label={tt("Username", "用户名")}
@@ -368,6 +452,7 @@ export function LogInPage() {
 
   return (
     <AuthShell title={tt("Log in", "登录")}>
+      <ProviderButtons next={safeNext(nav.params().get("next"))} />
       <form onSubmit={(e) => void submit(e)}>
         <Field label={tt("Email", "邮箱")} type="email" value={email} onChange={setEmail} autoComplete="email" autoFocus />
         <Field label={tt("Password", "密码")} type="password" value={password} onChange={setPassword} autoComplete="current-password" />
@@ -486,7 +571,7 @@ function NewPasswordForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-type CallbackStep = { kind: "working" } | { kind: "confirmed" } | { kind: "otherBrowser" } | { kind: "newPassword" } | { kind: "passwordSaved" } | { kind: "failed"; message: string };
+type CallbackStep = { kind: "working" } | { kind: "confirmed" } | { kind: "signedIn" } | { kind: "chooseUsername" } | { kind: "otherBrowser" } | { kind: "newPassword" } | { kind: "passwordSaved" } | { kind: "failed"; message: string };
 
 /** Where links in our emails land: confirms the email, or lets the player choose a new password. */
 export function AuthCallbackPage() {
@@ -501,7 +586,8 @@ export function AuthCallbackPage() {
     started.current = true;
     const query = nav.params();
     const hash = new URLSearchParams(location.hash.slice(1));
-    const errorCode = query.get("error_code") ?? hash.get("error_code");
+    // Email links put errors in the hash; Google, Microsoft and GitHub in the query.
+    const errorCode = query.get("error_code") ?? hash.get("error_code") ?? query.get("error") ?? hash.get("error");
     const tokenHash = query.get("token_hash");
     const type = query.get("type");
     const code = query.get("code");
@@ -522,9 +608,14 @@ export function AuthCallbackPage() {
         const { data, error } = await sb.auth.exchangeCodeForSession(code);
         if (error?.code === "pkce_code_verifier_not_found") return setStep({ kind: "otherBrowser" });
         if (error) return setStep({ kind: "failed", message: authErrorText(error, tt) });
-        await account.refresh();
+        const state = await account.refresh();
         // redirectType is returned at runtime but missing from the published types.
-        setStep((data as { redirectType?: string | null }).redirectType === "recovery" ? { kind: "newPassword" } : { kind: "confirmed" });
+        if ((data as { redirectType?: string | null }).redirectType === "recovery") return setStep({ kind: "newPassword" });
+        const provider = data.user?.app_metadata.provider;
+        if (state.status === "signedIn" && !state.user.usernameChosen) return setStep({ kind: "chooseUsername" });
+        const next = takeNext();
+        if (next) return location.assign(nav.href(next));
+        setStep(provider && provider !== "email" ? { kind: "signedIn" } : { kind: "confirmed" });
       } else {
         setStep({ kind: "failed", message: tt("This link is incomplete. Open it again from the email.", "链接不完整，请从邮件中重新打开。") });
       }
@@ -555,6 +646,29 @@ export function AuthCallbackPage() {
               {tt("Start learning", "开始学习")}
             </a>
           </p>
+        </AuthShell>
+      );
+    case "signedIn":
+      return (
+        <AuthShell title={tt("You're in", "已登录")}>
+          <p role="status">{tt(`You're signed in as ${name}.`, `你已登录为 ${name}。`)}</p>
+          <p className="buttons">
+            <a className="button primary" href={nav.href("/")}>
+              {tt("Go to home", "回到首页")}
+            </a>
+          </p>
+        </AuthShell>
+      );
+    case "chooseUsername":
+      return (
+        <AuthShell title={tt("Choose your username", "选择用户名")}>
+          <ChooseUsername
+            onDone={() => {
+              const next = takeNext();
+              if (next) location.assign(nav.href(next));
+              else setStep({ kind: "signedIn" });
+            }}
+          />
         </AuthShell>
       );
     case "otherBrowser":
@@ -614,4 +728,81 @@ export function AuthCallbackPage() {
         </AuthShell>
       );
   }
+}
+
+/** Once, after a first Google/Microsoft/GitHub sign-in: swap the placeholder name for a real one. */
+function ChooseUsername({ onDone }: { onDone: () => void }) {
+  const { tt } = useT();
+  const account = useAccount();
+  const user = account.state.status === "signedIn" ? account.state.user : null;
+  const [username, setUsername] = useState("");
+  const [problem, setProblem] = useUsernameProblem(account, username, user?.id);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // Suggest a name from the provider's profile, made unique if needed.
+  useEffect(() => {
+    void (async () => {
+      const sb = await account.client();
+      const meta = (await sb.auth.getUser()).data.user?.user_metadata ?? {};
+      const base = suggestUsername(meta.user_name, meta.preferred_username, meta.full_name, meta.name, meta.email);
+      if (!base) return;
+      for (const candidate of [base, ...[1, 2, 3].map(() => `${base.slice(0, 16)}${Math.floor(100 + Math.random() * 900)}`)]) {
+        const { data } = await sb.rpc("username_problem", { name: candidate, for_user: user?.id });
+        if (data === null) return setUsername((current) => current || candidate);
+      }
+    })().catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!user) return null;
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    const local = usernameFormatProblem(username);
+    if (local || problem) return setProblem(local ?? problem);
+    setBusy(true);
+    setError(null);
+    const sb = await account.client();
+    const { error } = await sb.from("profiles").update({ username }).eq("user_id", user.id);
+    setBusy(false);
+    if (error) {
+      const hint = error.hint as UsernameProblem | "too_soon" | null;
+      if (hint && hint !== "too_soon") return setProblem(hint);
+      return setError(authErrorText(error, tt));
+    }
+    await account.refresh();
+    onDone();
+  };
+  return (
+    <>
+      <p className="muted">
+        {tt(
+          `You're signed in. Pick the name other players will see; for now you're ${user.username}.`,
+          `你已登录。请选择其他棋友看到的名字，目前是 ${user.username}。`,
+        )}
+      </p>
+      <form onSubmit={(e) => void submit(e)}>
+        <Field
+          label={tt("Username", "用户名")}
+          type="text"
+          value={username}
+          onChange={setUsername}
+          autoComplete="username"
+          minLength={3}
+          maxLength={20}
+          autoFocus
+          error={problem ? usernameText(problem, tt) : null}
+          hint={tt("3–20 letters, digits, _ or -. Please don't use your real name.", "3–20 个字母、数字、_ 或 -。请不要使用真实姓名。")}
+        />
+        <FormError text={error} />
+        <button type="submit" className="primary wide" disabled={busy || !username}>
+          {busy ? "…" : tt("Save username", "保存用户名")}
+        </button>
+      </form>
+      <p className="auth-alt">
+        <button type="button" className="link-button" onClick={onDone}>
+          {tt("Skip for now", "暂时跳过")}
+        </button>
+      </p>
+    </>
+  );
 }

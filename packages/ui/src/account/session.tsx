@@ -19,7 +19,17 @@ export interface AccountUser {
   id: string;
   email: string;
   username: string;
+  /** False while the name is the placeholder given to a Google/Microsoft/GitHub sign-up. */
+  usernameChosen: boolean;
 }
+
+/** Sign-in providers the site offers besides email (Supabase calls Microsoft "azure"). */
+export type Provider = "google" | "azure" | "github";
+export const PROVIDERS: { id: Provider; name: string }[] = [
+  { id: "google", name: "Google" },
+  { id: "azure", name: "Microsoft" },
+  { id: "github", name: "GitHub" },
+];
 
 export type AccountState =
   | { status: "off" }
@@ -32,7 +42,9 @@ export interface Account {
   /** The Supabase client, loaded on first use. Throws when accounts are off. */
   client: () => Promise<SupabaseClient>;
   /** Re-reads the session and profile (after sign-in, or a username change). */
-  refresh: () => Promise<void>;
+  refresh: () => Promise<AccountState>;
+  /** Providers switched on in the Supabase project, in display order. */
+  providers: () => Promise<Provider[]>;
   /** Signs out on this device only. */
   signOut: () => Promise<void>;
 }
@@ -51,7 +63,8 @@ function hasStoredSession(config: AccountConfig): boolean {
 const OFF: Account = {
   state: { status: "off" },
   client: () => Promise.reject(new Error("Accounts are not configured")),
-  refresh: async () => {},
+  refresh: async () => ({ status: "off" }),
+  providers: async () => [],
   signOut: async () => {},
 };
 
@@ -72,21 +85,41 @@ export function AccountProvider({ config, children }: { config: AccountConfig | 
     return clientRef.current;
   }, [config]);
 
-  const load = useCallback(async () => {
-    if (!config) return;
+  const load = useCallback(async (): Promise<AccountState> => {
+    if (!config) return { status: "off" };
     const sb = await client();
     const { data } = await sb.auth.getSession();
     const user = data.session?.user;
-    if (!user) {
-      setState({ status: "guest" });
-      return;
+    let next: AccountState = { status: "guest" };
+    if (user) {
+      const { data: profile } = await sb.from("profiles").select("username, username_chosen").eq("user_id", user.id).maybeSingle();
+      next = {
+        status: "signedIn",
+        user: {
+          id: user.id,
+          email: user.email ?? "",
+          username: (profile?.username as string | undefined) ?? (user.user_metadata.username as string | undefined) ?? "",
+          usernameChosen: (profile?.username_chosen as boolean | undefined) ?? true,
+        },
+      };
     }
-    const { data: profile } = await sb.from("profiles").select("username").eq("user_id", user.id).maybeSingle();
-    setState({
-      status: "signedIn",
-      user: { id: user.id, email: user.email ?? "", username: (profile?.username as string | undefined) ?? (user.user_metadata.username as string | undefined) ?? "" },
-    });
+    setState(next);
+    return next;
   }, [config, client]);
+
+  const providersRef = useRef<Promise<Provider[]> | null>(null);
+  const providers = useCallback(() => {
+    if (!config) return Promise.resolve([]);
+    // Public settings: which sign-in methods the project has switched on.
+    providersRef.current ??= fetch(`${config.url}/auth/v1/settings`, { headers: { apikey: config.key } })
+      .then((r) => r.json() as Promise<{ external?: Record<string, boolean> }>)
+      .then((s) => PROVIDERS.filter((p) => s.external?.[p.id]).map((p) => p.id))
+      .catch(() => {
+        providersRef.current = null;
+        return [];
+      });
+    return providersRef.current;
+  }, [config]);
 
   useEffect(() => {
     if (!config) return;
@@ -118,7 +151,7 @@ export function AccountProvider({ config, children }: { config: AccountConfig | 
     setState({ status: "guest" });
   }, [client]);
 
-  const value = useMemo<Account>(() => (config ? { state, client, refresh: load, signOut } : OFF), [config, state, client, load, signOut]);
+  const value = useMemo<Account>(() => (config ? { state, client, refresh: load, providers, signOut } : OFF), [config, state, client, load, providers, signOut]);
   return <AccountContext.Provider value={value}>{children}</AccountContext.Provider>;
 }
 

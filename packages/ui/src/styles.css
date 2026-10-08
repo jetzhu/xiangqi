@@ -369,3 +369,9 @@ kbd { font-family: ui-monospace, monospace; font-size: 0.9em; padding: 1px 5px; 
 button.wide { width: 100%; padding: 10px; font-size: 16px; }
 .auth-alt { margin: 18px 0 0; font-size: 14px; text-align: center; }
 .check-email p { margin: 0 0 10px; }
+.providers { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.providers .provider { width: 100%; padding: 10px; font-size: 15px; font-weight: 600; }
+.providers .or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+.providers .or::before, .providers .or::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
+.linked-sign-ins ul { list-style: none; margin: 0; padding: 0; }
+.linked-sign-ins li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }

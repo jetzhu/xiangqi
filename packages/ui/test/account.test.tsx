@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LogInPage, authErrorText, safeNext, usernameFormatProblem } from "../src/account/AuthPages.js";
+import { LogInPage, authErrorText, safeNext, suggestUsername, usernameFormatProblem } from "../src/account/AuthPages.js";
 import { AccountProvider, sessionKey } from "../src/account/session.js";
 import { SiteNav } from "../src/SiteNav.js";
 import { SettingsProvider } from "../src/settings.js";
@@ -69,6 +69,16 @@ describe("account rules shared with the database", () => {
     expect(safeNext("/\\evil.example")).toBe("/");
     expect(safeNext("https://evil.example")).toBe("/");
     expect(safeNext(null)).toBe("/");
+  });
+
+  it("suggests a username from a provider's profile", () => {
+    expect(suggestUsername("octocat")).toBe("octocat");
+    expect(suggestUsername(undefined, "Carol Example")).toBe("Carol_Example");
+    expect(suggestUsername("José Núñez")).toBe("Jose_Nunez");
+    expect(suggestUsername("张伟", "zhang.wei@example.com")).toBe("zhangwei");
+    expect(suggestUsername("2024")).toBe("p2024");
+    expect(suggestUsername("A very long display name indeed")).toBe("A_very_long_display");
+    expect(suggestUsername("x", "-")).toBe("");
   });
 
   it("explains auth errors in both languages", () => {
