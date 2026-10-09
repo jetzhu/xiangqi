@@ -28,6 +28,7 @@
     "@xq/engine": "workspace:*",
     "@xq/lessons": "workspace:*",
     "@xq/puzzles": "workspace:*",
+    "@xq/records": "workspace:*",
     "idb-keyval": "^6.3.0",
     "xiangqi-core": "workspace:*"
   },

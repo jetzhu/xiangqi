@@ -1,0 +1,24 @@
+{
+  "name": "@xq/records",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bot-game and puzzle-attempt checks and the bot rating, shared by the site and the server functions",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@xq/content": "workspace:*",
+    "@xq/puzzles": "workspace:*",
+    "xiangqi-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.4",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  }
+}

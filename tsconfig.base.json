@@ -34,6 +34,9 @@
       ],
       "@xq/ui": [
         "./packages/ui/src/index.ts"
+      ],
+      "@xq/records": [
+        "./packages/records/src/index.ts"
       ]
     }
   }

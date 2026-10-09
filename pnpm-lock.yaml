@@ -414,6 +414,28 @@ importers:
         specifier: 5.0.3
         version: 5.0.3(@types/node@26.6.4)(jsdom@30.1.1)(vite@8.3.2(@types/node@26.6.4))
 
+  packages/records:
+    dependencies:
+      '@xq/content':
+        specifier: workspace:*
+        version: link:../content
+      '@xq/puzzles':
+        specifier: workspace:*
+        version: link:../puzzles
+      xiangqi-core:
+        specifier: workspace:*
+        version: link:../xiangqi-core
+    devDependencies:
+      '@types/node':
+        specifier: 26.6.4
+        version: 26.6.4
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: 5.0.3
+        version: 5.0.3(@types/node@26.6.4)(jsdom@30.1.1)(vite@8.3.2(@types/node@26.6.4))
+
   packages/ui:
     dependencies:
       '@supabase/supabase-js':
@@ -437,6 +459,9 @@ importers:
       '@xq/puzzles':
         specifier: workspace:*
         version: link:../puzzles
+      '@xq/records':
+        specifier: workspace:*
+        version: link:../records
       idb-keyval:
         specifier: ^6.3.0
         version: 6.3.0

@@ -26,7 +26,7 @@ const config: NextConfig = {
   images: { unoptimized: true },
   env: { NEXT_PUBLIC_BUILD: build },
   // Workspace packages ship TypeScript sources.
-  transpilePackages: ["@xq/ui", "@xq/board", "@xq/engine", "@xq/bots", "@xq/lessons", "@xq/puzzles", "@xq/content", "xiangqi-core"],
+  transpilePackages: ["@xq/ui", "@xq/board", "@xq/engine", "@xq/bots", "@xq/lessons", "@xq/puzzles", "@xq/content", "@xq/records", "xiangqi-core"],
   // Sources import siblings as "./x.js" (NodeNext style); map that to the .ts/.tsx file.
   webpack: (cfg) => {
     cfg.resolve.extensionAlias = { ".js": [".ts", ".tsx", ".js"], ".mjs": [".mts", ".mjs"] };
