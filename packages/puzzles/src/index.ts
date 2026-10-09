@@ -54,6 +54,13 @@ export function judge(p: Puzzle, i: number, fen: string, move: string): Verdict 
   return "wrong";
 }
 
+/** The first puzzles a new solver sees, unrated warm-ups: the easiest mates in one. */
+export const onboardingOf = (puzzles: readonly Puzzle[]) =>
+  puzzles
+    .filter((p) => p.themes.includes("mateIn1"))
+    .sort((a, b) => a.rating - b.rating)
+    .slice(0, 5);
+
 // --- Rating (Glicko-1): rating.ts ------------------------------------------------------------
 
 export * from "./rating.js";

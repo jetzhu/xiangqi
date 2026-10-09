@@ -7,12 +7,14 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "apply": "node scripts/apply.mjs"
+    "apply": "node scripts/apply.mjs",
+    "functions": "node scripts/functions.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
     "@types/node": "26.6.4",
     "typescript": "7.0.2",
-    "vitest": "5.0.3"
+    "vitest": "5.0.3",
+    "rolldown": "1.2.12"
   }
 }
