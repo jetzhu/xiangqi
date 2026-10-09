@@ -35,7 +35,8 @@ end $$;
 
 /**
  * Saves a checked bot game, and for a rated one the new bot rating. Returns false if the game
- * was already saved (a retry), true if it is new.
+ * was already saved (a retry, or the same game sent again with the accuracy from its review,
+ * which is then filled in), true if it is new.
  */
 create function public.record_bot_game(p_user uuid, p_game jsonb, p_rating jsonb, p_expected_games int)
 returns boolean language plpgsql set search_path = '' as $$
@@ -43,6 +44,8 @@ declare
   rated boolean := coalesce(jsonb_typeof(p_rating) = 'object', false);
 begin
   if exists (select 1 from public.bot_games g where g.id = (p_game->>'id')::uuid) then
+    update public.bot_games g set accuracy = coalesce(g.accuracy, (p_game->>'accuracy')::real)
+      where g.id = (p_game->>'id')::uuid and g.user_id = p_user;
     return false;
   end if;
   insert into public.bot_games (id, user_id, bot_id, bot_rating, player_color, moves, result, reason, rated,

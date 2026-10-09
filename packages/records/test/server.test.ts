@@ -96,6 +96,16 @@ describe("record: bot games", () => {
     expect(f.ratings.get(`${U}/bot`)!.games).toBe(1);
   });
 
+  it("passes on the accuracy when a saved game is sent again after its review", async () => {
+    const f = fakeDb();
+    await handle(post(game(1)), f.db, content, NOW);
+    const sent: unknown[] = [];
+    const rpc = f.db.rpc;
+    f.db.rpc = (name, args) => (sent.push(args.p_game), rpc(name, args));
+    await handle(post(game(1, { accuracy: 71.5 })), f.db, content, NOW);
+    expect(sent).toEqual([{ id: id(1), accuracy: 71.5 }]);
+  });
+
   it("starts again when another result lands first, so neither is lost", async () => {
     const f = fakeDb();
     // Another device's game is saved between reading the rating and saving this one.

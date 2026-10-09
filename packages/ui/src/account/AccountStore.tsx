@@ -83,7 +83,15 @@ function inLanguage(lang: Lang): string | null {
 const withLock = <T,>(name: string, fn: () => Promise<T>): Promise<T> =>
   typeof navigator !== "undefined" && navigator.locks ? (navigator.locks.request(name, fn) as Promise<T>) : fn();
 
-const NoticeContext = createContext<{ welcome: ImportSummary | null; dismiss: () => void }>({ welcome: null, dismiss: () => {} });
+interface Notices {
+  welcome: ImportSummary | null;
+  dismiss: () => void;
+  /** The skill question is open: the account has no ratings yet. */
+  askSkill: boolean;
+  /** Answers it (400, 800, 1200 or 1600); resolves false if that couldn't be saved. */
+  answerSkill: (rating: number) => Promise<boolean>;
+}
+const NoticeContext = createContext<Notices>({ welcome: null, dismiss: () => {}, askSkill: false, answerSkill: async () => false });
 
 export function AccountStoreProvider({ children }: { children: ReactNode }) {
   const account = useAccount();
@@ -100,6 +108,7 @@ export function AccountStoreProvider({ children }: { children: ReactNode }) {
   const store = useMemo(() => (sync ? createStore(sync.kv) : defaultStore()), [sync, rev]);
 
   const [welcome, setWelcome] = useState<ImportSummary | null>(null);
+  const [askSkill, setAskSkill] = useState(false);
   const pageLangRef = useRef(pageLang);
   pageLangRef.current = pageLang;
 
@@ -162,6 +171,7 @@ export function AccountStoreProvider({ children }: { children: ReactNode }) {
         setWelcome(summary);
         void sync.flush();
       }
+      setAskSkill(pulled.newPlayer);
       if (pulled.changed || summary) setRev((r) => r + 1);
     };
     void run();
@@ -184,6 +194,7 @@ export function AccountStoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (state.status !== "guest") return;
     setWelcome(null);
+    setAskSkill(false);
     try {
       const uid = localStorage.getItem(CACHE_USER);
       if (!uid || account.storedUserId()) return;
@@ -192,7 +203,25 @@ export function AccountStoreProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, [state.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const notice = useMemo(() => ({ welcome, dismiss: () => setWelcome(null) }), [welcome]);
+  const notice = useMemo<Notices>(
+    () => ({
+      welcome,
+      dismiss: () => setWelcome(null),
+      askSkill,
+      async answerSkill(rating) {
+        if (!sync) return false;
+        try {
+          await sync.startingRating(rating);
+        } catch {
+          return false; // offline: asked again later
+        }
+        setAskSkill(false);
+        setRev((r) => r + 1);
+        return true;
+      },
+    }),
+    [welcome, askSkill, sync],
+  );
   return (
     <StoreProvider store={store}>
       <NoticeContext.Provider value={notice}>{children}</NoticeContext.Provider>
@@ -207,30 +236,64 @@ export function SyncNotice() {
   const { welcome, dismiss } = useContext(NoticeContext);
   const { tt, lang } = useT();
   if (!welcome) return null;
-  const join = (parts: (string | 0)[]) => (parts.filter(Boolean) as string[]).join(lang === "zh" ? "、" : ", ");
-  const saved = join([
+  const parts = [
     welcome.lessons && count(welcome.lessons, ["lesson", "lessons"], "节课", lang),
-    welcome.analyses && count(welcome.analyses, ["analysis", "analyses"], "个分析", lang),
-  ]);
-  // Puzzles and bot games can only join the account once the server checks them (M12).
-  const kept = join([
-    welcome.puzzles &&
-      (lang === "zh" ? `${welcome.puzzles} 道题及解题等级分` : `${count(welcome.puzzles, ["puzzle", "puzzles"], "", lang)} with your puzzle rating`),
+    welcome.puzzles && count(welcome.puzzles, ["puzzle", "puzzles"], "道题", lang),
     welcome.games && count(welcome.games, ["game", "games"], "盘对局", lang),
-  ]);
+    welcome.analyses && count(welcome.analyses, ["analysis", "analyses"], "个分析", lang),
+  ].filter(Boolean) as string[];
+  const list = parts.join(lang === "zh" ? "、" : ", ");
   return (
     <div className="sync-notice" role="status">
       <p>
-        {saved
-          ? tt(`Your progress from this browser is now saved to your account: ${saved}.`, `本浏览器中的进度已保存到你的账号：${saved}。`)
+        {list
+          ? tt(`Your progress from this browser is now saved to your account: ${list}.`, `本浏览器中的进度已保存到你的账号：${list}。`)
           : tt("Your progress from this browser is now saved to your account.", "本浏览器中的进度已保存到你的账号。")}
-        {kept &&
-          ` ${tt(
-            `Kept in this browser for now, until a coming update moves them to your account: ${kept}.`,
-            `以下内容暂时只保存在本浏览器，后续更新会将其移入你的账号：${kept}。`,
-          )}`}
       </p>
       <button type="button" onClick={dismiss} aria-label={tt("Dismiss", "关闭")}>
+        ×
+      </button>
+    </div>
+  );
+}
+
+const LEVELS: { rating: number; en: string; zh: string }[] = [
+  { rating: 400, en: "New to Xiangqi", zh: "刚接触象棋" },
+  { rating: 800, en: "Beginner", zh: "初学" },
+  { rating: 1200, en: "Intermediate", zh: "中级" },
+  { rating: 1600, en: "Advanced", zh: "高级" },
+];
+
+/**
+ * "How well do you know Xiangqi?": asked once, for an account with no ratings yet, to set the
+ * starting bot and puzzle rating (as chess.com does). Skipping or closing it means 800.
+ */
+export function SkillQuestion() {
+  const { askSkill, answerSkill } = useContext(NoticeContext);
+  const { tt } = useT();
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  if (!askSkill) return null;
+  const answer = async (rating: number) => {
+    setBusy(true);
+    setFailed(!(await answerSkill(rating)));
+    setBusy(false);
+  };
+  return (
+    <div className="skill-question" role="region" aria-label={tt("Starting rating", "初始等级分")}>
+      <p>{tt("How well do you know Xiangqi? Your answer sets your starting rating for bot games and puzzles.", "你的象棋水平如何？你的回答将决定人机对局和解题的初始等级分。")}</p>
+      <div className="skill-options">
+        {LEVELS.map((l) => (
+          <button key={l.rating} type="button" disabled={busy} onClick={() => void answer(l.rating)}>
+            {tt(l.en, l.zh)} <span className="muted">{l.rating}</span>
+          </button>
+        ))}
+        <button type="button" className="link" disabled={busy} onClick={() => void answer(800)}>
+          {tt("Skip", "跳过")}
+        </button>
+      </div>
+      {failed && <p className="form-error">{tt("Couldn't save that. Check your connection and try again.", "保存失败，请检查网络后重试。")}</p>}
+      <button type="button" disabled={busy} onClick={() => void answer(800)} aria-label={tt("Skip", "跳过")}>
         ×
       </button>
     </div>

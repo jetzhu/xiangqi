@@ -115,6 +115,8 @@ function RatedPuzzlesWith({ PUZZLES }: { PUZZLES: Puzzle[] }) {
   const [hinted, setHinted] = useState(false);
   /** Difficulty was changed mid-puzzle (or during the warm-up): say when it takes effect. */
   const [difficultyNote, setDifficultyNote] = useState(false);
+  /** The solver's moves in this puzzle, recorded with the attempt for the server to check. */
+  const played = useRef<string[]>([]);
 
   // A new Store means another player (signed in or out): their rating and a fresh puzzle,
   // unless their puzzle record is the same as on screen (the account's other data changed).
@@ -147,6 +149,7 @@ function RatedPuzzlesWith({ PUZZLES }: { PUZZLES: Puzzle[] }) {
     setDelta(null);
     setHinted(false);
     setDifficultyNote(false);
+    played.current = [];
   };
 
   /** A hint in a rated puzzle counts as a failed attempt; solving goes on, unrated. */
@@ -188,7 +191,10 @@ function RatedPuzzlesWith({ PUZZLES }: { PUZZLES: Puzzle[] }) {
     if (seenBefore && !counts) return;
     const s: PuzzleState = {
       rating,
-      history: [...state.history, { id: puzzle.id, score, ratingAfter: rating.rating, at: new Date().toISOString() }],
+      history: [
+        ...state.history,
+        { id: puzzle.id, score, ratingAfter: rating.rating, at: new Date().toISOString(), clientId: crypto.randomUUID(), rated: counts, moves: [...played.current] },
+      ],
     };
     setDelta(counts ? rating.rating - state.rating.rating : null);
     setState(s);
@@ -205,6 +211,7 @@ function RatedPuzzlesWith({ PUZZLES }: { PUZZLES: Puzzle[] }) {
   const onMove = (move: string) => {
     if (!puzzle || phase !== "solving") return;
     const verdict = judge(puzzle, ply, fen, move);
+    if (verdict !== "illegal") played.current.push(move);
     const g = new Game(fen);
     const rec = g.move(move)!;
     playSound(rec.check ? "check" : rec.captured ? "capture" : "move");
@@ -237,6 +244,7 @@ function RatedPuzzlesWith({ PUZZLES }: { PUZZLES: Puzzle[] }) {
 
   const retry = () => {
     if (!puzzle) return;
+    played.current = [];
     setFen(puzzle.fen);
     setPly(0);
     setLastMove(null);

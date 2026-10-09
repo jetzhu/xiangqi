@@ -1,5 +1,6 @@
+import { readFileSync } from "node:fs";
 import { type Page, type Route, expect, test } from "@playwright/test";
-import { at } from "./helpers.js";
+import { at, play } from "./helpers.js";
 
 // Supabase is replaced by a fake that answers the few calls the site makes, so these tests
 // run offline and never create real accounts. Requests from the Pages build's service worker
@@ -38,6 +39,10 @@ interface Calls {
   unlinked: string[];
   /** The account's synced rows, as the fake database holds them. */
   tables: Tables;
+  /** What the site sent to the record server function (M12). */
+  recorded: Record<string, unknown>[];
+  /** Answers to the skill question. */
+  startingRating: number[];
 }
 
 /** The tables M11 syncs, one signed-in user's rows. */
@@ -46,8 +51,20 @@ interface Tables {
   player_state: { key: string; value: unknown }[];
   analyses: { id: string; title: string; data: unknown; updated_at: string }[];
   settings: { data: Record<string, unknown> }[];
+  // Written only by the record server function and set_starting_rating (M12).
+  bot_games: Record<string, unknown>[];
+  puzzle_attempts: Record<string, unknown>[];
+  ratings: { kind: string; rating: number; rd: number; games: number; peak: number | null; peak_at: string | null; last_played: string | null }[];
 }
-const KEYS: Record<keyof Tables, string[]> = { lesson_progress: ["lesson_id"], player_state: ["key"], analyses: ["id"], settings: [] };
+const KEYS: Record<keyof Tables, string[]> = {
+  lesson_progress: ["lesson_id"],
+  player_state: ["key"],
+  analyses: ["id"],
+  settings: [],
+  bot_games: ["id"],
+  puzzle_attempts: ["client_id"],
+  ratings: ["kind"],
+};
 const RANK: Record<string, number> = { new: 0, started: 1, mastered: 2 };
 
 /** What the database does on an upsert (packages/db): keep the better lesson status, merge player_state. */
@@ -77,8 +94,23 @@ interface FakeOptions {
 }
 
 async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> {
-  const tables: Tables = { lesson_progress: [], player_state: [], analyses: [], settings: [], ...structuredClone(opts.tables ?? {}) };
-  const calls: Calls = { signup: [], verify: [], password: [], updateUser: [], logout: [], authorize: [], profileUpdates: [], unlinked: [], tables };
+  const tables: Tables = {
+    lesson_progress: [],
+    player_state: [],
+    analyses: [],
+    settings: [],
+    bot_games: [],
+    puzzle_attempts: [],
+    ratings: [],
+    ...structuredClone(opts.tables ?? {}),
+  };
+  const calls: Calls = { signup: [], verify: [], password: [], updateUser: [], logout: [], authorize: [], profileUpdates: [], unlinked: [], tables, recorded: [], startingRating: [] };
+  /** The server's rating of a kind; the fake moves it by a fixed step, so tests can tell it from the browser's. */
+  const rating = (kind: string) => {
+    let row = tables.ratings.find((x) => x.kind === kind);
+    if (!row) tables.ratings.push((row = { kind, rating: 800, rd: 200, games: 0, peak: null, peak_at: null, last_played: null }));
+    return row;
+  };
   const profile = { ...(opts.profile ?? { username: "Alice_1", username_chosen: true }) };
   let user = { ...USER, identities: [...USER.identities] };
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, json: body, headers: { "access-control-allow-origin": "*" } });
@@ -89,6 +121,31 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
       return route.fulfill({ status: 200, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
     const body = req.postDataJSON() as Record<string, unknown> | null;
     switch (url.pathname) {
+      case "/rest/v1/rpc/set_starting_rating": {
+        calls.startingRating.push(body?.p_rating as number);
+        if (tables.ratings.length) return json(route, false);
+        for (const kind of ["bot", "puzzle"]) Object.assign(rating(kind), { rating: body?.p_rating as number });
+        return json(route, true);
+      }
+      case "/functions/v1/record": {
+        calls.recorded.push(body ?? {});
+        if (body?.type === "bot-game") {
+          const g = body.game as Record<string, unknown>;
+          const r = rating("bot");
+          const before = r.rating;
+          if (g.rated) Object.assign(r, { rating: before + (g.result === "win" ? 7 : g.result === "loss" ? -7 : 0), games: r.games + 1 });
+          tables.bot_games.unshift({
+            id: g.id, bot_id: g.botId, bot_rating: 250, player_color: g.playerColor, moves: g.moves, result: g.result, reason: g.reason, rated: g.rated,
+            rating_before: g.rated ? before : null, rating_after: g.rated ? r.rating : null, stars: g.stars, helps: g.helps, accuracy: g.accuracy,
+            started_at: g.startedAt, ended_at: g.endedAt,
+          });
+          return json(route, { rated: !!g.rated, ratingBefore: g.rated ? before : null, ratingAfter: g.rated ? r.rating : null, rating: { rating: r.rating, rd: r.rd, games: r.games, peak: null, peakAt: null, lastPlayed: null } });
+        }
+        const a = body?.attempt as Record<string, unknown>;
+        const r = rating("puzzle");
+        tables.puzzle_attempts.unshift({ client_id: a.clientId, puzzle_id: a.puzzleId, score: a.score, rated: false, rating_after: r.rating, at: a.at });
+        return json(route, { rated: false, ratingAfter: r.rating, rating: { rating: r.rating, rd: r.rd } });
+      }
       case "/rest/v1/rpc/username_problem": {
         const name = String(body?.name).toLowerCase();
         return json(route, opts.takenNames?.map((n) => n.toLowerCase()).includes(name) ? "taken" : null);
@@ -351,7 +408,7 @@ async function seedGuest(page: Page) {
     await put("xq-v1-bots", "bots", "stars", { xiaobing: 2 });
     await put("xq-v1-puzzles", "puzzles", "state", {
       rating: { rating: 950, rd: 120 },
-      history: [{ id: "p1", score: 1, ratingAfter: 950, at: "2026-10-01T09:00:00.000Z" }],
+      history: [{ id: "p1", score: 1, ratingAfter: 950, at: "2026-10-01T09:00:00.000Z", clientId: "00000000-0000-4000-8000-000000000001", rated: true, moves: ["h2e2"] }],
     });
     localStorage.setItem("xq:daily:v1", JSON.stringify(["2026-10-01"]));
   });
@@ -370,9 +427,7 @@ test("signing in moves guest progress into the account; signing out leaves an em
   await page.getByLabel("Email").fill("alice@example.com");
   await page.getByLabel("Password", { exact: true }).fill("correct-horse");
   await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page.getByRole("status")).toContainText("Your progress from this browser is now saved to your account: 2 lessons.");
-  // Puzzles can't sync until the server checks them (M12): the note says they stay here.
-  await expect(page.getByRole("status")).toContainText("Kept in this browser for now, until a coming update moves them to your account: 1 puzzle with your puzzle rating.");
+  await expect(page.getByRole("status")).toHaveText(/^Your progress from this browser is now saved to your account: 2 lessons, 1 puzzle\./);
   await expect(lessonsMastered(page)).toHaveCount(1);
 
   await expect.poll(() => calls.tables.lesson_progress.map((r) => `${r.lesson_id}:${r.status}`).sort()).toEqual(["the-board:mastered", "the-general:started"]);
@@ -433,7 +488,7 @@ test("signing in shows the page in the account's language; switching it follows 
 });
 
 test("the puzzles page shows the player's own rating after signing in and out", async ({ page }) => {
-  await fakeSupabase(page);
+  await fakeSupabase(page, { tables: RATED });
   await page.goto(at("/en/puzzles/"));
   await seedGuest(page);
   await page.reload();
@@ -444,9 +499,9 @@ test("the puzzles page shows the player's own rating after signing in and out", 
   await page.getByLabel("Email").fill("alice@example.com");
   await page.getByLabel("Password", { exact: true }).fill("correct-horse");
   await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page.locator(".sync-notice")).toContainText("1 puzzle with your puzzle rating");
-  // The guest rating stays with this browser's copy of the account.
-  await expect(rating).toContainText("950");
+  await expect(page.locator(".sync-notice")).toContainText("1 puzzle");
+  // The guest's attempts join the account unrated: the account's rating is its own.
+  await expect(rating).toContainText("1000");
 
   await page.getByRole("button", { name: /Alice_1/ }).click();
   await page.getByRole("button", { name: "Sign out" }).click();
@@ -494,4 +549,68 @@ test("signed in, opening a page in the other language makes it the account's", a
   await expect.poll(() => calls.tables.settings[0]?.data).toMatchObject({ lang: "en" });
   await page.reload();
   await expect(page).toHaveURL(/\/en\/learn\/$/);
+});
+
+// M12: finished games and puzzle attempts go to the record server function.
+
+const RATED = {
+  ratings: [
+    { kind: "bot", rating: 900, rd: 120, games: 3, peak: null, peak_at: null, last_played: "2026-10-08T10:00:00Z" },
+    { kind: "puzzle", rating: 1000, rd: 100, games: 9, peak: null, peak_at: null, last_played: "2026-10-08T10:00:00Z" },
+  ],
+};
+
+test("a new account answers the skill question; a rated bot game is recorded by the server", async ({ page }) => {
+  test.skip(!!process.env.E2E_PAGES, "the bot needs the engine, which needs the service worker these tests block on Pages");
+  const calls = await fakeSupabase(page);
+  await page.goto(at("/en/auth/callback/?token_hash=abc123&type=signup"));
+  await expect(page.getByText(/signed in as Alice_1/)).toBeVisible();
+  const question = page.getByRole("region", { name: "Starting rating" });
+  await expect(question).toContainText("How well do you know Xiangqi?");
+  await question.getByRole("button", { name: /Intermediate/ }).click();
+  await expect(question).toHaveCount(0);
+  expect(calls.startingRating).toEqual([1200]);
+
+  await page.goto(at("/en/bots/"));
+  await expect(page.locator(".rated-choice")).toContainText("1200");
+  await page.locator(".rated-choice .choice").nth(1).click();
+  await page.locator("button.play").click();
+  await play(page, "h2e2");
+  await expect(page.locator("ol.moves li").first().locator(".mv").nth(1)).not.toHaveText("", { timeout: 30_000 });
+  await play(page, "h0g2");
+  await expect(page.locator("ol.moves li").nth(1).locator(".mv").nth(1)).not.toHaveText("", { timeout: 30_000 });
+  await page.getByRole("button", { name: "Resign" }).click();
+  await page.getByRole("button", { name: "Confirm resign?" }).click();
+  // This browser's own figure at once…
+  await expect(page.locator(".rating-line")).toContainText(/Bot rating 1200 → \d+/);
+  await expect.poll(() => calls.recorded.length).toBe(1);
+  expect(calls.recorded[0]).toMatchObject({
+    type: "bot-game",
+    game: { rated: true, result: "loss", reason: "resign", moves: ["h2e2", expect.any(String), "h0g2", expect.any(String)] },
+  });
+  // …then the server's (the fake takes 7 for a loss).
+  await page.goto(at("/en/stats/"));
+  await expect(page.locator(".stat-card").first()).toContainText("1193");
+  await expect(page.getByRole("region", { name: "Starting rating" })).toHaveCount(0);
+});
+
+test("a signed-in puzzle attempt is sent to be recorded, with its moves", async ({ page }) => {
+  const puzzles = readFileSync(new URL("../../../content/puzzles/puzzles.jsonl", import.meta.url), "utf8")
+    .trim()
+    .split("\n")
+    .map((l) => JSON.parse(l) as { id: string; solution: string[]; rating: number; themes: string[] });
+  const first = puzzles.filter((p) => p.themes.includes("mateIn1")).sort((a, b) => a.rating - b.rating)[0]!;
+  const calls = await fakeSupabase(page, { tables: RATED });
+  await page.goto(at("/en/auth/callback/?token_hash=abc123&type=signup"));
+  await expect(page.getByText(/signed in as Alice_1/)).toBeVisible();
+  await page.goto(at("/en/puzzles/"));
+  // An account with ratings isn't asked the skill question; its puzzle rating shows.
+  await expect(page.getByRole("region", { name: "Starting rating" })).toHaveCount(0);
+  await expect(page.locator(".big-rating")).toHaveText("1000");
+  await expect(page.getByText("Warm-up 1/")).toBeVisible();
+  await play(page, first.solution[0]!);
+  await expect(page.getByRole("button", { name: "Next puzzle" })).toBeVisible();
+  await expect
+    .poll(() => calls.recorded)
+    .toMatchObject([{ type: "puzzle-attempt", attempt: { puzzleId: first.id, score: 1, rated: false, moves: [first.solution[0]] } }]);
 });

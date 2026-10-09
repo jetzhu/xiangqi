@@ -296,9 +296,13 @@ a.button.primary { background: var(--accent); color: #fff; border-color: var(--a
 kbd { font-family: ui-monospace, monospace; font-size: 0.9em; padding: 1px 5px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--button); }
 .reset-progress { margin-top: 20px; }
 .update-banner { display: flex; gap: 12px; align-items: center; justify-content: center; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--border); font-size: 14px; }
-.sync-notice { display: flex; gap: 12px; align-items: center; justify-content: center; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--border); font-size: 14px; }
-.sync-notice p { margin: 0; }
-.sync-notice button { border: 0; background: none; font-size: 18px; line-height: 1; padding: 4px 8px; cursor: pointer; color: inherit; }
+.sync-notice, .skill-question { display: flex; gap: 12px; align-items: center; justify-content: center; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--border); font-size: 14px; }
+.sync-notice p, .skill-question p { margin: 0; }
+.sync-notice button, .skill-question > button { border: 0; background: none; font-size: 18px; line-height: 1; padding: 4px 8px; cursor: pointer; color: inherit; }
+.skill-question { flex-wrap: wrap; }
+.skill-question .skill-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.skill-question .skill-options button { font-size: 14px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg, transparent); }
+.skill-question .skill-options button.link { border-color: transparent; text-decoration: underline; }
 .classical { margin: 0 0 6px; font-size: 14px; }
 .rated-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
 .rated-choice .choice { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; font-size: 13px; }

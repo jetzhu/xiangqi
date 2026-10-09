@@ -134,7 +134,11 @@ async function botGame(db: Backend, user: string, g: BotGameIn, content: Content
     const rating = botRatingOf(await db.rating(user, "bot"));
     return json(200, { rated: saved?.rated ?? false, ratingBefore: saved?.rating_before ?? null, ratingAfter: saved?.rating_after ?? null, rating } satisfies BotGameOut);
   };
-  if (await db.game(user, g.id)) return already();
+  if (await db.game(user, g.id)) {
+    // Sent again with the accuracy from the post-game review: the database fills it in.
+    if (typeof g.accuracy === "number") await db.rpc("record_bot_game", { p_user: user, p_game: { id: g.id, accuracy: g.accuracy }, p_rating: null, p_expected_games: 0 });
+    return already();
+  }
   const check = checkBotGame(g, content.bots);
   if (!check.ok) return refuse(check.error);
 

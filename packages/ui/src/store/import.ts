@@ -8,7 +8,7 @@ import type { KV } from "./kv.js";
 export interface ImportSummary {
   /** Lessons started or mastered. */
   lessons: number;
-  /** Puzzles attempted. */
+  /** Puzzle attempts (those with moves the server can check). */
   puzzles: number;
   /** Finished bot games. */
   games: number;
@@ -88,11 +88,15 @@ export async function importGuest(guest: KV, account: KV): Promise<ImportSummary
     await account.set("games", g.id, casual);
   }
 
-  // Puzzles: attempts join the history; the guest rating counts only if the account has none.
-  if (d.puzzles.history.length) {
+  // Puzzles: attempts join the history, unrated, so the account's puzzle rating is its own
+  // (from the skill question). Only those with moves can be checked by the server: attempts
+  // from before M12 have none and stay behind.
+  const attempts = d.puzzles.history.filter((h) => h.clientId && h.moves);
+  if (attempts.length) {
     const mine = await a.puzzles.load();
-    const history = [...mine.history, ...d.puzzles.history].sort((x, y) => x.at.localeCompare(y.at));
-    await account.set("puzzles", "state", { rating: mine.history.length ? mine.rating : d.puzzles.rating, history });
+    const guest = attempts.map((h) => ({ ...h, rated: false }));
+    const history = [...mine.history, ...guest].sort((x, y) => x.at.localeCompare(y.at));
+    await account.set("puzzles", "state", { rating: mine.rating, history });
   }
 
   // Clear the guest copy.
@@ -109,7 +113,7 @@ export async function importGuest(guest: KV, account: KV): Promise<ImportSummary
 
   return {
     lessons: Object.values(d.lessons).filter((s) => s !== "new").length,
-    puzzles: d.puzzles.history.length,
+    puzzles: attempts.length,
     games: d.games.length,
     analyses: d.analyses.length,
   };

@@ -319,9 +319,10 @@ describe("recording results (M12 server functions)", () => {
   it("saves a rated game with its rating, once, and refuses a rating that is out of date", async () => {
     const out = await asServer(async (tx) => {
       const first = (await tx.query<{ ok: boolean }>(`select public.record_bot_game($1, $2, $3, 0) as ok`, [D, game(), rating(780)])).rows[0]!.ok;
-      const again = (await tx.query<{ ok: boolean }>(`select public.record_bot_game($1, $2, $3, 0) as ok`, [D, game(), rating(780)])).rows[0]!.ok;
+      const withAccuracy = JSON.stringify({ ...JSON.parse(game()), accuracy: 71.5 });
+      const again = (await tx.query<{ ok: boolean }>(`select public.record_bot_game($1, $2, $3, 0) as ok`, [D, withAccuracy, rating(780)])).rows[0]!.ok;
       const r = (await tx.query(`select rating, games, last_played from public.ratings where user_id = $1 and kind = 'bot'`, [D])).rows;
-      const g = (await tx.query(`select rated, rating_before, rating_after, moves from public.bot_games where id = $1`, [GAME])).rows;
+      const g = (await tx.query(`select rated, rating_before, rating_after, moves, accuracy from public.bot_games where id = $1`, [GAME])).rows;
       // A second game computed from the same old rating (another tab got there first).
       const stale = await errorOf(tx.query(`select public.record_bot_game($1, $2, $3, 0)`, [D, game("33333333-3333-4333-8333-333333333333"), rating(760)]));
       return { first, again, r, g, stale };
@@ -330,7 +331,8 @@ describe("recording results (M12 server functions)", () => {
       first: true,
       again: false,
       r: [{ rating: 780, games: 1, last_played: new Date("2026-10-09T10:05:00Z") }],
-      g: [{ rated: true, rating_before: 800, rating_after: 780, moves: ["h2e2", "h7e7", "h0g2", "h9g7"] }],
+      // Sent again with the accuracy from the review: saved once, accuracy filled in.
+      g: [{ rated: true, rating_before: 800, rating_after: 780, moves: ["h2e2", "h7e7", "h0g2", "h9g7"], accuracy: 71.5 }],
       stale: "stale",
     });
   });
