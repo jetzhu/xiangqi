@@ -418,3 +418,15 @@ button.wide { width: 100%; padding: 10px; font-size: 16px; }
 .country-picker { display: flex; flex-direction: column; gap: 4px; max-width: 320px; margin-bottom: 16px; font-weight: 600; }
 .country-picker select { font-weight: normal; }
 .change-username { max-width: 320px; }
+
+/* Settings → Account (M14) */
+.account-settings section { margin-top: 22px; }
+.account-settings h2 { font-size: 17px; margin: 0 0 6px; }
+.account-form { max-width: 360px; }
+.danger-zone { border-top: 1px solid var(--border); padding-top: 16px; }
+button.danger { background: #b3261e; border-color: #b3261e; color: #fff; }
+.deletion-notice { padding: 10px 12px; border: 1px solid #b3261e; border-radius: 8px; background: var(--panel); }
+.age-gate fieldset { border: 0; padding: 0; margin: 0 0 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+.age-gate legend { font-weight: 600; margin-bottom: 6px; }
+.age-gate label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; margin-bottom: 8px; }
+.age-gate select { font-weight: normal; }

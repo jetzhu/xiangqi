@@ -90,8 +90,10 @@ interface Notices {
   askSkill: boolean;
   /** Answers it (400, 800, 1200 or 1600); resolves false if that couldn't be saved. */
   answerSkill: (rating: number) => Promise<boolean>;
+  /** Signing in just cancelled a deletion the player had asked for. */
+  deletionCancelled: boolean;
 }
-const NoticeContext = createContext<Notices>({ welcome: null, dismiss: () => {}, askSkill: false, answerSkill: async () => false });
+const NoticeContext = createContext<Notices>({ welcome: null, dismiss: () => {}, askSkill: false, answerSkill: async () => false, deletionCancelled: false });
 
 export function AccountStoreProvider({ children }: { children: ReactNode }) {
   const account = useAccount();
@@ -109,6 +111,7 @@ export function AccountStoreProvider({ children }: { children: ReactNode }) {
 
   const [welcome, setWelcome] = useState<ImportSummary | null>(null);
   const [askSkill, setAskSkill] = useState(false);
+  const [deletionCancelled, setDeletionCancelled] = useState(false);
   const pageLangRef = useRef(pageLang);
   pageLangRef.current = pageLang;
 
@@ -144,6 +147,16 @@ export function AccountStoreProvider({ children }: { children: ReactNode }) {
       const before = changes();
       const pulled = await sync.pull();
       if (!live || !pulled) return;
+      // Signed in during the 10 days: the deletion is off (as on chess.com).
+      if (pulled.deletionPending) {
+        const { data } = await (await account.client()).rpc("cancel_account_deletion");
+        if (live && data === true) {
+          setDeletionCancelled(true);
+          try {
+            sessionStorage.removeItem("xq:deletion-scheduled");
+          } catch {}
+        }
+      }
       // Settings: the account's win; a new account takes this browser's. A change made here
       // while the pull was on its way is newer than both.
       if (pulled.settings === null) void sync.saveSettings(syncedPart(saved()));
@@ -206,7 +219,11 @@ export function AccountStoreProvider({ children }: { children: ReactNode }) {
   const notice = useMemo<Notices>(
     () => ({
       welcome,
-      dismiss: () => setWelcome(null),
+      dismiss: () => {
+        setWelcome(null);
+        setDeletionCancelled(false);
+      },
+      deletionCancelled,
       askSkill,
       async answerSkill(rating) {
         if (!sync) return false;
@@ -220,7 +237,7 @@ export function AccountStoreProvider({ children }: { children: ReactNode }) {
         return true;
       },
     }),
-    [welcome, askSkill, sync],
+    [welcome, askSkill, sync, deletionCancelled],
   );
   return (
     <StoreProvider store={store}>
@@ -233,8 +250,17 @@ const count = (n: number, en: [string, string], zh: string, lang: "en" | "zh") =
 
 /** "Your progress is saved": shown once, after guest progress moved into the account. */
 export function SyncNotice() {
-  const { welcome, dismiss } = useContext(NoticeContext);
+  const { welcome, dismiss, deletionCancelled } = useContext(NoticeContext);
   const { tt, lang } = useT();
+  if (deletionCancelled)
+    return (
+      <div className="sync-notice" role="status">
+        <p>{tt("Welcome back. Your account will not be deleted: signing in cancelled it.", "欢迎回来。你的账号不会被删除：登录已取消删除申请。")}</p>
+        <button type="button" onClick={dismiss} aria-label={tt("Dismiss", "关闭")}>
+          ×
+        </button>
+      </div>
+    );
   if (!welcome) return null;
   const parts = [
     welcome.lessons && count(welcome.lessons, ["lesson", "lessons"], "节课", lang),

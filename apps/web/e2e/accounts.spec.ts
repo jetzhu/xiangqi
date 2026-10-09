@@ -43,6 +43,8 @@ interface Calls {
   recorded: Record<string, unknown>[];
   /** Answers to the skill question. */
   startingRating: number[];
+  /** Account RPCs called (M14), by name. */
+  rpc: string[];
 }
 
 /** The tables M11 syncs, one signed-in user's rows. */
@@ -55,6 +57,7 @@ interface Tables {
   bot_games: Record<string, unknown>[];
   puzzle_attempts: Record<string, unknown>[];
   ratings: { kind: string; rating: number; rd: number; games: number; peak: number | null; peak_at: string | null; last_played: string | null }[];
+  account_deletions: { user_id: string }[];
 }
 const KEYS: Record<keyof Tables, string[]> = {
   lesson_progress: ["lesson_id"],
@@ -64,6 +67,7 @@ const KEYS: Record<keyof Tables, string[]> = {
   bot_games: ["id"],
   puzzle_attempts: ["client_id"],
   ratings: ["kind"],
+  account_deletions: ["user_id"],
 };
 const RANK: Record<string, number> = { new: 0, started: 1, mastered: 2 };
 
@@ -102,9 +106,10 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
     bot_games: [],
     puzzle_attempts: [],
     ratings: [],
+    account_deletions: [],
     ...structuredClone(opts.tables ?? {}),
   };
-  const calls: Calls = { signup: [], verify: [], password: [], updateUser: [], logout: [], authorize: [], profileUpdates: [], unlinked: [], tables, recorded: [], startingRating: [] };
+  const calls: Calls = { signup: [], verify: [], password: [], updateUser: [], logout: [], authorize: [], profileUpdates: [], unlinked: [], tables, recorded: [], startingRating: [], rpc: [] };
   /** The server's rating of a kind; the fake moves it by a fixed step, so tests can tell it from the browser's. */
   const rating = (kind: string) => {
     let row = tables.ratings.find((x) => x.kind === kind);
@@ -121,6 +126,22 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
       return route.fulfill({ status: 200, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
     const body = req.postDataJSON() as Record<string, unknown> | null;
     switch (url.pathname) {
+      case "/rest/v1/rpc/request_account_deletion": {
+        calls.rpc.push("request_account_deletion");
+        if (String(body?.p_username).toLowerCase() !== profile.username.toLowerCase())
+          return json(route, { code: "P0001", message: "the username does not match", hint: "username" }, 400);
+        tables.account_deletions = [{ user_id: USER.id }];
+        return json(route, new Date(Date.now() + 10 * 864e5).toISOString());
+      }
+      case "/rest/v1/rpc/cancel_account_deletion": {
+        calls.rpc.push("cancel_account_deletion");
+        const had = tables.account_deletions.length > 0;
+        tables.account_deletions = [];
+        return json(route, had);
+      }
+      case "/rest/v1/rpc/delete_new_account":
+        calls.rpc.push("delete_new_account");
+        return json(route, true);
       case "/rest/v1/rpc/set_starting_rating": {
         calls.startingRating.push(body?.p_rating as number);
         if (tables.ratings.length) return json(route, false);
@@ -223,11 +244,20 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
   return calls;
 }
 
+/** The age check before an account is made (M14): an adult in the US. */
+async function passAgeGate(page: Page, year = "1990", country = "US") {
+  await page.getByLabel("Month").selectOption("5");
+  await page.getByLabel("Year").selectOption(year);
+  await page.getByLabel("Country or region").selectOption(country);
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+}
+
 test("sign up: checks the username, then asks to confirm the email", async ({ page }) => {
   const calls = await fakeSupabase(page, { takenNames: ["bob-xq"] });
   await page.goto(at("/en/"));
   await page.getByRole("link", { name: "Sign up" }).click();
   await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
+  await passAgeGate(page);
 
   const username = page.getByLabel("Username");
   await username.fill("1234");
@@ -352,6 +382,8 @@ test("first GitHub sign-in: choose a username, then back to the page", async ({ 
   await expect(page.locator(".providers .provider")).toHaveText(["Continue with Google", "Continue with GitHub"]);
   await page.getByRole("button", { name: "Continue with GitHub" }).click();
   await expect(page.getByRole("heading", { name: "Choose your username" })).toBeVisible();
+  // Straight from the log-in page: the age check comes first.
+  await passAgeGate(page);
   expect(calls.authorize).toEqual(["github"]);
   // "octocat" is taken, so a variant is suggested.
   await expect(page.getByLabel("Username")).toHaveValue(/^octocat\d{3}$/);
@@ -366,12 +398,12 @@ test("settings: connect and disconnect a sign-in method", async ({ page }) => {
   const calls = await fakeSupabase(page, { providers: ["github", "azure"] });
   await page.goto(at("/en/auth/callback/?token_hash=abc&type=signup"));
   await expect(page.getByText(/signed in as Alice_1/)).toBeVisible();
-  await page.goto(at("/en/settings/"));
+  await page.goto(at("/en/settings/?tab=account"));
   const linked = page.locator(".linked-sign-ins");
   await expect(linked.locator("li")).toHaveText([/Email and password/, /Microsoft\s*Connect/, /GitHub\s*Connect/]);
   await linked.locator("li", { hasText: "GitHub" }).getByRole("button", { name: "Connect" }).click();
-  // Back on Settings after the provider, now connected.
-  await expect(page).toHaveURL(/\/en\/settings\/$/);
+  // Back on Settings → Account after the provider, now connected.
+  await expect(page).toHaveURL(/\/en\/settings\/\?tab=account$/);
   await expect(linked.locator("li", { hasText: "GitHub" })).toContainText("alice@users.example");
   expect(calls.authorize).toEqual(["link:github"]);
   await linked.locator("li", { hasText: "GitHub" }).getByRole("button", { name: "Disconnect" }).click();
@@ -667,4 +699,90 @@ test("profile: avatar, country and a new username, from the account menu", async
   expect(calls.profileUpdates).toEqual([{ avatar: "red-horse" }, { country: "CN" }, { username: "alice_xq" }]);
   // The header shows the chosen piece.
   await expect(page.locator(".account-button .account-avatar")).toHaveText("马");
+});
+
+// M14: the age check, and Settings → Account.
+
+test("someone under the minimum age stays a guest", async ({ page }) => {
+  const calls = await fakeSupabase(page);
+  await page.goto(at("/en/signup/"));
+  // 15 this year, in Germany (16 there).
+  await passAgeGate(page, String(new Date().getFullYear() - 15), "DE");
+  await expect(page.getByText("You need to be 16 or older to create an account where you live.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Start learning" })).toBeVisible();
+  await expect(page.getByLabel("Email")).toHaveCount(0);
+  expect(calls.signup).toEqual([]);
+});
+
+test("a first GitHub sign-in by someone under age removes the new account", async ({ page }) => {
+  const github = { ...USER, app_metadata: { provider: "github", providers: ["github"] }, identities: [{ id: "g1", provider: "github" }] };
+  const calls = await fakeSupabase(page, { providers: ["github"], profile: { username: "player-4821936", username_chosen: false }, oauthUser: github });
+  await page.goto(at("/en/login/"));
+  await page.getByRole("button", { name: "Continue with GitHub" }).click();
+  await passAgeGate(page, String(new Date().getFullYear() - 10));
+  await expect(page.getByText("You need to be 13 or older to create an account where you live.")).toBeVisible();
+  await expect.poll(() => calls.rpc).toEqual(["delete_new_account"]);
+  await expect.poll(() => calls.logout).toEqual(["local"]);
+});
+
+async function signedInSettings(page: Page, calls: Calls) {
+  await page.goto(at("/en/auth/callback/?token_hash=abc123&type=signup"));
+  await expect(page.getByText(/signed in as Alice_1/)).toBeVisible();
+  await page.goto(at("/en/settings/"));
+  await page.getByRole("tab", { name: "Account" }).click();
+  await expect(page).toHaveURL(/tab=account/);
+  void calls;
+}
+
+test("settings → account: password, log out everywhere, download my data", async ({ page }) => {
+  const calls = await fakeSupabase(page, { tables: { ...RATED, lesson_progress: [{ lesson_id: "the-board", status: "mastered" }] } });
+  await signedInSettings(page, calls);
+  await expect(page.getByText("alice@example.com", { exact: true })).toBeVisible();
+
+  await page.getByLabel("New password").fill("new-horse-99");
+  await page.getByRole("button", { name: "Change password" }).click();
+  await expect(page.getByText("Password saved. Other devices are signed out.")).toBeVisible();
+  expect(calls.updateUser).toMatchObject([{ password: "new-horse-99" }]);
+  expect(calls.logout).toEqual(["others"]);
+
+  const [file] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download my data" }).click()]);
+  expect(file.suggestedFilename()).toMatch(/^xiangqi-Alice_1-\d{4}-\d\d-\d\d\.json$/);
+  const data = JSON.parse(readFileSync((await file.path())!, "utf8"));
+  expect(data).toMatchObject({ account: { email: "alice@example.com" }, lesson_progress: [{ lesson_id: "the-board", status: "mastered" }], ratings: [{ kind: "bot" }, { kind: "puzzle" }] });
+
+  await page.getByRole("button", { name: "Log out on all devices" }).click();
+  await page.getByRole("button", { name: "Log out everywhere? Click again to confirm" }).click();
+  await expect(page.getByRole("link", { name: "Log in" })).toBeVisible();
+  expect(calls.logout).toEqual(["others", "global"]);
+});
+
+test("deleting the account: username and password, then 10 days; signing in cancels it", async ({ page }) => {
+  const calls = await fakeSupabase(page, { tables: RATED });
+  await signedInSettings(page, calls);
+  await page.getByRole("button", { name: "Delete my account…" }).click();
+  await page.getByLabel(/Type your username/).fill("alice");
+  await page.getByRole("textbox", { name: "Password", exact: true }).fill("correct-horse");
+  await page.getByRole("button", { name: "Delete my account in 10 days" }).click();
+  await expect(page.getByText("That isn't your username.")).toBeVisible();
+  await page.getByLabel(/Type your username/).fill("Alice_1");
+  await page.getByRole("button", { name: "Delete my account in 10 days" }).click();
+  // Signed out everywhere, with the date and how to cancel.
+  await expect(page.getByText(/Your account will be deleted on .*Sign in before then to cancel\./)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Log in" })).toBeVisible();
+  // The password is checked on each try (the first had the wrong username).
+  expect(calls.password).toMatchObject([
+    { email: "alice@example.com", password: "correct-horse" },
+    { email: "alice@example.com", password: "correct-horse" },
+  ]);
+  expect(calls.rpc).toEqual(["request_account_deletion", "request_account_deletion"]);
+  expect(calls.logout).toEqual(["global"]);
+
+  // Signing in again within the 10 days cancels it.
+  await page.getByRole("link", { name: "Log in" }).click();
+  await page.getByLabel("Email").fill("alice@example.com");
+  await page.getByLabel("Password", { exact: true }).fill("correct-horse");
+  await page.getByRole("button", { name: "Log in" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Your account will not be deleted" })).toBeVisible();
+  expect(calls.rpc).toContain("cancel_account_deletion");
+  expect(calls.tables.account_deletions).toEqual([]);
 });

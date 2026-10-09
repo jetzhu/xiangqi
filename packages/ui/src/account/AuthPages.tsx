@@ -2,8 +2,10 @@
 // Sign up, log in, reset password, and the page links in our emails open (/auth/callback/).
 // Email sign-ups stay guests until they click the link in the confirmation email.
 
-import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNav } from "../nav.js";
+import { COUNTRIES } from "./avatar.js";
+import { ageChecked, markAgeChecked, minAgeFor, oldEnough } from "./age.js";
 import { useT } from "../settings.js";
 import { type Account, PROVIDERS, type Provider, useAccount } from "./session.js";
 
@@ -69,7 +71,7 @@ export function authErrorText(e: { code?: string | undefined; message?: string; 
 }
 
 /** Absolute address of the page our email links open, in the current language. */
-function callbackUrl(href: (p: string) => string): string {
+export function callbackUrl(href: (p: string) => string): string {
   return new URL(href("/auth/callback"), location.href).toString();
 }
 
@@ -81,7 +83,7 @@ export function safeNext(next: string | null): string {
 const NEXT_KEY = "xq:auth-next";
 
 /** Remembers where to go after a sign-in that leaves the site (Google, Microsoft, GitHub). */
-function rememberNext(next: string) {
+export function rememberNext(next: string) {
   try {
     sessionStorage.setItem(NEXT_KEY, safeNext(next));
   } catch {}
@@ -186,7 +188,7 @@ function AuthShell({ title, children }: { title: string; children: ReactNode }) 
   );
 }
 
-function Field(props: {
+export function Field(props: {
   label: string;
   type: string;
   value: string;
@@ -237,7 +239,7 @@ function Field(props: {
   );
 }
 
-function FormError({ text }: { text: string | null }) {
+export function FormError({ text }: { text: string | null }) {
   return text ? (
     <p className="form-error" role="alert">
       {text}
@@ -311,9 +313,17 @@ export function SignUpPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
+  const [age, setAge] = useState<"ask" | "ok" | number>("ask");
+  useEffect(() => setAge(ageChecked() ? "ok" : "ask"), []);
 
   if (account.state.status === "off") return <Unavailable />;
   if (account.state.status === "signedIn") return <SignedInAlready />;
+  if (age !== "ok")
+    return (
+      <AuthShell title={tt("Create your account", "注册账号")}>
+        {typeof age === "number" ? <TooYoung min={age} /> : <AgeGate onPass={() => setAge("ok")} onFail={setAge} />}
+      </AuthShell>
+    );
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -347,8 +357,8 @@ export function SignUpPage() {
     <AuthShell title={tt("Create your account", "注册账号")}>
       <p className="muted">
         {tt(
-          "Free. An account will keep your progress, ratings and games on every device. Accounts are new: for now your progress still stays in this browser, and moving it into your account comes next.",
-          "免费注册。账号将在所有设备上保存你的进度、等级分和对局。账号功能刚刚上线：目前进度仍保存在本浏览器，下一步会把它转入你的账号。",
+          "Free. An account keeps your progress, ratings and games on every device. What you've done in this browser moves into it when you sign in.",
+          "免费注册。账号会在所有设备上保存你的进度、等级分和对局。登录后，你在本浏览器中的进度会转入账号。",
         )}
       </p>
       <ProviderButtons next="/" />
@@ -739,6 +749,27 @@ export function AuthCallbackPage() {
 
 /** Once, after a first Google/Microsoft/GitHub sign-in: swap the placeholder name for a real one. */
 function ChooseUsername({ onDone }: { onDone: () => void }) {
+  const [age, setAge] = useState<"ask" | "ok" | number>(() => (ageChecked() ? "ok" : "ask"));
+  const account = useAccount();
+  if (typeof age === "number") return <TooYoung min={age} />;
+  if (age === "ask")
+    return (
+      <AgeGate
+        onPass={() => setAge("ok")}
+        onFail={(min) => {
+          setAge(min);
+          // The account was made a moment ago by the provider sign-in: remove it, sign out.
+          void account
+            .client()
+            .then((sb) => sb.rpc("delete_new_account"))
+            .finally(() => void account.signOut());
+        }}
+      />
+    );
+  return <ChooseName onDone={onDone} />;
+}
+
+function ChooseName({ onDone }: { onDone: () => void }) {
   const { tt } = useT();
   const account = useAccount();
   const user = account.state.status === "signedIn" ? account.state.user : null;
@@ -867,5 +898,101 @@ export function ChangeUsername() {
         {busy ? "…" : tt("Change username", "修改用户名")}
       </button>
     </form>
+  );
+}
+
+/**
+ * Before an account is made: birth month, year and country, against chess.com's minimum ages
+ * (account/age.ts). Nothing is stored; under the age, the visitor stays a guest.
+ */
+export function AgeGate({ onPass, onFail }: { onPass: () => void; onFail: (minAge: number) => void }) {
+  const { tt, lang } = useT();
+  const now = new Date().getFullYear();
+  const [year, setYear] = useState("");
+  const [month, setMonth] = useState("");
+  const [country, setCountry] = useState("");
+  const locale = lang === "zh" ? "zh-CN" : "en";
+  const names = useMemo(() => {
+    try {
+      const d = new Intl.DisplayNames([locale], { type: "region" });
+      return (c: string) => d.of(c) ?? c;
+    } catch {
+      return (c: string) => c;
+    }
+  }, [locale]);
+  const countries = useMemo(() => [...COUNTRIES].sort((a, b) => names(a).localeCompare(names(b), locale)), [names, locale]);
+  const months = useMemo(() => Array.from({ length: 12 }, (_, i) => new Date(2000, i, 1).toLocaleDateString(locale, { month: "long" })), [locale]);
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (oldEnough(Number(year), Number(month), country)) {
+      markAgeChecked();
+      onPass();
+    } else onFail(minAgeFor(country));
+  };
+  return (
+    <form className="age-gate" onSubmit={submit}>
+      <p className="muted">{tt("First, so we follow the rules for young players where you live:", "首先，为了遵守你所在地区关于未成年人的规定：")}</p>
+      <fieldset>
+        <legend>{tt("Your birthday", "你的出生年月")}</legend>
+        <select aria-label={tt("Month", "月")} value={month} onChange={(e) => setMonth(e.target.value)} required>
+          <option value="">{tt("Month", "月")}</option>
+          {months.map((m, i) => (
+            <option key={m} value={i + 1}>
+              {m}
+            </option>
+          ))}
+        </select>
+        <select aria-label={tt("Year", "年")} value={year} onChange={(e) => setYear(e.target.value)} required>
+          <option value="">{tt("Year", "年")}</option>
+          {Array.from({ length: 100 }, (_, i) => now - i).map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+        </select>
+      </fieldset>
+      <label>
+        {tt("Country or region", "国家或地区")}
+        <select value={country} onChange={(e) => setCountry(e.target.value)} required>
+          <option value="" />
+          {countries.map((c) => (
+            <option key={c} value={c}>
+              {names(c)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="muted small">{tt("We don't keep your answer.", "我们不会保存你的回答。")}</p>
+      <button type="submit" className="primary wide" disabled={!year || !month || !country}>
+        {tt("Continue", "继续")}
+      </button>
+    </form>
+  );
+}
+
+/** Under the minimum age: no account, but everything works as a guest. */
+export function TooYoung({ min }: { min: number }) {
+  const { tt } = useT();
+  const nav = useNav();
+  return (
+    <div role="status">
+      <p>
+        {tt(
+          `You need to be ${min} or older to create an account where you live.`,
+          `在你所在的地区，年满 ${min} 岁才能注册账号。`,
+        )}
+      </p>
+      <p>
+        {tt(
+          "You can still use everything on the site: lessons, puzzles, bots and analysis. Your progress is kept in this browser.",
+          "你仍然可以使用网站的全部功能：课程、题目、人机对弈和分析。你的进度保存在本浏览器中。",
+        )}
+      </p>
+      <p className="buttons">
+        <a className="button primary" href={nav.href("/learn")}>
+          {tt("Start learning", "开始学习")}
+        </a>
+      </p>
+    </div>
   );
 }

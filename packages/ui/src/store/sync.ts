@@ -42,6 +42,8 @@ export interface Snapshot {
   analyses: SavedAnalysis[];
   settings: SyncedSettings | null;
   records: Records;
+  /** The player asked for the account to be deleted (M14); signing in cancels it. */
+  deletionPending: boolean;
 }
 
 /** A puzzle attempt, as the server function takes it. */
@@ -105,7 +107,7 @@ export interface AccountSync {
    * is "pending" when a newer change from this browser is still on its way. `newPlayer`: the
    * account has no ratings yet, so the skill question applies.
    */
-  pull(): Promise<{ changed: boolean; settings: SyncedSettings | null | "pending"; newPlayer: boolean } | null>;
+  pull(): Promise<{ changed: boolean; settings: SyncedSettings | null | "pending"; newPlayer: boolean; deletionPending: boolean } | null>;
   /** Saves settings to the account (through the outbox). */
   saveSettings(data: SyncedSettings): Promise<void>;
   /** Sets the starting ratings (the skill question), then pulls them. False if too late. */
@@ -321,6 +323,7 @@ export function accountSync({ cache, outbox, device, remote }: SyncParts): Accou
       changed,
       settings: pending.has("settings/data") ? ("pending" as const) : snap.settings,
       newPlayer: records.botRating === null && records.puzzleRating === null && records.games.length === 0 && records.puzzles.length === 0,
+      deletionPending: snap.deletionPending,
     };
   };
 

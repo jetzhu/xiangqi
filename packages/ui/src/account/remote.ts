@@ -89,7 +89,7 @@ function check<T>({ data, error, status }: Result<T>): T {
 export function supabaseRemote(sb: SupabaseClient, userId: string): Remote {
   return {
     async pull() {
-      const [lessons, state, analyses, settings, games, attempts, ratings] = await Promise.all([
+      const [lessons, state, analyses, settings, games, attempts, ratings, deletion] = await Promise.all([
         sb.from("lesson_progress").select("lesson_id, status"),
         sb.from("player_state").select("key, value"),
         sb.from("analyses").select("id, title, data, updated_at"),
@@ -101,6 +101,7 @@ export function supabaseRemote(sb: SupabaseClient, userId: string): Remote {
           .limit(MAX_GAMES),
         sb.from("puzzle_attempts").select("client_id, puzzle_id, score, rated, rating_after, at").order("at", { ascending: false }).limit(MAX_ATTEMPTS),
         sb.from("ratings").select("kind, rating, rd, games, peak, peak_at, last_played"),
+        sb.from("account_deletions").select("user_id"),
       ]);
       const rows = <T>(r: Result<T[]>) => check(r) ?? [];
       const rated = rows(ratings as Result<RatingRow[]>);
@@ -128,6 +129,7 @@ export function supabaseRemote(sb: SupabaseClient, userId: string): Remote {
           botRating,
           puzzleRating,
         },
+        deletionPending: rows(deletion as Result<unknown[]>).length > 0,
       };
     },
 

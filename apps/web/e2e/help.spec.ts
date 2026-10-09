@@ -53,6 +53,11 @@ test("privacy policy and terms are plain pages, readable without JavaScript", as
 
 test("sign-up links to the terms and privacy policy", async ({ page }) => {
   await page.goto(at("/en/signup/"));
+  // The age check comes first (M14).
+  await page.getByLabel("Month").selectOption("5");
+  await page.getByLabel("Year").selectOption("1990");
+  await page.getByLabel("Country or region").selectOption("US");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.getByRole("link", { name: "privacy policy" })).toHaveAttribute("href", /\/en\/privacy\/$/);
   await expect(page.getByRole("link", { name: "terms of use" })).toHaveAttribute("href", /\/en\/terms\/$/);
 });

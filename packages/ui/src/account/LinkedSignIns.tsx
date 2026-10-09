@@ -38,7 +38,7 @@ export function LinkedSignIns() {
     setError(null);
     setBusy(provider);
     try {
-      sessionStorage.setItem(NEXT_KEY, "/settings");
+      sessionStorage.setItem(NEXT_KEY, "/settings?tab=account");
     } catch {}
     const sb = await account.client();
     const redirectTo = new URL(nav.href("/auth/callback"), location.href).toString();

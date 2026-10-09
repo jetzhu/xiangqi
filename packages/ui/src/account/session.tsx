@@ -51,8 +51,8 @@ export interface Account {
   refresh: () => Promise<AccountState>;
   /** Providers switched on in the Supabase project, in display order. */
   providers: () => Promise<Provider[]>;
-  /** Signs out on this device only. */
-  signOut: () => Promise<void>;
+  /** Signs out on this device ("local", the default), or ends every session ("global"). */
+  signOut: (scope?: "local" | "global") => Promise<void>;
   /** The user id of the session stored in this browser, read without loading Supabase. */
   storedUserId: () => string | null;
   /** Runs `fn` before signing out (e.g. sending unsaved progress); returns an unsubscribe. */
@@ -185,11 +185,13 @@ export function AccountProvider({ config, children }: { config: AccountConfig | 
   }, []);
   const stored = useCallback(() => storedUserId(config), [config]);
 
-  const signOut = useCallback(async () => {
+  const signOut = useCallback(async (scope: "local" | "global" = "local") => {
     const wait = new Promise((done) => setTimeout(done, SIGN_OUT_WAIT_MS));
     await Promise.race([Promise.allSettled([...hooks.current].map((fn) => fn())), wait]);
     const sb = await client();
-    await sb.auth.signOut({ scope: "local" });
+    const { error } = await sb.auth.signOut({ scope });
+    // Ending the other sessions failed (offline): this device is still signed out.
+    if (error && scope === "global") await sb.auth.signOut({ scope: "local" });
     setState({ status: "guest" });
   }, [client]);
 

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { type Locale, pageMetadata, withBase } from "../../../lib/site";
 
-const UPDATED = "2026-10-08";
+const UPDATED = "2026-10-09";
 const CONTACT = "jianjetzhu@gmail.com";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -30,7 +30,7 @@ function En() {
       </ul>
       <h2>Your data</h2>
       <p>
-        What we keep and why is in the <a href={withBase("/en/privacy/")}>privacy policy</a>. You can ask for your account to be deleted at any time.
+        What we keep and why is in the <a href={withBase("/en/privacy/")}>privacy policy</a>. You can delete your account at any time in Settings → Account.
       </p>
       <h2>Content and software</h2>
       <p>
@@ -65,7 +65,7 @@ function Zh() {
       </ul>
       <h2>你的数据</h2>
       <p>
-        我们保存哪些数据及其用途，见<a href={withBase("/zh/privacy/")}>隐私政策</a>。你可以随时要求删除账号。
+        我们保存哪些数据及其用途，见<a href={withBase("/zh/privacy/")}>隐私政策</a>。你可以随时在“设置 → 账号”中删除账号。
       </p>
       <h2>内容与软件</h2>
       <p>

@@ -45,6 +45,7 @@ function fakeServer() {
           botRating: db.bot && { ...db.bot },
           puzzleRating: db.puzzle && { ...db.puzzle },
         },
+        deletionPending: false,
       };
     },
     async lessons(p) {
