@@ -1,6 +1,6 @@
 import { type Arrow, type Highlight } from "@xq/board";
 import { LEVELS, type Puzzle, goalOf, judge, levelOf, pickInLevel, pickPuzzle, updateRating } from "@xq/puzzles";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Game, Position, explainIllegal, parseSquare, squareName, toIccs } from "xiangqi-core";
 import { onboardingOf, usePuzzles } from "./data.js";
 import type { PuzzleState } from "./store.js";
@@ -116,8 +116,23 @@ function RatedPuzzlesWith({ PUZZLES }: { PUZZLES: Puzzle[] }) {
   /** Difficulty was changed mid-puzzle (or during the warm-up): say when it takes effect. */
   const [difficultyNote, setDifficultyNote] = useState(false);
 
+  // A new Store means another player (signed in or out): their rating and a fresh puzzle,
+  // unless their puzzle record is the same as on screen (the account's other data changed).
+  const stateRef = useRef(state);
+  stateRef.current = state;
   useEffect(() => {
-    void store.puzzles.load().then(setState);
+    let live = true;
+    void store.puzzles.load().then((s) => {
+      if (!live || (stateRef.current && JSON.stringify(s) === JSON.stringify(stateRef.current))) return;
+      if (stateRef.current) {
+        setPuzzle(null);
+        setDelta(null);
+      }
+      setState(s);
+    });
+    return () => {
+      live = false;
+    };
   }, [store]);
 
   const start = (p: Puzzle, isRated: boolean) => {

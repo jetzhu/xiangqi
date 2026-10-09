@@ -6,9 +6,10 @@ export const metadata: Metadata = {
   alternates: { canonical: `${SITE_URL}/zh/`, languages: { "zh-CN": `${SITE_URL}/zh/`, en: `${SITE_URL}/en/` } },
 };
 
-// Static hosting has no server redirect: pick the visitor's language in the browser,
-// and offer plain links for everyone else (and for search engines).
-const pick = `(function(){var l=(navigator.languages&&navigator.languages[0])||navigator.language||"";location.replace(/^zh/i.test(l)?${JSON.stringify(withBase("/zh/"))}:${JSON.stringify(withBase("/en/"))});})();`;
+// Static hosting has no server redirect: pick the visitor's language in the browser (the one
+// they chose before, which follows their account, or else the browser's), and offer plain
+// links for everyone else (and for search engines).
+const pick = `(function(){var l="";try{l=JSON.parse(localStorage.getItem("xq:settings:v1")||"{}").lang||""}catch(e){}if(!l)l=(navigator.languages&&navigator.languages[0])||navigator.language||"";location.replace(/^zh/i.test(l)?${JSON.stringify(withBase("/zh/"))}:${JSON.stringify(withBase("/en/"))});})();`;
 
 export default function Root() {
   return (

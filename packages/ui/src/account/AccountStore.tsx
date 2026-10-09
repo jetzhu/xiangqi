@@ -5,7 +5,7 @@
 // computer shows an empty guest state.
 
 import { type ReactNode, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { DEFAULT_SETTINGS, type Settings, useSettings, useT } from "../settings.js";
+import { DEFAULT_SETTINGS, type Lang, type Settings, useSettings, useT } from "../settings.js";
 import { StoreProvider, browserKV, createStore, defaultStore } from "../store/index.js";
 import type { ImportSummary } from "../store/import.js";
 import { idbKV } from "../store/kv.js";
@@ -14,6 +14,26 @@ import { type Account, useAccount } from "./session.js";
 
 /** The account whose data this browser caches, so it can be cleared after signing out. */
 const CACHE_USER = "xq:account-cache:v1";
+/**
+ * The account with a settings change not yet in the outbox. Written at once, because the change
+ * often comes just before leaving the page (switching language), sooner than IndexedDB saves.
+ */
+const UNSENT = "xq:settings-unsent:v1";
+const storage = {
+  get: (k: string) => {
+    try {
+      return localStorage.getItem(k);
+    } catch {
+      return null;
+    }
+  },
+  set: (k: string, v: string | null) => {
+    try {
+      if (v === null) localStorage.removeItem(k);
+      else localStorage.setItem(k, v);
+    } catch {}
+  },
+};
 const dbNames = (uid: string) => ({ cache: `xq-account-${uid}`, outbox: `xq-account-${uid}-outbox`, device: `xq-account-${uid}-device` });
 
 function syncFor(uid: string, account: Account): AccountSync {
@@ -29,13 +49,20 @@ function syncFor(uid: string, account: Account): AccountSync {
 
 const clearCache = (uid: string) => Promise.all([idbKV(dbNames(uid).cache).clear(), idbKV(dbNames(uid).outbox).clear()]);
 
-/** Settings that follow the account: all but the language, which each page's address sets. */
-function syncedPart(s: Settings): SyncedSettings {
-  const { lang: _lang, ...rest } = s;
-  return rest;
-}
+/** Settings that follow the account, the language included (the one the player chose). */
+const syncedPart = (s: Settings): SyncedSettings => ({ ...s });
 function fromAccount(data: SyncedSettings): Partial<Settings> {
-  return Object.fromEntries(Object.entries(data).filter(([k]) => k in DEFAULT_SETTINGS && k !== "lang")) as Partial<Settings>;
+  const known = Object.entries(data).filter(([k]) => k in DEFAULT_SETTINGS && (k !== "lang" || data.lang === "en" || data.lang === "zh"));
+  return Object.fromEntries(known) as Partial<Settings>;
+}
+
+/** This page's address in another language (/en/learn/ → /zh/learn/), or null if it has none. */
+function inLanguage(lang: Lang): string | null {
+  const url = new URL(location.href);
+  const path = url.pathname.replace(/\/(en|zh)(?=\/|$)/, `/${lang}`);
+  if (path === url.pathname) return null;
+  url.pathname = path;
+  return url.href;
 }
 
 const withLock = <T,>(name: string, fn: () => Promise<T>): Promise<T> =>
@@ -45,7 +72,8 @@ const NoticeContext = createContext<{ welcome: ImportSummary | null; dismiss: ()
 
 export function AccountStoreProvider({ children }: { children: ReactNode }) {
   const account = useAccount();
-  const { settings, update, onChange, changes } = useSettings();
+  const { update, onChange, changes, saved } = useSettings();
+  const pageLang = useSettings().settings.lang;
   const { state } = account;
   // While the session is still loading, the stored session already says whose cache to show.
   const userId = state.status === "signedIn" ? state.user.id : state.status === "loading" ? account.storedUserId() : null;
@@ -57,8 +85,8 @@ export function AccountStoreProvider({ children }: { children: ReactNode }) {
   const store = useMemo(() => (sync ? createStore(sync.kv) : defaultStore()), [sync, rev]);
 
   const [welcome, setWelcome] = useState<ImportSummary | null>(null);
-  const settingsRef = useRef(settings);
-  settingsRef.current = settings;
+  const pageLangRef = useRef(pageLang);
+  pageLangRef.current = pageLang;
 
   const signedIn = state.status === "signedIn";
   useEffect(() => {
@@ -71,13 +99,28 @@ export function AccountStoreProvider({ children }: { children: ReactNode }) {
     } catch {}
 
     const run = async () => {
+      // A change that may not have reached the outbox (the last page closed first): send it again.
+      if (storage.get(UNSENT) === userId) await sync.saveSettings(syncedPart(saved()));
+      storage.set(UNSENT, null);
       const before = changes();
       const pulled = await sync.pull();
       if (!live || !pulled) return;
       // Settings: the account's win; a new account takes this browser's. A change made here
       // while the pull was on its way is newer than both.
-      if (pulled.settings === null) void sync.saveSettings(syncedPart(settingsRef.current));
-      else if (pulled.settings !== "pending" && changes() === before) update(fromAccount(pulled.settings), "account");
+      if (pulled.settings === null) void sync.saveSettings(syncedPart(saved()));
+      else if (pulled.settings !== "pending" && changes() === before) {
+        const previous = saved().lang;
+        const theirs = fromAccount(pulled.settings);
+        update(theirs, "account");
+        // Saved before the language followed the account: add this browser's.
+        if (!theirs.lang) void sync.saveSettings(syncedPart(saved()));
+        // The account's language is new to this browser: show this page in it. (Once it's
+        // known here, a link to the other language stays in that language.)
+        else if (theirs.lang !== previous && theirs.lang !== pageLangRef.current) {
+          const there = inLanguage(theirs.lang);
+          if (there) return void location.replace(there);
+        }
+      }
       const guest = browserKV();
       const { hasGuestData, importGuest } = await import("../store/import.js");
       const summary = await withLock("xq-guest-import", async () => ((await hasGuestData(guest)) ? importGuest(guest, sync.kv) : null));
@@ -101,7 +144,17 @@ export function AccountStoreProvider({ children }: { children: ReactNode }) {
 
   // Settings the player changes follow the account to other devices, from the moment the
   // stored session names the account (before the session is confirmed).
-  useEffect(() => (sync ? onChange((s) => void sync.saveSettings(syncedPart(s))) : undefined), [sync, onChange]);
+  useEffect(() => {
+    if (!sync || !userId) return;
+    let saving = 0;
+    return onChange((s) => {
+      storage.set(UNSENT, userId);
+      saving++;
+      void sync.saveSettings(syncedPart(s)).finally(() => {
+        if (--saving === 0) storage.set(UNSENT, null);
+      });
+    });
+  }, [sync, onChange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Signed out (here, in another tab, or everywhere): forget the account's cached data. A
   // session still stored means sign-in just couldn't be checked (offline), so keep it.

@@ -2,7 +2,7 @@
 import { AccountMenu } from "./account/AccountMenu.js";
 import { useAccount } from "./account/session.js";
 import { useNav } from "./nav.js";
-import { useT } from "./settings.js";
+import { useSettings, useT } from "./settings.js";
 
 export type Section = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "account" | "privacy" | "terms";
 
@@ -18,6 +18,7 @@ const ITEMS: { id: Section; path: string; en: string; zh: string }[] = [
 export function SiteNav({ current, languageHref }: { current: Section; languageHref?: string }) {
   const nav = useNav();
   const { tt, lang } = useT();
+  const { update } = useSettings();
   // Signed in, My stats and Settings move into the account menu.
   const signedIn = useAccount().state.status === "signedIn";
   return (
@@ -34,7 +35,7 @@ export function SiteNav({ current, languageHref }: { current: Section; languageH
       </div>
       <div className="topnav-right">
         {languageHref && (
-          <a href={languageHref} hrefLang={lang === "zh" ? "en" : "zh"} lang={lang === "zh" ? "en" : "zh"}>
+          <a href={languageHref} onClick={() => update({ lang: lang === "zh" ? "en" : "zh" })} hrefLang={lang === "zh" ? "en" : "zh"} lang={lang === "zh" ? "en" : "zh"}>
             {lang === "zh" ? "English" : "中文"}
           </a>
         )}

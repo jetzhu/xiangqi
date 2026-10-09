@@ -412,3 +412,45 @@ test("a signed-in browser shows the account's progress and settings from another
   await notation.selectOption("wxf");
   await expect.poll(() => calls.tables.settings[0]?.data).toMatchObject({ notation: "wxf", pieceSet: "icons" });
 });
+
+test("signing in shows the page in the account's language; switching it follows the account", async ({ page }) => {
+  const calls = await fakeSupabase(page, { tables: { settings: [{ data: { lang: "zh", notation: "chinese" } }] } });
+  await page.goto(at("/en/learn/"));
+  await page.getByRole("link", { name: "Log in" }).click();
+  await page.getByLabel("Email").fill("alice@example.com");
+  await page.getByLabel("Password", { exact: true }).fill("correct-horse");
+  await page.getByRole("button", { name: "Log in" }).click();
+  await expect(page).toHaveURL(/\/zh\/learn\/$/);
+  await expect(page.getByRole("link", { name: "English" })).toBeVisible();
+
+  // Choosing English here: no bounce back, and the account remembers it.
+  await page.getByRole("link", { name: "English" }).click();
+  await expect(page).toHaveURL(/\/en\/learn\/$/);
+  await expect.poll(() => calls.tables.settings[0]?.data).toMatchObject({ lang: "en" });
+  await page.reload();
+  await expect(page).toHaveURL(/\/en\/learn\/$/);
+  await expect(page.getByRole("link", { name: "中文" })).toBeVisible();
+});
+
+test("the puzzles page shows the player's own rating after signing in and out", async ({ page }) => {
+  await fakeSupabase(page);
+  await page.goto(at("/en/puzzles/"));
+  await seedGuest(page);
+  await page.reload();
+  const rating = page.locator(".muted", { hasText: "Puzzle rating" }).locator("..");
+  await expect(rating).toContainText("950");
+
+  await page.getByRole("link", { name: "Log in" }).click();
+  await page.getByLabel("Email").fill("alice@example.com");
+  await page.getByLabel("Password", { exact: true }).fill("correct-horse");
+  await page.getByRole("button", { name: "Log in" }).click();
+  await expect(page.locator(".sync-notice")).toContainText("1 puzzle with your puzzle rating");
+  // The guest rating stays with this browser's copy of the account.
+  await expect(rating).toContainText("950");
+
+  await page.getByRole("button", { name: /Alice_1/ }).click();
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page.getByRole("link", { name: "Log in" })).toBeVisible();
+  await expect(rating).toContainText("800");
+  await expect(rating.locator(".up, .down")).toHaveCount(0);
+});

@@ -90,8 +90,16 @@ interface Ctx {
   onChange: (fn: (s: Settings) => void) => () => void;
   /** How many changes the player has made so far (to tell whether one came in meanwhile). */
   changes: () => number;
+  /** The saved settings, with the language the player chose rather than the page's. */
+  saved: () => Settings;
 }
-const SettingsContext = createContext<Ctx>({ settings: DEFAULT_SETTINGS, update: () => {}, onChange: () => () => {}, changes: () => 0 });
+const SettingsContext = createContext<Ctx>({
+  settings: DEFAULT_SETTINGS,
+  update: () => {},
+  onChange: () => () => {},
+  changes: () => 0,
+  saved: () => DEFAULT_SETTINGS,
+});
 
 /**
  * `lang`, when given, is fixed by the page (e.g. the /en or /zh route) and overrides the
@@ -104,17 +112,19 @@ export function SettingsProvider({ children, lang }: { children: ReactNode; lang
   useEffect(() => {
     const saved = read();
     const browserZh = typeof navigator !== "undefined" && navigator.language?.toLowerCase().startsWith("zh");
+    const first = lang ?? (browserZh ? "zh" : "en");
     latest.current = {
       ...DEFAULT_SETTINGS,
-      // First visit: follow the browser's language, and its usual notation.
-      ...(saved.lang ? {} : { lang: browserZh ? "zh" : "en", notation: browserZh ? "chinese" : "wxf" }),
+      // First visit: the page's language (or the browser's), and its usual notation.
+      ...(saved.lang ? {} : { lang: first, notation: first === "zh" ? "chinese" : "wxf" }),
       ...saved,
     };
     setStored(latest.current);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const listeners = useRef(new Set<(s: Settings) => void>());
   const count = useRef(0);
   const changes = useCallback(() => count.current, []);
+  const savedNow = useCallback(() => latest.current, []);
   const onChange = useCallback((fn: (s: Settings) => void) => {
     listeners.current.add(fn);
     return () => void listeners.current.delete(fn);
@@ -133,7 +143,7 @@ export function SettingsProvider({ children, lang }: { children: ReactNode; lang
     for (const fn of listeners.current) fn(next);
   }, []);
   const settings = useMemo(() => (lang ? { ...stored, lang } : stored), [stored, lang]);
-  const value = useMemo(() => ({ settings, update, onChange, changes }), [settings, update, onChange, changes]);
+  const value = useMemo(() => ({ settings, update, onChange, changes, saved: savedNow }), [settings, update, onChange, changes, savedNow]);
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }
 
