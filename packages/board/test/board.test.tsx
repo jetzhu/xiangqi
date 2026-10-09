@@ -20,6 +20,23 @@ describe("XiangqiBoard", () => {
     expect(screen.getByRole("application", { name: "Xiangqi board" })).toBeTruthy();
   });
 
+  it("rings a highlighted piece from above, so a hint shows which piece to move", () => {
+    const { container } = render(
+      <XiangqiBoard
+        fen={START_FEN}
+        highlights={[
+          { square: "h2", kind: "hint" },
+          { square: "e2", kind: "hint" },
+        ]}
+      />,
+    );
+    // Only the occupied square needs the ring; it comes after (above) the pieces.
+    const rings = container.querySelectorAll('[data-highlight="hint"]');
+    expect(rings).toHaveLength(1);
+    const lastPiece = [...container.querySelectorAll("text")].at(-1)!;
+    expect(lastPiece.compareDocumentPosition(rings[0]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("makes a legal move with click-click", () => {
     const onMove = vi.fn();
     const { container } = render(<XiangqiBoard fen={START_FEN} legalMoves={legal(START_FEN)} onMove={onMove} />);

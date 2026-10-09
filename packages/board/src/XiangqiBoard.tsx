@@ -516,6 +516,23 @@ export function XiangqiBoard({
           );
         })}
 
+        {/* A highlight on a piece (a hint shows which piece to move) would be hidden under it:
+            ring it from above. */}
+        {highlights
+          .filter((h) => pieces.some((p) => p.square === h.square))
+          .map((h, i) => (
+            <circle
+              key={`hr${i}`}
+              {...ptAttrs(toScreen(h.square, orientation))}
+              r={0.5}
+              fill="none"
+              stroke={highlightColor[h.kind]}
+              strokeWidth={0.1}
+              style={{ pointerEvents: "none" }}
+              data-highlight={h.kind}
+            />
+          ))}
+
         {/* Selection ring drawn above the piece so it stays visible */}
         {selected && (
           <circle {...ptAttrs(toScreen(selected, orientation))} r={0.49} fill="none" stroke={theme.cursor} strokeWidth={0.07} style={{ pointerEvents: "none" }} />
