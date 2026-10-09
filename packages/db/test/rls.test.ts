@@ -283,3 +283,123 @@ describe("rules kept by the database", () => {
     }
   });
 });
+
+describe("recording results (M12 server functions)", () => {
+  const D = "00000000-0000-4000-8000-00000000000d";
+  const GAME = "11111111-1111-4111-8111-111111111111";
+  const game = (id = GAME) =>
+    JSON.stringify({ id, bot_id: "laochen", bot_rating: 800, player_color: "red", moves: ["h2e2", "h7e7", "h0g2", "h9g7"], result: "loss", reason: "resign", helps: 0, started_at: "2026-10-09T10:00:00Z", ended_at: "2026-10-09T10:05:00Z" });
+  const rating = (r: number, before = 800) => JSON.stringify({ rating: r, rd: 180, before, last_played: "2026-10-09T10:05:00Z" });
+  const attempt = (client_id: string, puzzle_id = "p9") => JSON.stringify({ client_id, puzzle_id, score: 1, moves: ["a0a1"], at: "2026-10-09T11:00:00Z" });
+
+  /** Runs `fn` with the service key's role (as the server functions do), then rolls back. */
+  async function asServer<T>(fn: (tx: Transaction) => Promise<T>): Promise<T> {
+    let out!: T;
+    await db
+      .transaction(async (tx) => {
+        await tx.exec(`set local role service_role`);
+        out = await fn(tx);
+        await tx.rollback();
+      })
+      .catch((e: unknown) => {
+        if (!(e instanceof Error && /rollback/i.test(e.message))) throw e;
+      });
+    return out;
+  }
+  const errorOf = async (p: Promise<unknown>) => p.then(() => "no error", (e: Error) => e.message);
+
+  beforeAll(() => signUp(D, { username: "dora_xq" }));
+
+  it("only the server functions can record results", async () => {
+    expect(await failsAs(D, `select public.record_bot_game('${D}', '${game()}', null, 0)`)).toMatch(/permission denied/);
+    expect(await failsAs(D, `select public.record_puzzle_attempt('${D}', '${attempt("22222222-2222-4222-8222-222222222222")}', null, 0)`)).toMatch(/permission denied/);
+    expect(await failsAs(D, `select public.save_rating('${D}', 'bot', '${rating(900)}', 0)`)).toMatch(/permission denied/);
+  });
+
+  it("saves a rated game with its rating, once, and refuses a rating that is out of date", async () => {
+    const out = await asServer(async (tx) => {
+      const first = (await tx.query<{ ok: boolean }>(`select public.record_bot_game($1, $2, $3, 0) as ok`, [D, game(), rating(780)])).rows[0]!.ok;
+      const again = (await tx.query<{ ok: boolean }>(`select public.record_bot_game($1, $2, $3, 0) as ok`, [D, game(), rating(780)])).rows[0]!.ok;
+      const r = (await tx.query(`select rating, games, last_played from public.ratings where user_id = $1 and kind = 'bot'`, [D])).rows;
+      const g = (await tx.query(`select rated, rating_before, rating_after, moves from public.bot_games where id = $1`, [GAME])).rows;
+      // A second game computed from the same old rating (another tab got there first).
+      const stale = await errorOf(tx.query(`select public.record_bot_game($1, $2, $3, 0)`, [D, game("33333333-3333-4333-8333-333333333333"), rating(760)]));
+      return { first, again, r, g, stale };
+    });
+    expect(out).toEqual({
+      first: true,
+      again: false,
+      r: [{ rating: 780, games: 1, last_played: new Date("2026-10-09T10:05:00Z") }],
+      g: [{ rated: true, rating_before: 800, rating_after: 780, moves: ["h2e2", "h7e7", "h0g2", "h9g7"] }],
+      stale: "stale",
+    });
+  });
+
+  it("a casual game leaves the rating alone; a JSON null counts as no rating", async () => {
+    const out = await asServer(async (tx) => {
+      await tx.query(`select public.record_bot_game($1, $2, 'null'::jsonb, 0)`, [D, game()]);
+      return {
+        g: (await tx.query(`select rated, rating_after from public.bot_games where id = $1`, [GAME])).rows,
+        r: (await tx.query(`select 1 from public.ratings where user_id = $1`, [D])).rows,
+      };
+    });
+    expect(out).toEqual({ g: [{ rated: false, rating_after: null }], r: [] });
+  });
+
+  it("rates a puzzle only the first time it is tried, and saves each attempt once", async () => {
+    const out = await asServer(async (tx) => {
+      const ok = (q: Promise<{ rows: { ok: boolean }[] }>) => q.then((r) => r.rows[0]!.ok);
+      const first = await ok(tx.query(`select public.record_puzzle_attempt($1, $2, $3, 0) as ok`, [D, attempt("44444444-4444-4444-8444-444444444444"), rating(830)]));
+      const retry = await ok(tx.query(`select public.record_puzzle_attempt($1, $2, $3, 0) as ok`, [D, attempt("44444444-4444-4444-8444-444444444444"), rating(830)]));
+      // Each server call is its own transaction; here a savepoint stands in for that.
+      await tx.exec(`savepoint repeat`);
+      const ratedRepeat = await errorOf(tx.query(`select public.record_puzzle_attempt($1, $2, $3, 1)`, [D, attempt("55555555-5555-4555-8555-555555555555"), rating(850, 830)]));
+      await tx.exec(`rollback to savepoint repeat`);
+      const unratedRepeat = await ok(tx.query(`select public.record_puzzle_attempt($1, $2, null, 1) as ok`, [D, attempt("55555555-5555-4555-8555-555555555555")]));
+      return {
+        first,
+        retry,
+        ratedRepeat,
+        unratedRepeat,
+        attempts: (await tx.query(`select puzzle_id, rated, rating_after, moves from public.puzzle_attempts where user_id = $1 order by id`, [D])).rows,
+        rating: (await tx.query(`select rating, games from public.ratings where user_id = $1 and kind = 'puzzle'`, [D])).rows,
+      };
+    });
+    expect(out).toEqual({
+      first: true,
+      retry: false,
+      ratedRepeat: "stale",
+      unratedRepeat: true,
+      attempts: [
+        { puzzle_id: "p9", rated: true, rating_after: 830, moves: ["a0a1"] },
+        { puzzle_id: "p9", rated: false, rating_after: null, moves: ["a0a1"] },
+      ],
+      rating: [{ rating: 830, games: 1 }],
+    });
+  });
+
+  it("sets the starting rating once, before any rated result, from the four answers", async () => {
+    const out = await as(D, async (tx) => {
+      const bad = await errorOf(tx.query(`select public.set_starting_rating(1000)`));
+      return { bad };
+    });
+    expect(out.bad).toMatch(/bad starting rating/);
+    const set = await as(D, async (tx) => {
+      const first = (await tx.query<{ ok: boolean }>(`select public.set_starting_rating(1200) as ok`)).rows[0]!.ok;
+      const second = (await tx.query<{ ok: boolean }>(`select public.set_starting_rating(400) as ok`)).rows[0]!.ok;
+      const rows = (await tx.query(`select kind, rating, rd, games from public.ratings order by kind`)).rows;
+      return { first, second, rows };
+    });
+    expect(set).toEqual({
+      first: true,
+      second: false,
+      rows: [
+        { kind: "bot", rating: 1200, rd: 200, games: 0 },
+        { kind: "puzzle", rating: 1200, rd: 200, games: 0 },
+      ],
+    });
+    // Alice already has a bot rating: too late.
+    expect(await as(A, async (tx) => (await tx.query<{ ok: boolean }>(`select public.set_starting_rating(1600) as ok`)).rows[0]!.ok)).toBe(false);
+    expect(await failsAs(null, `select public.set_starting_rating(800)`)).toMatch(/permission denied/);
+  });
+});
