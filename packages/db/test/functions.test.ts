@@ -10,7 +10,7 @@ describe("the record function bundle", () => {
     let handler!: (req: Request) => Promise<Response>;
     const fetched: string[] = [];
     (globalThis as Record<string, unknown>).Deno = {
-      env: { get: (k: string) => ({ SUPABASE_URL: "https://ref.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "sb_secret_test" })[k] },
+      env: { get: (k: string) => ({ SUPABASE_URL: "https://ref.supabase.co", SUPABASE_SECRET_KEYS: '{"default":"sb_secret_test"}' })[k] },
       serve: (h: typeof handler) => void (handler = h),
     };
     const realFetch = globalThis.fetch;
