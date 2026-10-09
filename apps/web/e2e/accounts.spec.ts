@@ -349,6 +349,10 @@ async function seedGuest(page: Page) {
       });
     await put("xq-v1-lessons", "lessons", "progress", { "the-board": "mastered", "the-general": "started" });
     await put("xq-v1-bots", "bots", "stars", { xiaobing: 2 });
+    await put("xq-v1-puzzles", "puzzles", "state", {
+      rating: { rating: 950, rd: 120 },
+      history: [{ id: "p1", score: 1, ratingAfter: 950, at: "2026-10-01T09:00:00.000Z" }],
+    });
     localStorage.setItem("xq:daily:v1", JSON.stringify(["2026-10-01"]));
   });
 }
@@ -366,7 +370,9 @@ test("signing in moves guest progress into the account; signing out leaves an em
   await page.getByLabel("Email").fill("alice@example.com");
   await page.getByLabel("Password", { exact: true }).fill("correct-horse");
   await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Your progress from this browser is now saved to your account: 2 lessons." })).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("Your progress from this browser is now saved to your account: 2 lessons.");
+  // Puzzles can't sync until the server checks them (M12): the note says they stay here.
+  await expect(page.getByRole("status")).toContainText("Kept in this browser for now, until a coming update moves them to your account: 1 puzzle with your puzzle rating.");
   await expect(lessonsMastered(page)).toHaveCount(1);
 
   await expect.poll(() => calls.tables.lesson_progress.map((r) => `${r.lesson_id}:${r.status}`).sort()).toEqual(["the-board:mastered", "the-general:started"]);

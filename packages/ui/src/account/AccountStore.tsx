@@ -131,19 +131,28 @@ export function SyncNotice() {
   const { welcome, dismiss } = useContext(NoticeContext);
   const { tt, lang } = useT();
   if (!welcome) return null;
-  const parts = [
+  const join = (parts: (string | 0)[]) => (parts.filter(Boolean) as string[]).join(lang === "zh" ? "、" : ", ");
+  const saved = join([
     welcome.lessons && count(welcome.lessons, ["lesson", "lessons"], "节课", lang),
-    welcome.puzzles && count(welcome.puzzles, ["puzzle", "puzzles"], "道题", lang),
-    welcome.games && count(welcome.games, ["game", "games"], "盘对局", lang),
     welcome.analyses && count(welcome.analyses, ["analysis", "analyses"], "个分析", lang),
-  ].filter(Boolean) as string[];
-  const list = parts.join(lang === "zh" ? "、" : ", ");
+  ]);
+  // Puzzles and bot games can only join the account once the server checks them (M12).
+  const kept = join([
+    welcome.puzzles &&
+      (lang === "zh" ? `${welcome.puzzles} 道题及解题等级分` : `${count(welcome.puzzles, ["puzzle", "puzzles"], "", lang)} with your puzzle rating`),
+    welcome.games && count(welcome.games, ["game", "games"], "盘对局", lang),
+  ]);
   return (
     <div className="sync-notice" role="status">
       <p>
-        {parts.length
-          ? tt(`Your progress from this browser is now saved to your account: ${list}.`, `本浏览器中的进度已保存到你的账号：${list}。`)
+        {saved
+          ? tt(`Your progress from this browser is now saved to your account: ${saved}.`, `本浏览器中的进度已保存到你的账号：${saved}。`)
           : tt("Your progress from this browser is now saved to your account.", "本浏览器中的进度已保存到你的账号。")}
+        {kept &&
+          ` ${tt(
+            `Kept in this browser for now, until a coming update moves them to your account: ${kept}.`,
+            `以下内容暂时只保存在本浏览器，后续更新会将其移入你的账号：${kept}。`,
+          )}`}
       </p>
       <button type="button" onClick={dismiss} aria-label={tt("Dismiss", "关闭")}>
         ×
