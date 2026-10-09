@@ -487,6 +487,8 @@ test("signed in, opening a page in the other language makes it the account's", a
   const calls = await fakeSupabase(page, { tables: { settings: [{ data: { lang: "zh" } }] } });
   await page.goto(at("/zh/auth/callback/?token_hash=abc123&type=signup"));
   await expect(page.getByRole("button", { name: /Alice_1/ })).toBeVisible();
+  // This browser has taken the account's language.
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("xq:settings:v1") ?? "{}").lang)).toBe("zh");
   await page.goto(at("/en/learn/"));
   await expect(page.getByRole("link", { name: "中文" })).toBeVisible();
   await expect.poll(() => calls.tables.settings[0]?.data).toMatchObject({ lang: "en" });

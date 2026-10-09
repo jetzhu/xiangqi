@@ -87,7 +87,7 @@ const NoticeContext = createContext<{ welcome: ImportSummary | null; dismiss: ()
 
 export function AccountStoreProvider({ children }: { children: ReactNode }) {
   const account = useAccount();
-  const { update, onChange, changes, saved } = useSettings();
+  const { update, onChange, changes, saved, knowsLang } = useSettings();
   const pageLang = useSettings().settings.lang;
   const { state } = account;
   // While the session is still loading, the stored session already says whose cache to show.
@@ -102,6 +102,21 @@ export function AccountStoreProvider({ children }: { children: ReactNode }) {
   const [welcome, setWelcome] = useState<ImportSummary | null>(null);
   const pageLangRef = useRef(pageLang);
   pageLangRef.current = pageLang;
+
+  // (Before the sign-in effect, so a change it must not overwrite is already marked unsent.)
+  // Settings the player changes follow the account to other devices, from the moment the
+  // stored session names the account (before the session is confirmed).
+  useEffect(() => {
+    if (!sync || !userId) return;
+    let saving = 0;
+    return onChange((s) => {
+      storage.set(UNSENT, userId);
+      saving++;
+      void sync.saveSettings(syncedPart(s)).finally(() => {
+        if (--saving === 0) storage.set(UNSENT, null);
+      });
+    });
+  }, [sync, onChange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const signedIn = state.status === "signedIn";
   useEffect(() => {
@@ -126,11 +141,14 @@ export function AccountStoreProvider({ children }: { children: ReactNode }) {
       else if (pulled.settings !== "pending" && changes() === before) {
         const previous = saved().lang;
         const theirs = fromAccount(pulled.settings);
+        // The language last used here is newer than the account's; a browser with none of its
+        // own takes the account's.
+        const ours = knowsLang() && theirs.lang !== previous;
+        if (ours) theirs.lang = previous;
         update(theirs, "account");
-        // Saved before the language followed the account: add this browser's.
-        if (!theirs.lang) void sync.saveSettings(syncedPart(saved()));
-        // The account's language is new to this browser: show the page in it. (Once it's
-        // known here, a link to the other language stays in that language.)
+        // Saved before the language followed the account, or changed here: send this browser's.
+        if (!theirs.lang || ours) void sync.saveSettings(syncedPart(saved()));
+        // The account's language is new to this browser: show the page in it.
         else if (theirs.lang !== previous) {
           storage.set(FOLLOW_LANG, theirs.lang);
           followLanguage(pageLangRef.current);
@@ -160,19 +178,6 @@ export function AccountStoreProvider({ children }: { children: ReactNode }) {
   // A page reached after signing in (from the sign-in pages) switches to the account's language.
   useEffect(() => followLanguage(pageLang), [pageLang]);
 
-  // Settings the player changes follow the account to other devices, from the moment the
-  // stored session names the account (before the session is confirmed).
-  useEffect(() => {
-    if (!sync || !userId) return;
-    let saving = 0;
-    return onChange((s) => {
-      storage.set(UNSENT, userId);
-      saving++;
-      void sync.saveSettings(syncedPart(s)).finally(() => {
-        if (--saving === 0) storage.set(UNSENT, null);
-      });
-    });
-  }, [sync, onChange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Signed out (here, in another tab, or everywhere): forget the account's cached data. A
   // session still stored means sign-in just couldn't be checked (offline), so keep it.

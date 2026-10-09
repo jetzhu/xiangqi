@@ -92,6 +92,8 @@ interface Ctx {
   changes: () => number;
   /** The saved settings, with the language the player chose rather than the page's. */
   saved: () => Settings;
+  /** Whether this browser has a language of its own; if not, a signed-in account's is taken. */
+  knowsLang: () => boolean;
 }
 const SettingsContext = createContext<Ctx>({
   settings: DEFAULT_SETTINGS,
@@ -99,6 +101,7 @@ const SettingsContext = createContext<Ctx>({
   onChange: () => () => {},
   changes: () => 0,
   saved: () => DEFAULT_SETTINGS,
+  knowsLang: () => false,
 });
 
 /**
@@ -117,6 +120,9 @@ export function SettingsProvider({ children, lang }: { children: ReactNode; lang
     listeners.current.add(fn);
     return () => void listeners.current.delete(fn);
   }, []);
+  // Whether this browser has a language of its own (saved before, or chosen since).
+  const known = useRef(false);
+  const knowsLang = useCallback(() => known.current, []);
   const update = useCallback((patch: Partial<Settings>, from?: "account") => {
     const next = { ...latest.current, ...patch };
     latest.current = next;
@@ -127,6 +133,7 @@ export function SettingsProvider({ children, lang }: { children: ReactNode; lang
       // storage blocked: settings last for this visit only
     }
     if (from === "account") return;
+    if (patch.lang) known.current = true;
     count.current++;
     for (const fn of listeners.current) fn(next);
   }, []);
@@ -140,13 +147,17 @@ export function SettingsProvider({ children, lang }: { children: ReactNode; lang
       ...(saved.lang ? {} : { lang: first, notation: first === "zh" ? "chinese" : "wxf" }),
       ...saved,
     };
+    known.current ||= !!saved.lang;
     setStored(latest.current);
     // The language is the one last used: opening a page in the other one makes it the player's
     // (and their account's). A first visit leaves it to the account, if they sign in.
     if (lang && saved.lang && saved.lang !== lang) update({ lang });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const settings = useMemo(() => (lang ? { ...stored, lang } : stored), [stored, lang]);
-  const value = useMemo(() => ({ settings, update, onChange, changes, saved: savedNow }), [settings, update, onChange, changes, savedNow]);
+  const value = useMemo(
+    () => ({ settings, update, onChange, changes, saved: savedNow, knowsLang }),
+    [settings, update, onChange, changes, savedNow, knowsLang],
+  );
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }
 
