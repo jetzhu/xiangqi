@@ -21,6 +21,12 @@ export interface AccountUser {
   username: string;
   /** False while the name is the placeholder given to a Google/Microsoft/GitHub sign-up. */
   usernameChosen: boolean;
+  /** A piece picked as the avatar (see account/avatar.ts), or null for the username's initial. */
+  avatar: string | null;
+  /** ISO 3166 country code, if the player chose to show one. */
+  country: string | null;
+  /** When the account was made (ISO time). */
+  memberSince: string;
 }
 
 /** Sign-in providers the site offers besides email (Supabase calls Microsoft "azure"). */
@@ -112,7 +118,11 @@ export function AccountProvider({ config, children }: { config: AccountConfig | 
     const user = data.session?.user;
     let next: AccountState = { status: "guest" };
     if (user) {
-      const { data: profile } = await sb.from("profiles").select("username, username_chosen").eq("user_id", user.id).maybeSingle();
+      const { data: profile } = await sb
+        .from("profiles")
+        .select("username, username_chosen, avatar, country, created_at")
+        .eq("user_id", user.id)
+        .maybeSingle();
       next = {
         status: "signedIn",
         user: {
@@ -120,6 +130,9 @@ export function AccountProvider({ config, children }: { config: AccountConfig | 
           email: user.email ?? "",
           username: (profile?.username as string | undefined) ?? (user.user_metadata.username as string | undefined) ?? "",
           usernameChosen: (profile?.username_chosen as boolean | undefined) ?? true,
+          avatar: (profile?.avatar as string | null | undefined) ?? null,
+          country: (profile?.country as string | null | undefined) ?? null,
+          memberSince: (profile?.created_at as string | undefined) ?? user.created_at,
         },
       };
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NO_FILTER, filterGames, pct, since, summarize } from "../src/stats/summary.js";
+import { NO_FILTER, filterGames, pct, puzzlePeak, puzzleThemes, since, summarize } from "../src/stats/summary.js";
 import type { GameRecord } from "../src/store/index.js";
 
 let n = 0;
@@ -48,5 +48,26 @@ describe("stats summary", () => {
     expect(filterGames(games, NO_FILTER)).toHaveLength(4);
     expect(filterGames(games, { ...NO_FILTER, type: "rated" })).toHaveLength(2);
     expect(filterGames(games, { ...NO_FILTER, result: "loss", color: "black" })).toHaveLength(1);
+  });
+});
+
+describe("puzzle stats", () => {
+  const h = (id: string, score: 0 | 0.5 | 1, ratingAfter: number, at = `2026-10-0${ratingAfter % 9 + 1}T00:00:00Z`) => ({ id, score, ratingAfter, at });
+  const THEMES: Record<string, string[]> = { a: ["fork", "short"], b: ["fork", "mateIn1"], c: ["mateIn1"] };
+
+  it("counts accuracy by theme from first tries, without length tags", () => {
+    const history = [h("a", 1, 810), h("b", 0, 800), h("b", 1, 800), h("c", 0.5, 800)];
+    expect(puzzleThemes(history, (id) => THEMES[id])).toEqual([
+      { theme: "fork", tried: 2, solved: 1 },
+      { theme: "mateIn1", tried: 2, solved: 0 },
+    ]);
+  });
+
+  it("finds the highest puzzle rating and when", () => {
+    expect(puzzlePeak([])).toBeNull();
+    expect(puzzlePeak([h("a", 1, 820, "2026-10-01T00:00:00Z"), h("b", 1, 860, "2026-10-02T00:00:00Z"), h("c", 0, 840, "2026-10-03T00:00:00Z")])).toEqual({
+      rating: 860,
+      at: "2026-10-02T00:00:00Z",
+    });
   });
 });

@@ -7,6 +7,7 @@ import { MoveTreeView } from "./MoveTreeView.js";
 import { PositionEditor } from "./PositionEditor.js";
 import type { SavedAnalysis } from "./storage.js";
 import { useStore } from "../store/index.js";
+import { useAccount } from "../account/session.js";
 import { useEngine } from "./useEngine.js";
 import { Board } from "../Board.js";
 import { type Nav, useNav } from "../nav.js";
@@ -44,6 +45,7 @@ const LINE_COLORS: ArrowColor[] = ["green", "blue", "orange"];
 export function AnalysisPage() {
   const nav = useNav();
   const store = useStore();
+  const signedIn = useAccount().state.status === "signedIn";
   const playSound = useSound();
   const { settings, update } = useSettings();
   const { tt } = useT();
@@ -277,7 +279,7 @@ export function AnalysisPage() {
           <button type="button" onClick={() => copy(new URL(nav.href(sharePath(t, current)), location.href).href, tt("Link", "链接"))}>{tt("Copy link", "复制链接")}</button>
         </div>
 
-        <h2>{tt("Saved analyses", "已保存的分析")}</h2>
+        <h2 id="saved">{tt("Saved analyses", "已保存的分析")}</h2>
         <form
           className="fen-form"
           onSubmit={async (e) => {
@@ -286,7 +288,7 @@ export function AnalysisPage() {
               const item = await store.analyses.save(title, t.toPgn({ Event: title || "Analysis" }));
               setSaved((s) => [item, ...s]);
               setTitle("");
-              setMessage(tt("Saved in this browser.", "已保存在本浏览器中。"));
+              setMessage(signedIn ? tt("Saved to your account.", "已保存到你的账号。") : tt("Saved in this browser.", "已保存在本浏览器中。"));
             } catch (err) {
               setMessage(`${tt("Could not save", "无法保存")}: ${(err as Error).message}`);
             }

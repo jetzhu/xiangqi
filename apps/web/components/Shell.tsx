@@ -6,7 +6,7 @@ import { ACCOUNTS, BASE_PATH } from "../lib/site";
 import { UpdateBanner } from "./UpdateBanner";
 
 type Section = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "account" | "privacy" | "terms";
-const ACCOUNT_PAGES = ["signup", "login", "reset-password", "auth"];
+const ACCOUNT_PAGES = ["signup", "login", "reset-password", "auth", "profile"];
 
 /** Providers and header for a locale; the language link points to the same page in the other locale. */
 export function Shell({ locale, children }: { locale: "zh" | "en"; children: ReactNode }) {

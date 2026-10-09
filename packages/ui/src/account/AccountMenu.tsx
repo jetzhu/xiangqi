@@ -4,6 +4,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useNav } from "../nav.js";
 import { useT } from "../settings.js";
+import { UserAvatar } from "./UserAvatar.js";
 import { useAccount } from "./session.js";
 
 export function AccountMenu() {
@@ -58,19 +59,23 @@ export function AccountMenu() {
         aria-controls={menuId}
         onClick={() => setOpen(!open)}
       >
-        <span className="account-avatar" aria-hidden>
-          {state.user.username.slice(0, 1).toUpperCase()}
-        </span>
+        <UserAvatar user={state.user} />
         {state.user.username}
       </button>
       {open && (
         <ul id={menuId} className="account-dropdown">
           <li className="muted account-email">{state.user.email}</li>
           <li>
+            <a href={nav.href("/profile")}>{tt("Profile", "个人资料")}</a>
+          </li>
+          <li>
             <a href={nav.href("/stats")}>{tt("My stats", "我的统计")}</a>
           </li>
           <li>
             <a href={nav.href("/stats?tab=games")}>{tt("Game history", "对局记录")}</a>
+          </li>
+          <li>
+            <a href={nav.href("/analysis#saved")}>{tt("My analyses", "我的分析")}</a>
           </li>
           <li>
             <a href={nav.href("/settings")}>{tt("Settings", "设置")}</a>

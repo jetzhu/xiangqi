@@ -8,37 +8,10 @@ import { useStore } from "../store/index.js";
 import { DailyPuzzle } from "./DailyPuzzle.js";
 import { PuzzleRush } from "./PuzzleRush.js";
 import { Board } from "../Board.js";
+import { THEME_NAMES } from "./themes.js";
 import { useNav } from "../nav.js";
 import { type Settings, useOrientation, useSettings, useSound, useT } from "../settings.js";
 
-const THEME_NAMES: Record<string, [string, string]> = {
-  mateIn1: ["Mate in 1", "一步杀"],
-  mateIn2: ["Mate in 2", "两步杀"],
-  mateIn3: ["Mate in 3", "三步杀"],
-  mateIn4: ["Mate in 4", "四步杀"],
-  mateIn5: ["Mate in 5", "五步杀"],
-  mateIn6: ["Mate in 6", "六步杀"],
-  mateIn7: ["Mate in 7", "七步杀"],
-  quiet: ["Quiet move", "冷着"],
-  stalemate: ["Stalemate win", "困毙"],
-  decoy: ["Tempting wrong tries", "有迷惑着法"],
-  discoveredCheck: ["Discovered check", "抽将"],
-  cannonScreen: ["Cannon screen", "炮架"],
-  classical: ["Classical", "古谱"],
-  advantage: ["Win material", "得子"],
-  fork: ["Fork", "捉双"],
-  sacrifice: ["Sacrifice", "弃子"],
-  oneMove: ["One move", "一步"],
-  short: ["Short", "短"],
-  long: ["Long", "长"],
-  chariot: ["Chariot", "车"],
-  horse: ["Horse", "马"],
-  cannon: ["Cannon", "炮"],
-  soldier: ["Soldier", "兵"],
-  general: ["General", "帅"],
-  advisor: ["Advisor", "仕"],
-  elephant: ["Elephant", "相"],
-};
 
 type Phase = "solving" | "solved" | "failed" | "review";
 

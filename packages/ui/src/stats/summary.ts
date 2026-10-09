@@ -1,4 +1,5 @@
 // Figures for the stats page, computed from saved games (pure, so they can be tested).
+import type { PuzzleRecord } from "../puzzles/store.js";
 import type { GameRecord } from "../store/index.js";
 
 export interface Tally {
@@ -70,4 +71,40 @@ export function filterGames(games: readonly GameRecord[], f: GameFilter): GameRe
       (f.color === "all" || g.playerColor === f.color) &&
       (f.type === "all" || (f.type === "rated") === g.rated),
   );
+}
+
+export interface ThemeAccuracy {
+  theme: string;
+  /** Puzzles tried with this theme (first tries only). */
+  tried: number;
+  /** Of those, solved first time without a hint. */
+  solved: number;
+}
+
+/**
+ * Puzzle accuracy by theme, from first tries (a retry or a hint doesn't count as solved), most
+ * tried first. Length tags (short, long, one move) are left out: they say nothing about skill.
+ */
+export function puzzleThemes(history: readonly PuzzleRecord[], themesOf: (id: string) => readonly string[] | undefined): ThemeAccuracy[] {
+  const seen = new Set<string>();
+  const by = new Map<string, ThemeAccuracy>();
+  for (const h of history) {
+    if (seen.has(h.id)) continue;
+    seen.add(h.id);
+    for (const theme of themesOf(h.id) ?? []) {
+      if (theme === "short" || theme === "long" || theme === "oneMove") continue;
+      const a = by.get(theme) ?? { theme, tried: 0, solved: 0 };
+      a.tried++;
+      if (h.score === 1) a.solved++;
+      by.set(theme, a);
+    }
+  }
+  return [...by.values()].sort((a, b) => b.tried - a.tried || a.theme.localeCompare(b.theme));
+}
+
+/** The highest puzzle rating reached, and when. */
+export function puzzlePeak(history: readonly PuzzleRecord[]): { rating: number; at: string } | null {
+  let best: PuzzleRecord | null = null;
+  for (const h of history) if (!best || h.ratingAfter > best.ratingAfter) best = h;
+  return best && { rating: best.ratingAfter, at: best.at };
 }

@@ -614,3 +614,57 @@ test("a signed-in puzzle attempt is sent to be recorded, with its moves", async 
     .poll(() => calls.recorded)
     .toMatchObject([{ type: "puzzle-attempt", attempt: { puzzleId: first.id, score: 1, rated: false, moves: [first.solution[0]] } }]);
 });
+
+// M13: signed-in pages.
+
+test("the home page is a dashboard for a returning player", async ({ page }) => {
+  await fakeSupabase(page, {
+    tables: {
+      ...RATED,
+      lesson_progress: [{ lesson_id: "the-board", status: "mastered" }],
+      bot_games: [
+        {
+          id: "00000000-0000-4000-8000-000000000001", bot_id: "xiaobing", bot_rating: 250, player_color: "red", moves: ["h2e2", "h9g7", "h0g2", "i9h9"],
+          result: "win", reason: "resign", rated: true, rating_before: 893, rating_after: 900, stars: 3, helps: 0, accuracy: null,
+          started_at: "2026-10-08T10:00:00Z", ended_at: "2026-10-08T10:05:00Z",
+        },
+      ],
+      player_state: [{ key: "stars", value: { xiaobing: 3 } }],
+    },
+  });
+  await page.goto(at("/en/auth/callback/?token_hash=abc123&type=signup"));
+  await expect(page.getByText(/signed in as Alice_1/)).toBeVisible();
+  await page.goto(at("/en/"));
+  await expect(page.getByRole("heading", { name: "Welcome back, Alice_1" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Continue: / })).toHaveAttribute("href", /\/learn\/[a-z-]+\/?$/);
+  const recent = page.locator(".recent-games li");
+  await expect(recent).toHaveCount(1);
+  await expect(recent).toContainText("Won");
+  await expect(recent).toContainText("+7");
+  await expect(recent.getByRole("link", { name: "Review" })).toHaveAttribute("href", /analysis\/?\?moves=h2e2,h9g7,h0g2,i9h9/);
+  await expect(page.locator(".milestones li.earned")).toHaveCount(2);
+  await expect(page.locator(".milestones")).toContainText("Raise your puzzle rating by 100");
+});
+
+test("profile: avatar, country and a new username, from the account menu", async ({ page }) => {
+  const calls = await fakeSupabase(page, { tables: RATED });
+  await page.goto(at("/en/auth/callback/?token_hash=abc123&type=signup"));
+  await page.getByRole("button", { name: /Alice_1/ }).click();
+  await page.getByRole("link", { name: "Profile" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Alice_1");
+  await expect(page.getByText("Only you can see your profile.")).toBeVisible();
+  await expect(page.locator(".stat-card").first()).toContainText("900");
+
+  await page.getByRole("button", { name: "Red horse" }).click();
+  await expect(page.getByRole("button", { name: "Red horse" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByLabel("Country or region (optional)").selectOption("CN");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("🇨🇳");
+  const name = page.getByRole("textbox", { name: "Username" });
+  await name.fill("alice_xq");
+  await page.getByRole("button", { name: "Change username" }).click();
+  await expect(page.getByText("Username changed.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /alice_xq/ })).toBeVisible();
+  expect(calls.profileUpdates).toEqual([{ avatar: "red-horse" }, { country: "CN" }, { username: "alice_xq" }]);
+  // The header shows the chosen piece.
+  await expect(page.locator(".account-button .account-avatar")).toHaveText("马");
+});

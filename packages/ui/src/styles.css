@@ -257,6 +257,21 @@ a.button.primary { background: var(--accent); color: #fff; border-color: var(--a
 .lesson-index, .lesson-text { max-width: 760px; margin: 24px auto; padding: 0 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
 .lesson-text h2 { color: var(--text); }
 .difficulty { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 14px; color: var(--muted); }
+.dash-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.dash-head h1 { font-size: 28px; margin: 0; }
+.recent { margin-top: 28px; }
+.recent h2 { font-size: 18px; margin: 0; }
+.recent-games { list-style: none; padding: 0; margin: 8px 0 0; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
+.recent-games li { display: grid; grid-template-columns: 3.5em 1fr auto auto; gap: 12px; align-items: center; padding: 8px 14px; border-top: 1px solid var(--border); font-size: 14px; }
+.recent-games li:first-child { border-top: 0; }
+.recent-games .result { font-weight: 700; }
+.recent-games .result.win { color: #3a7d44; }
+.recent-games .result.loss { color: #ca3431; }
+.milestones { list-style: none; padding: 0; margin: 24px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.milestones li { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; border: 1px dashed var(--border); border-radius: 10px; }
+.milestones li:not(.earned) strong { color: var(--muted); font-weight: 600; }
+.milestones li.earned { border-style: solid; border-color: var(--accent); }
+.milestones li.earned strong::before { content: "★ "; color: #e0a030; }
 .streak { text-align: center; margin: 16px auto 4px; font-size: 14px; }
 .streak.done strong { color: #e8762b; }
 .tabs { display: flex; gap: 4px; justify-content: center; margin: 12px auto 0; flex-wrap: wrap; }
@@ -371,6 +386,7 @@ kbd { font-family: ui-monospace, monospace; font-size: 0.9em; padding: 1px 5px; 
 .field-hint { font-size: 13px; }
 .field-error, .form-error { color: var(--accent); font-size: 13px; margin: 0; }
 .form-error { font-size: 14px; margin-bottom: 12px; }
+.form-ok { font-size: 14px; margin-bottom: 12px; color: #3a7d44; }
 .field-aside { margin: -6px 0 14px; font-size: 14px; }
 .link-button { background: none; border-color: transparent; color: var(--muted); }
 button.wide { width: 100%; padding: 10px; font-size: 16px; }
@@ -382,3 +398,23 @@ button.wide { width: 100%; padding: 10px; font-size: 16px; }
 .providers .or::before, .providers .or::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
 .linked-sign-ins ul { list-style: none; margin: 0; padding: 0; }
 .linked-sign-ins li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+
+/* Profile (M13) */
+.profile { max-width: 860px; margin: 24px auto; padding: 0 16px; }
+.profile-head { display: flex; align-items: center; gap: 16px; }
+.profile-head h1 { margin: 0 0 4px; }
+.profile h2 { font-size: 18px; margin: 24px 0 8px; }
+.account-avatar.piece-red, .account-avatar.piece-black { background: #f6e3b8; border: 2px solid #8a5a2b; font-family: "KaiTi", "STKaiti", "Noto Serif SC", serif; }
+.account-avatar.piece-red { color: #c8281e; }
+.account-avatar.piece-black { color: #1f1f1f; }
+.profile-bots { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.profile-bots li { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; color: var(--muted); }
+.profile-bots li:not(.beaten) .avatar { filter: grayscale(1); opacity: 0.5; }
+.profile-bots li.beaten { color: var(--text); font-weight: 600; }
+.avatar-picker { display: flex; flex-wrap: wrap; gap: 6px; border: 0; padding: 0; margin: 0 0 12px; }
+.avatar-picker legend { font-weight: 600; margin-bottom: 6px; }
+.avatar-picker button { padding: 3px; border: 2px solid transparent; border-radius: 50%; background: none; cursor: pointer; }
+.avatar-picker button.active { border-color: var(--accent); }
+.country-picker { display: flex; flex-direction: column; gap: 4px; max-width: 320px; margin-bottom: 16px; font-weight: 600; }
+.country-picker select { font-weight: normal; }
+.change-username { max-width: 320px; }

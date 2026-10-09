@@ -13,7 +13,10 @@ import type { PuzzleState } from "../puzzles/store.js";
 import { useT } from "../settings.js";
 import { type GameRecord, useStore } from "../store/index.js";
 import { type Streak, computeStreak, dayOf } from "../streak.js";
-import { type GameFilter, NO_FILTER, type Tally, filterGames, pct, since, summarize } from "./summary.js";
+import { useAccount } from "../account/session.js";
+import { usePuzzles } from "../puzzles/data.js";
+import { THEME_NAMES } from "../puzzles/themes.js";
+import { type GameFilter, NO_FILTER, type Tally, filterGames, pct, puzzlePeak, puzzleThemes, since, summarize } from "./summary.js";
 
 type Tab = "overview" | "games";
 type Period = "90" | "all";
@@ -33,6 +36,8 @@ export function StatsPage() {
   const [progress, setProgress] = useState<Progress>({});
   const [streak, setStreak] = useState<Streak>({ days: 0, today: false, missed: 0 });
   const [filter, setFilter] = useState<GameFilter>(NO_FILTER);
+  const signedIn = useAccount().state.status === "signedIn";
+  const allPuzzles = usePuzzles();
 
   useEffect(() => {
     setTab(nav.params().get("tab") === "games" ? "games" : "overview");
@@ -47,6 +52,12 @@ export function StatsPage() {
   const from = period === "90" ? new Date(Date.now() - 90 * 864e5).toISOString() : null;
   const botPoints = since(summary.ratingHistory, from);
   const puzzlePoints = since((puzzles?.history ?? []).map((h) => ({ at: h.at, rating: h.ratingAfter })), from);
+  const peak = useMemo(() => puzzlePeak(puzzles?.history ?? []), [puzzles]);
+  const themes = useMemo(() => {
+    if (!allPuzzles || !puzzles) return [];
+    const byId = new Map(allPuzzles.map((p) => [p.id, p.themes]));
+    return puzzleThemes(puzzles.history, (id) => byId.get(id)).slice(0, 10);
+  }, [allPuzzles, puzzles]);
   const mastered = LESSON_ORDER.filter((id) => progress[id] === "mastered").length;
   const { rank } = learningRank(mastered);
   const go = (next: Tab) => {
@@ -60,7 +71,9 @@ export function StatsPage() {
     <div className="stats">
       <h1>{tt("My stats", "我的统计")}</h1>
       <p className="muted small">
-        {tt("Kept in this browser. With an account (coming soon) they follow you to every device.", "保存在本浏览器中。账号功能上线后可在所有设备同步。")}
+        {signedIn
+          ? tt("Saved to your account: the same on every device you sign in on.", "已保存到你的账号：在你登录的所有设备上都一样。")
+          : tt("Kept in this browser. Sign up to keep them on every device.", "保存在本浏览器中。注册账号即可在所有设备上保留。")}
       </p>
       <div className="tabs" role="tablist" aria-label={tt("Stats sections", "统计分区")}>
         {(
@@ -94,6 +107,7 @@ export function StatsPage() {
               <strong>{puzzles?.rating.rating ?? 800}</strong>
               <span className="muted small">
                 {puzzles?.history.filter((h) => h.score > 0).length ?? 0} {tt("solved", "道已解")}
+                {peak && ` · ${tt("peak", "最高")} ${peak.rating} (${fmtDate(peak.at, lang)})`}
               </span>
             </div>
             <div className="stat-card">
@@ -171,6 +185,32 @@ export function StatsPage() {
               </>
             )}
           </section>
+
+          {themes.length > 0 && (
+            <section aria-labelledby="h-themes">
+              <h2 id="h-themes">{tt("Puzzles by theme", "按主题的解题情况")}</h2>
+              <table className="results">
+                <thead>
+                  <tr>
+                    <th />
+                    <th>{tt("Tried", "尝试")}</th>
+                    <th>{tt("Solved first time", "一次解出")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {themes.map((a) => (
+                    <tr key={a.theme}>
+                      <th scope="row">{THEME_NAMES[a.theme] ? tt(...THEME_NAMES[a.theme]!) : a.theme}</th>
+                      <td>{a.tried}</td>
+                      <td>
+                        {a.solved} <span className="muted small">({pct(a.solved, a.tried)}%)</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
         </>
       ) : (
         <GameList games={games} filter={filter} onFilter={setFilter} />

@@ -28,7 +28,7 @@ export const ACCOUNTS =
     : null;
 export const SITE_NAME = { zh: "象棋学堂", en: "Xiangqi School" } as const;
 
-type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "signup" | "login" | "resetPassword" | "authCallback" | "privacy" | "terms";
+type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "profile" | "signup" | "login" | "resetPassword" | "authCallback" | "privacy" | "terms";
 const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; description: Record<Locale, string> }> = {
   home: {
     path: "/",
@@ -70,6 +70,11 @@ const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; desc
     path: "/stats",
     title: { zh: "我的统计", en: "My stats" },
     description: { zh: "你的等级分、战绩和对局记录。", en: "Your ratings, results and game history." },
+  },
+  profile: {
+    path: "/profile",
+    title: { zh: "个人资料", en: "Profile" },
+    description: { zh: "你的头像、等级分和学习进度。", en: "Your avatar, ratings and progress." },
   },
   privacy: {
     path: "/privacy",

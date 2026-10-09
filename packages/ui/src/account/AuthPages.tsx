@@ -813,3 +813,59 @@ function ChooseUsername({ onDone }: { onDone: () => void }) {
     </>
   );
 }
+
+/** Changing the username later (on the profile page): once every 90 days, as the database allows. */
+export function ChangeUsername() {
+  const { tt } = useT();
+  const account = useAccount();
+  const user = account.state.status === "signedIn" ? account.state.user : null;
+  const [username, setUsername] = useState(user?.username ?? "");
+  const [problem, setProblem] = useUsernameProblem(account, username === user?.username ? "" : username, user?.id);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  if (!user) return null;
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (username === user.username) return;
+    const local = usernameFormatProblem(username);
+    if (local || problem) return setProblem(local ?? problem);
+    setBusy(true);
+    setError(null);
+    setDone(false);
+    const sb = await account.client();
+    const { error } = await sb.from("profiles").update({ username }).eq("user_id", user.id);
+    setBusy(false);
+    if (error) {
+      const hint = error.hint as UsernameProblem | "too_soon" | null;
+      if (hint === "too_soon" || /90 days/.test(error.message)) return setError(tt("You can change your username once every 90 days.", "用户名每 90 天只能修改一次。"));
+      if (hint) return setProblem(hint);
+      return setError(authErrorText(error, tt));
+    }
+    await account.refresh();
+    setDone(true);
+  };
+  return (
+    <form className="change-username" onSubmit={(e) => void submit(e)}>
+      <Field
+        label={tt("Username", "用户名")}
+        type="text"
+        value={username}
+        onChange={(v) => {
+          setUsername(v);
+          setDone(false);
+        }}
+        autoComplete="username"
+        minLength={3}
+        maxLength={20}
+        error={problem ? usernameText(problem, tt) : null}
+        hint={tt("Once every 90 days. Please don't use your real name.", "每 90 天可修改一次。请不要使用真实姓名。")}
+      />
+      <FormError text={error} />
+      {done && <p className="form-ok">{tt("Username changed.", "用户名已修改。")}</p>}
+      <button type="submit" disabled={busy || !username || username === user.username}>
+        {busy ? "…" : tt("Change username", "修改用户名")}
+      </button>
+    </form>
+  );
+}
