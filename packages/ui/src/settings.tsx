@@ -102,25 +102,13 @@ const SettingsContext = createContext<Ctx>({
 });
 
 /**
- * `lang`, when given, is fixed by the page (e.g. the /en or /zh route) and overrides the
- * stored preference.
+ * `lang`, when given, is fixed by the page (e.g. the /en or /zh route) and becomes the saved
+ * language.
  */
 export function SettingsProvider({ children, lang }: { children: ReactNode; lang?: Lang }) {
   const [stored, setStored] = useState<Settings>(DEFAULT_SETTINGS);
   // The newest settings, so changes made in quick succession build on each other.
   const latest = useRef<Settings>(DEFAULT_SETTINGS);
-  useEffect(() => {
-    const saved = read();
-    const browserZh = typeof navigator !== "undefined" && navigator.language?.toLowerCase().startsWith("zh");
-    const first = lang ?? (browserZh ? "zh" : "en");
-    latest.current = {
-      ...DEFAULT_SETTINGS,
-      // First visit: the page's language (or the browser's), and its usual notation.
-      ...(saved.lang ? {} : { lang: first, notation: first === "zh" ? "chinese" : "wxf" }),
-      ...saved,
-    };
-    setStored(latest.current);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const listeners = useRef(new Set<(s: Settings) => void>());
   const count = useRef(0);
   const changes = useCallback(() => count.current, []);
@@ -142,6 +130,21 @@ export function SettingsProvider({ children, lang }: { children: ReactNode; lang
     count.current++;
     for (const fn of listeners.current) fn(next);
   }, []);
+  useEffect(() => {
+    const saved = read();
+    const browserZh = typeof navigator !== "undefined" && navigator.language?.toLowerCase().startsWith("zh");
+    const first = lang ?? (browserZh ? "zh" : "en");
+    latest.current = {
+      ...DEFAULT_SETTINGS,
+      // First visit: the page's language (or the browser's), and its usual notation.
+      ...(saved.lang ? {} : { lang: first, notation: first === "zh" ? "chinese" : "wxf" }),
+      ...saved,
+    };
+    setStored(latest.current);
+    // The language is the one last used: opening a page in the other one makes it the player's
+    // (and their account's). A first visit leaves it to the account, if they sign in.
+    if (lang && saved.lang && saved.lang !== lang) update({ lang });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const settings = useMemo(() => (lang ? { ...stored, lang } : stored), [stored, lang]);
   const value = useMemo(() => ({ settings, update, onChange, changes, saved: savedNow }), [settings, update, onChange, changes, savedNow]);
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

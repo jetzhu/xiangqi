@@ -454,3 +454,42 @@ test("the puzzles page shows the player's own rating after signing in and out", 
   await expect(rating).toContainText("800");
   await expect(rating.locator(".up, .down")).toHaveCount(0);
 });
+
+test("GitHub sign-in comes back to the page in the account's language", async ({ page }) => {
+  const github = { ...USER, app_metadata: { provider: "github", providers: ["github"] }, identities: [{ id: "g1", provider: "github" }] };
+  await fakeSupabase(page, { providers: ["github"], oauthUser: github, tables: { settings: [{ data: { lang: "zh" } }] } });
+  await page.goto(at("/en/bots/"));
+  await page.getByRole("link", { name: "Log in" }).click();
+  await page.getByRole("button", { name: "Continue with GitHub" }).click();
+  await expect(page).toHaveURL(/\/zh\/bots\/$/);
+  await expect(page.getByRole("button", { name: /Alice_1/ })).toBeVisible();
+  // Known here now: the English page stays English.
+  await page.goto(at("/en/bots/"));
+  await expect(page.getByRole("link", { name: "中文" })).toBeVisible();
+  await expect(page).toHaveURL(/\/en\/bots\/$/);
+});
+
+test("the language last used becomes the account's, even if it was never chosen in Settings", async ({ page }) => {
+  // A browser that saved English long ago and has since been reading the Chinese pages.
+  const calls = await fakeSupabase(page, { tables: { settings: [{ data: { notation: "iccs" } }] } });
+  await page.goto(at("/en/learn/"));
+  await page.evaluate(() => localStorage.setItem("xq:settings:v1", JSON.stringify({ lang: "en" })));
+  await page.goto(at("/zh/learn/"));
+  await page.getByRole("link", { name: "登录" }).click();
+  await page.getByLabel("邮箱").fill("alice@example.com");
+  await page.getByLabel("密码", { exact: true }).fill("correct-horse");
+  await page.getByRole("button", { name: "登录" }).click();
+  await expect(page).toHaveURL(/\/zh\/learn\/$/);
+  await expect.poll(() => calls.tables.settings[0]?.data).toMatchObject({ lang: "zh", notation: "iccs" });
+});
+
+test("signed in, opening a page in the other language makes it the account's", async ({ page }) => {
+  const calls = await fakeSupabase(page, { tables: { settings: [{ data: { lang: "zh" } }] } });
+  await page.goto(at("/zh/auth/callback/?token_hash=abc123&type=signup"));
+  await expect(page.getByRole("button", { name: /Alice_1/ })).toBeVisible();
+  await page.goto(at("/en/learn/"));
+  await expect(page.getByRole("link", { name: "中文" })).toBeVisible();
+  await expect.poll(() => calls.tables.settings[0]?.data).toMatchObject({ lang: "en" });
+  await page.reload();
+  await expect(page).toHaveURL(/\/en\/learn\/$/);
+});

@@ -19,6 +19,8 @@ const CACHE_USER = "xq:account-cache:v1";
  * often comes just before leaving the page (switching language), sooner than IndexedDB saves.
  */
 const UNSENT = "xq:settings-unsent:v1";
+/** The account's language, new to this browser at sign-in: the next page is shown in it. */
+const FOLLOW_LANG = "xq:follow-lang:v1";
 const storage = {
   get: (k: string) => {
     try {
@@ -54,6 +56,19 @@ const syncedPart = (s: Settings): SyncedSettings => ({ ...s });
 function fromAccount(data: SyncedSettings): Partial<Settings> {
   const known = Object.entries(data).filter(([k]) => k in DEFAULT_SETTINGS && (k !== "lang" || data.lang === "en" || data.lang === "zh"));
   return Object.fromEntries(known) as Partial<Settings>;
+}
+
+/**
+ * Shows this page in the account's language when sign-in brought one new to this browser. Not
+ * on the sign-in pages: they send the player back to where they came from, which then switches.
+ */
+function followLanguage(pageLang: Lang) {
+  const want = storage.get(FOLLOW_LANG);
+  if (want !== "en" && want !== "zh") return;
+  if (want !== pageLang && /\/(login|signup|reset-password|auth)\//.test(location.pathname)) return;
+  storage.set(FOLLOW_LANG, null);
+  const there = want === pageLang ? null : inLanguage(want);
+  if (there) location.replace(there);
 }
 
 /** This page's address in another language (/en/learn/ → /zh/learn/), or null if it has none. */
@@ -114,11 +129,11 @@ export function AccountStoreProvider({ children }: { children: ReactNode }) {
         update(theirs, "account");
         // Saved before the language followed the account: add this browser's.
         if (!theirs.lang) void sync.saveSettings(syncedPart(saved()));
-        // The account's language is new to this browser: show this page in it. (Once it's
+        // The account's language is new to this browser: show the page in it. (Once it's
         // known here, a link to the other language stays in that language.)
-        else if (theirs.lang !== previous && theirs.lang !== pageLangRef.current) {
-          const there = inLanguage(theirs.lang);
-          if (there) return void location.replace(there);
+        else if (theirs.lang !== previous) {
+          storage.set(FOLLOW_LANG, theirs.lang);
+          followLanguage(pageLangRef.current);
         }
       }
       const guest = browserKV();
@@ -141,6 +156,9 @@ export function AccountStoreProvider({ children }: { children: ReactNode }) {
       unhook();
     };
   }, [signedIn, sync]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A page reached after signing in (from the sign-in pages) switches to the account's language.
+  useEffect(() => followLanguage(pageLang), [pageLang]);
 
   // Settings the player changes follow the account to other devices, from the moment the
   // stored session names the account (before the session is confirmed).
