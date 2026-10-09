@@ -18,6 +18,8 @@ const SUPABASE_STANDIN = `
   create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}');
   create function auth.uid() returns uuid language sql stable as
     $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+  create function auth.jwt() returns jsonb language sql stable as
+    $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
 `;
 
 const migrations = new URL("../supabase/migrations/", import.meta.url);
@@ -403,5 +405,65 @@ describe("recording results (M12 server functions)", () => {
     // Alice already has a bot rating: too late.
     expect(await as(A, async (tx) => (await tx.query<{ ok: boolean }>(`select public.set_starting_rating(1600) as ok`)).rows[0]!.ok)).toBe(false);
     expect(await failsAs(null, `select public.set_starting_rating(800)`)).toMatch(/permission denied/);
+  });
+});
+
+describe("deleting an account (M14)", () => {
+  const E = "00000000-0000-4000-8000-00000000000e";
+  const F = "00000000-0000-4000-8000-00000000000f";
+  /** As `as`, with the token's sign-in time `minutesAgo` minutes back. */
+  const signedInAs = <T>(user: string, minutesAgo: number, fn: (tx: Transaction) => Promise<T>) =>
+    as(user, async (tx) => {
+      const amr = [{ method: "password", timestamp: Math.floor(Date.now() / 1000) - minutesAgo * 60 }];
+      await tx.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: user, amr })]);
+      return fn(tx);
+    });
+  const errorOf = async (p: Promise<unknown>) => p.then(() => "no error", (e: Error) => e.message);
+
+  beforeAll(async () => {
+    await signUp(E, { username: "erin_xq" });
+    await signUp(F, {}); // a Google/Microsoft/GitHub sign-up: placeholder name, not chosen yet
+  });
+
+  it("needs a sign-in in the last 10 minutes and the username typed out", async () => {
+    expect(await signedInAs(E, 30, (tx) => errorOf(tx.query(`select public.request_account_deletion('erin_xq')`)))).toMatch(/sign in again/);
+    expect(await signedInAs(E, 2, (tx) => errorOf(tx.query(`select public.request_account_deletion('erin')`)))).toMatch(/username does not match/);
+    const when = await signedInAs(E, 2, async (tx) => (await tx.query<{ at: Date }>(`select public.request_account_deletion('ERIN_XQ') as at`)).rows[0]!.at);
+    expect(when.getTime() - Date.now()).toBeGreaterThan(9.9 * 864e5);
+    expect(when.getTime() - Date.now()).toBeLessThan(10.1 * 864e5);
+  });
+
+  it("is cancelled by signing in again", async () => {
+    const out = await signedInAs(E, 1, async (tx) => {
+      await tx.query(`select public.request_account_deletion('erin_xq')`);
+      const mine = (await tx.query(`select 1 from public.account_deletions`)).rows.length;
+      const first = (await tx.query<{ ok: boolean }>(`select public.cancel_account_deletion() as ok`)).rows[0]!.ok;
+      const second = (await tx.query<{ ok: boolean }>(`select public.cancel_account_deletion() as ok`)).rows[0]!.ok;
+      return { mine, first, second };
+    });
+    expect(out).toEqual({ mine: 1, first: true, second: false });
+  });
+
+  it("deletes an account once its 10 days are up, and not before", async () => {
+    await db.query(`insert into public.account_deletions (user_id, requested_at) values ($1, now() - interval '11 days'), ($2, now() - interval '9 days')`, [E, A]);
+    expect(await failsAs(E, `select public.purge_deleted_accounts()`)).toMatch(/permission denied/);
+    const { rows } = await db.query<{ n: number }>(`select public.purge_deleted_accounts() as n`);
+    expect(rows[0]!.n).toBe(1);
+    expect((await db.query(`select 1 from auth.users where id = $1`, [E])).rows).toHaveLength(0);
+    expect((await db.query(`select 1 from public.profiles where user_id = $1`, [E])).rows).toHaveLength(0);
+    expect((await db.query(`select 1 from auth.users where id = $1`, [A])).rows).toHaveLength(1);
+    await db.query(`delete from public.account_deletions where user_id = $1`, [A]);
+  });
+
+  it("removes a brand-new provider account at once when its owner is under age", async () => {
+    // Alice chose her name long ago: not removable this way.
+    expect(await as(A, async (tx) => (await tx.query<{ ok: boolean }>(`select public.delete_new_account() as ok`)).rows[0]!.ok)).toBe(false);
+    const { rows } = await db.query<{ ok: boolean }>(
+      `select set_config('request.jwt.claim.sub', $1, false), public.delete_new_account() as ok`,
+      [F],
+    );
+    await db.query(`select set_config('request.jwt.claim.sub', '', false)`);
+    expect(rows[0]!.ok).toBe(true);
+    expect((await db.query(`select 1 from auth.users where id = $1`, [F])).rows).toHaveLength(0);
   });
 });
