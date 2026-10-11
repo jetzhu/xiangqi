@@ -67,4 +67,4 @@ Node 24+ and pnpm (`corepack enable pnpm`).
 
 Every push to `main` runs the tests and publishes the site to https://jetzhu.github.io/xiangqi/ through GitHub Actions (`.github/workflows/pages.yml`).
 Database changes and the edge function are deployed separately with the `@xq/db` scripts above.
-Releases are tagged `v0.1.x`.
+Releases are tagged `v0.x.y`; the latest is v0.2.0, accounts on the free plan.

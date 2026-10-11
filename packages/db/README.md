@@ -78,5 +78,5 @@ templates. A Gmail account sends up to about 500 a day for free:
 2. Supabase dashboard → Authentication → Emails → SMTP Settings → enable custom SMTP:
    host `smtp.gmail.com`, port `465`, username and sender email = the Gmail address,
    password = the app password, sender name `Xiangqi School 象棋学堂`.
-3. Run `pnpm --filter @xq/db apply` to install the bilingual email templates (it skips them
-   while the built-in sender is in use).
+3. Run `pnpm --filter @xq/db apply` to install the bilingual email templates and raise the
+   limit to 20 emails an hour (it skips both while the built-in sender is in use).

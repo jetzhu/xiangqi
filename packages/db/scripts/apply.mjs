@@ -27,6 +27,8 @@ const AUTH = {
   // Players connect Google, Microsoft or GitHub to their account in Settings (linkIdentity).
   security_manual_linking_enabled: true,
   smtp_max_frequency: 60, // seconds between emails to one address
+  // Emails per hour, all addresses together. Gmail sends about 500 a day: 20 × 24 stays under.
+  rate_limit_email_sent: 20,
   // Emails in both languages: each template picks English or Chinese from the language saved
   // with the account at sign-up (.Data.lang; Chinese unless it is "en").
   mailer_subjects_confirmation: "Confirm your email · 确认你的邮箱 — Xiangqi School 象棋学堂",
@@ -84,11 +86,12 @@ const current = await api("GET", "/config/auth");
 const unknown = Object.keys(AUTH).filter((k) => !(k in current));
 if (unknown.length) throw new Error(`Unknown auth settings: ${unknown.join(", ")}`);
 // Supabase's built-in email sender (no smtp_host) doesn't allow custom templates on the free
-// plan: keep its default English emails until a custom sender is configured.
+// plan, and keeps its own limit of a few emails an hour: keep its default English emails and
+// limit until a custom sender is configured.
 const builtInSender = !current.smtp_host;
 if (builtInSender) console.log("! built-in email sender: email templates and subjects skipped until a custom SMTP sender is set");
 const changes = Object.fromEntries(
-  Object.entries(AUTH).filter(([k, v]) => current[k] !== v && !(builtInSender && k.startsWith("mailer_") && /subjects|templates/.test(k))),
+  Object.entries(AUTH).filter(([k, v]) => current[k] !== v && !(builtInSender && (k === "rate_limit_email_sent" || (k.startsWith("mailer_") && /subjects|templates/.test(k))))),
 );
 for (const k of Object.keys(changes)) console.log(`${dryRun ? "would set" : "~"} auth.${k}${k.includes("content") ? "" : ` = ${JSON.stringify(changes[k])}`}`);
 if (!dryRun && Object.keys(changes).length) await api("PATCH", "/config/auth", changes);
