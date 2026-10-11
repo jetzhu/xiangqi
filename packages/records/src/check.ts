@@ -4,7 +4,7 @@
 // bot rating is labelled practice for that reason.
 import { type Puzzle, judge } from "@xq/puzzles";
 import { Game } from "xiangqi-core";
-import { MIN_PLIES } from "./botRating.js";
+import { DRAW_MIN_MOVES, MIN_PLIES } from "./botRating.js";
 
 export type Outcome = "win" | "loss" | "draw";
 export type Checked<T> = { ok: true; value: T } | { ok: false; error: string };
@@ -18,7 +18,7 @@ export interface BotGameClaim {
   /** ICCS, from the starting position. */
   moves: string[];
   result: Outcome;
-  /** A rules ending ("checkmate", "repetition"…), or "resign", "abandoned" or "timeout". */
+  /** A rules ending ("checkmate", "repetition"…), or "resign", "abandoned", "timeout" or "agreement". */
   reason: string;
 }
 
@@ -48,6 +48,10 @@ export function checkBotGame(c: BotGameClaim, bots: readonly { id: string; ratin
     if (c.result !== expected || c.reason !== g.result.reason) return fail(`the final position is a ${expected} by ${g.result.reason}`);
   } else if (c.reason === "resign" || c.reason === "abandoned") {
     if (c.result !== "loss") return fail(`"${c.reason}" is a loss for the player`);
+  } else if (c.reason === "agreement") {
+    // The bot's acceptance can't be checked here (it needs the engine); the move count can.
+    if (c.result !== "draw") return fail('"agreement" is a draw');
+    if (c.moves.length < 2 * DRAW_MIN_MOVES) return fail(`a draw can be agreed after ${DRAW_MIN_MOVES} moves each`);
   } else if (c.reason === "timeout") {
     // The side to move is the one whose clock ran out.
     const expected: Outcome = g.turn === c.playerColor ? "loss" : "win";

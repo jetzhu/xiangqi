@@ -4,7 +4,7 @@ export interface Text {
 }
 
 export type BotGroup = "beginner" | "casual" | "club" | "master";
-export type ChatEvent = "greet" | "botCheck" | "botCapture" | "lostPiece" | "win" | "lose" | "draw";
+export type ChatEvent = "greet" | "botCheck" | "botCapture" | "lostPiece" | "win" | "lose" | "draw" | "drawAccept" | "drawDecline";
 
 export interface BotStrength {
   /** Engine search depth per move. */
@@ -41,6 +41,11 @@ export interface BotConfig {
   bio: Text;
   strength: BotStrength;
   style: BotStyle;
+  /**
+   * Accepts a draw offer when its own evaluation (centipawns, from its side) is at most this:
+   * positive for a bot happy to agree a little ahead, negative for one that only agrees when worse.
+   */
+  acceptsDrawAt: number;
   /** Preferred lines in ICCS from the standard start; the bot follows one while the game matches. */
   book: string[][];
   chat: Record<ChatEvent, Text[]>;

@@ -1,5 +1,5 @@
 import { type Arrow, type Badge, type BadgeIcon, EvalBar, type Highlight } from "@xq/board";
-import { type BotConfig, type ChatEvent, type Text, chatLine, chooseMove } from "@xq/bots";
+import { type BotConfig, type ChatEvent, type Text, acceptsDraw, chatLine, chooseMove } from "@xq/bots";
 import { type MoveGrade, type ReviewedMove, type Score, accuracy, formatScore, gradeCounts, gradeMove, reviewGame, scoreToBar } from "@xq/engine";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -18,7 +18,7 @@ import { Avatar } from "./Avatar.js";
 import { GameReview, type ReviewFocus } from "./GameReview.js";
 import type { GameSettings, Lang } from "./BotPicker.js";
 import { type GameRecord, useStore } from "../store/index.js";
-import { MIN_PLIES, ratingNote } from "./rating.js";
+import { DRAW_MIN_MOVES, DRAW_RETRY_MOVES, MIN_PLIES, ratingNote } from "./rating.js";
 import { claimGame, finishGame } from "./records.js";
 import { useEngineInstance } from "./useEngineInstance.js";
 import { Board } from "../Board.js";
@@ -46,7 +46,7 @@ const CLOCKS: Record<string, { base: number; inc: number }> = {
 interface Over {
   winner: Color | null;
   text: Text;
-  /** How it ended, for the game record: a rules reason, "resign", "timeout" or "abandoned". */
+  /** How it ended, for the game record: a rules reason, "resign", "timeout", "abandoned" or "agreement". */
   reason: string;
 }
 interface CoachEval {
@@ -111,6 +111,9 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
   const [earned, setEarned] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [confirmResign, setConfirmResign] = useState(false);
+  /** A draw offer the bot is considering, and the player's move count when it last declined one. */
+  const [drawPending, setDrawPending] = useState(false);
+  const [drawDeclinedAt, setDrawDeclinedAt] = useState<number | null>(null);
   const coach = useRef(new Map<string, CoachEval>());
   const [coachTick, setCoachTick] = useState(0);
   const [threat, setThreat] = useState<{ fen: string; move: string } | null>(null);
@@ -379,11 +382,46 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
     finish({ winner: botColor, text: { en: "You resigned", zh: "你认输了" }, reason: "resign" });
   };
 
+  // A draw offer, on the player's turn: the bot asks its engine about the position and agrees
+  // if it isn't better than its personality allows (see acceptsDraw).
+  const offerDraw = () => {
+    const engine = botEng.engine;
+    if (over || turn !== playerColor || drawPending || !engine) return;
+    const each = Math.floor(history.length / 2);
+    if (history.length < 2 * DRAW_MIN_MOVES) {
+      setMessage(tt(`A draw can be offered after ${DRAW_MIN_MOVES} moves each (now ${each}).`, `双方各走满${DRAW_MIN_MOVES}步后才能提和（现在${each}步）。`));
+      return;
+    }
+    if (drawDeclinedAt !== null && playerMoves < drawDeclinedAt + DRAW_RETRY_MOVES) {
+      const left = drawDeclinedAt + DRAW_RETRY_MOVES - playerMoves;
+      setMessage(tt(`You can offer a draw again in ${left} more ${left === 1 ? "move" : "moves"}.`, `再走${left}步后才能再次提和。`));
+      return;
+    }
+    setMessage(null);
+    setDrawPending(true);
+    const posFen = fen;
+    const t0 = performance.now();
+    void engine.analyze(posFen, { depth: Math.max(bot.strength.depth, 8) }).then(async (r) => {
+      const wait = bot.strength.thinkMs - (performance.now() - t0);
+      if (wait > 0) await sleep(wait);
+      setDrawPending(false);
+      if (game.fen !== posFen) return;
+      if (acceptsDraw(bot, botColor, r.lines[0])) {
+        finish({ winner: null, text: { en: "Draw agreed", zh: "双方议和" }, reason: "agreement" });
+        say("drawAccept");
+      } else {
+        say("drawDecline");
+        setDrawDeclinedAt(playerMoves);
+        setMessage(tt(`${bot.name.en} declined the draw.`, `${bot.name.zh}拒绝了和棋。`));
+      }
+    });
+  };
+
   // --- Display ----------------------------------------------------------------------
 
   void coachTick;
   const evalNow = coach.current.get(fen);
-  const myTurn = turn === playerColor && !over;
+  const myTurn = turn === playerColor && !over && !drawPending;
   const best = myTurn ? evalNow?.best ?? null : null;
   const arrows: Arrow[] = [];
   if (best && ((a.suggestions && evalNow?.done) || hintStep === 2)) arrows.push({ from: best.slice(0, 2), to: best.slice(2, 4), color: "green" });
@@ -425,6 +463,8 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
           ? t(over.text)
           : thinking
             ? tt(`${bot.name.en} is thinking…`, `${bot.name.zh}正在思考…`)
+            : drawPending
+              ? tt(`${bot.name.en} is considering your draw offer…`, `${bot.name.zh}正在考虑你的提和…`)
             : tt("Your move", "轮到你走") + (inCheck ? tt(" · Check!", " · 被将军！") : "");
 
   return (
@@ -520,9 +560,14 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
                 {tt("Abort", "取消对局")}
               </button>
             ) : (
-              <button type="button" className={confirmResign ? "primary" : ""} onClick={resign} onBlur={() => setConfirmResign(false)}>
-                {confirmResign ? tt("Confirm resign?", "确认认输？") : tt("Resign", "认输")}
-              </button>
+              <>
+                <button type="button" disabled={!myTurn} onClick={offerDraw}>
+                  {drawPending ? tt("Draw offered…", "已提和…") : tt("Offer draw", "提和")}
+                </button>
+                <button type="button" className={confirmResign ? "primary" : ""} onClick={resign} onBlur={() => setConfirmResign(false)}>
+                  {confirmResign ? tt("Confirm resign?", "确认认输？") : tt("Resign", "认输")}
+                </button>
+              </>
             )}
           </div>
         )}

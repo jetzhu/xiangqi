@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Game, START_FEN } from "xiangqi-core";
-import { type BotConfig, chatLine, chooseMove } from "../src/index.js";
+import { type BotConfig, acceptsDraw, chatLine, chooseMove } from "../src/index.js";
 
 const BOTS: BotConfig[] = JSON.parse(readFileSync(new URL("../../../content/bots/bots.json", import.meta.url), "utf8"));
 const seeded = (seed: number) => () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
@@ -16,11 +16,40 @@ describe("bot content", () => {
       const g = new Game(START_FEN);
       for (const m of line) expect(g.move(m), `${b.id} book ${line.join(" ")}`).not.toBeNull();
     }
-    for (const ev of ["greet", "botCheck", "botCapture", "lostPiece", "win", "lose", "draw"] as const) {
+    for (const ev of ["greet", "botCheck", "botCapture", "lostPiece", "win", "lose", "draw", "drawAccept", "drawDecline"] as const) {
       expect(b.chat[ev].length, `${b.id} ${ev}`).toBeGreaterThan(0);
       for (const t of b.chat[ev]) expect(t.en && t.zh).toBeTruthy();
     }
     expect(b.name.en && b.name.zh && b.bio.en && b.bio.zh).toBeTruthy();
+    expect(Number.isInteger(b.acceptsDrawAt)).toBe(true);
+  });
+});
+
+describe("acceptsDraw", () => {
+  const line = (score: { cp: number } | { mate: number }) => ({ multipv: 1, depth: 10, score, pv: ["h2e2"] });
+
+  it("agrees when the bot's own evaluation is no better than its threshold", () => {
+    // Teacher Lin agrees up to +20 for himself; scores are from Red's view.
+    expect(acceptsDraw(bot("teacherlin"), "red", line({ cp: 20 }))).toBe(true);
+    expect(acceptsDraw(bot("teacherlin"), "red", line({ cp: 21 }))).toBe(false);
+    expect(acceptsDraw(bot("teacherlin"), "black", line({ cp: 21 }))).toBe(true);
+    expect(acceptsDraw(bot("teacherlin"), "black", line({ cp: -21 }))).toBe(false);
+  });
+
+  it("personalities differ: Grandpa Fu agrees a little ahead, Aqiang only when behind", () => {
+    expect(acceptsDraw(bot("afu"), "red", line({ cp: 100 }))).toBe(true);
+    expect(acceptsDraw(bot("aqiang"), "red", line({ cp: 0 }))).toBe(false);
+    expect(acceptsDraw(bot("aqiang"), "red", line({ cp: -150 }))).toBe(true);
+  });
+
+  it("a forced mate decides, whatever the threshold", () => {
+    expect(acceptsDraw(bot("afu"), "red", line({ mate: 5 }))).toBe(false);
+    expect(acceptsDraw(bot("longwang"), "red", line({ mate: -3 }))).toBe(true);
+    expect(acceptsDraw(bot("longwang"), "black", line({ mate: 3 }))).toBe(true);
+  });
+
+  it("declines without an evaluation", () => {
+    expect(acceptsDraw(bot("afu"), "red", undefined)).toBe(false);
   });
 });
 

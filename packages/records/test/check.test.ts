@@ -1,10 +1,24 @@
 import { BOTS, loadPuzzles } from "@xq/content";
 import { describe, expect, it } from "vitest";
+import { Game, toIccs } from "xiangqi-core";
 import { type BotGameClaim, checkBotGame, checkPuzzleAttempt } from "../src/index.js";
 
 // Both sides shuffle a horse out and back: the third time the position comes round it's a draw.
 const SHUFFLE = ["b0c2", "b9c7", "c2b0", "c7b9", "b0c2", "b9c7", "c2b0", "c7b9"];
 const OPENING = ["h2e2", "h9g7", "h0g2", "i9h9"];
+
+/** A game still going after `plies` plies: seeded random legal moves. */
+function longGame(plies: number): string[] {
+  let seed = 7;
+  const g = new Game();
+  while (g.history.length < plies) {
+    const legal = g.legalMoves().map(toIccs);
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    g.move(legal[seed % legal.length]!);
+    if (g.result) throw new Error("the test game ended early: pick another seed");
+  }
+  return g.history.map((r) => r.iccs);
+}
 
 const claim = (c: Partial<BotGameClaim>): BotGameClaim => ({
   botId: "laochen",
@@ -39,6 +53,12 @@ describe("checkBotGame", () => {
   it("resigning or leaving is only ever a loss", () => {
     expect(checkBotGame(claim({ reason: "abandoned" }), BOTS).ok).toBe(true);
     expect(checkBotGame(claim({ result: "win", reason: "resign" }), BOTS)).toMatchObject({ ok: false });
+  });
+
+  it("a draw by agreement needs 20 moves each", () => {
+    expect(checkBotGame(claim({ moves: longGame(40), result: "draw", reason: "agreement" }), BOTS).ok).toBe(true);
+    expect(checkBotGame(claim({ moves: longGame(39), result: "draw", reason: "agreement" }), BOTS)).toMatchObject({ ok: false, error: expect.stringMatching(/20 moves each/) });
+    expect(checkBotGame(claim({ moves: longGame(40), result: "win", reason: "agreement" }), BOTS)).toMatchObject({ ok: false });
   });
 
   it("on time, the side to move loses", () => {

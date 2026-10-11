@@ -289,6 +289,7 @@ function GameList({ games, filter, onFilter }: { games: GameRecord[]; filter: Ga
       resign: tt("resigned", "认输"),
       timeout: tt("on time", "超时"),
       abandoned: tt("left the game", "离开对局"),
+      agreement: tt("draw agreed", "议和"),
     })[r ?? ""] ?? r ?? "";
   return (
     <section aria-label={tt("Game history", "对局记录")}>

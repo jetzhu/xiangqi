@@ -14,6 +14,10 @@ export const NEW_BOT_RATING: BotRating = { ...NEW_PLAYER, games: 0, peak: null, 
 
 /** Fewer plies than this and a game is neither saved nor rated (as on chess.com). */
 export const MIN_PLIES = 4;
+/** A draw can be offered once each side has made this many moves (40 plies). */
+export const DRAW_MIN_MOVES = 20;
+/** After a declined offer, the player makes this many more moves before offering again. */
+export const DRAW_RETRY_MOVES = 5;
 /** A bot this far below the player is "much weaker": a win over it gains a quarter as much. */
 export const FARMING_GAP = 400;
 
