@@ -19,9 +19,11 @@ The site uses standard Xiangqi rules only.
 
 ## Design documents
 
-- Requirements study: https://claude.ai/code/artifact/ad1a27e3-de1c-451d-86c2-42aedf98b5e1
-- MVP design: https://claude.ai/code/artifact/738d1d2e-55bf-49c6-9564-7f3b5d71e38b
-- v0.2 accounts design: https://claude.ai/code/artifact/3426be11-900b-4b3a-97a7-15ad5915d713
+In [`docs/`](docs/):
+
+- [Requirements study](docs/requirements.md): what makes chess.com work, and what that means for this site
+- [MVP design](docs/mvp-design.md): the guest-first site (milestones M0–M7b)
+- [v0.2 accounts design](docs/v0.2-accounts-design.md): optional accounts and sync (milestones M8–M14)
 
 ## Layout
 
@@ -40,6 +42,7 @@ The site uses standard Xiangqi rules only.
 | `apps/web` | The website: Next.js static export, `/zh` and `/en`. See `apps/web/DEPLOY.md` |
 | `apps/playground` | Dev playground: two-player board and analysis board |
 | `content/` | Lessons (11), bots (8), puzzles (578) |
+| `docs/` | Design documents |
 | `spikes/engine` | M0: engine size and speed comparison |
 
 ## Requirements
