@@ -1,8 +1,8 @@
 # Xiangqi Site — MVP Design
 
-> A copy of the project's design document, exported 2026-10-10. Diagrams are not included.
+> This file is the master copy of this design document. It was first drafted in Claude Docs and moved here on 2026-10-10; update it here, in the same commit as the change it describes.
 
-Oct 4, 2026 · @Jet
+Oct 4, 2026 · Jet Zhu
 
 ## Goals and scope
 
@@ -32,7 +32,31 @@ The MVP is a guest-first Xiangqi learning site: a visitor can learn the rules, s
 
 ## Architecture at a glance
 
-*(Diagram not included in this copy: MVP architecture · browser modules, static host, later backend.)*
+```mermaid
+---
+title: The MVP runs entirely in the browser from a static host
+---
+flowchart LR
+  subgraph browser["Browser (no server of our own)"]
+    direction TB
+    pages["<b>Pages</b> (Next.js, per-locale routes)<br/>Home · Learn · Puzzles · Play bots · Analysis · Settings"]
+    board["<b>Board component</b><br/>SVG, drag and click<br/>arrows, highlights"]
+    stores["<b>Feature stores</b><br/>Zustand page state<br/>lesson, puzzle, bot"]
+    core["<b>xiangqi-core</b><br/>rules, notation, FEN<br/>repetition rulings"]
+    engine["<b>Engine worker</b><br/>Pikafish / Fairy-Stockfish WASM<br/>UCI over postMessage"]
+    idb["<b>IndexedDB</b><br/>guest progress, settings<br/>saved analyses"]
+    pages --> board
+    pages --> stores
+    stores --> board
+    stores --> core
+    stores --> engine
+    stores --> idb
+  end
+  host["<b>Static host + CDN</b><br/>pre-rendered pages<br/>lessons, puzzles, bots<br/>engine .wasm + network"] --> pages
+  later["<b>Phase 2 backend</b><br/>API + game server<br/>PostgreSQL + Redis<br/>reuses xiangqi-core"] -.-> browser
+  classDef main stroke-width:2px
+  class core main
+```
 
 Pages load from a static host. Each page drives the board and its feature store, and every rule question goes to `xiangqi-core`. The engine runs in a worker, and progress stays in IndexedDB. The phase 2 backend plugs in later for sync and live play, reusing the same core so client and server agree on every move.
 
@@ -188,7 +212,29 @@ Every feature page has the same layout: board on the left (top on phones), a tas
 
 ## Page map and navigation
 
-*(Diagram not included in this copy: MVP page map · 5 sections, Analysis reachable from every board.)*
+```mermaid
+---
+title: Five sections hang off Home, and every board links to Analysis
+---
+flowchart TD
+  home["<b>Home</b><br/>/ (next-step cards)"]
+  home --> learn["<b>Learn</b><br/>/learn (path map)"]
+  home --> puzzles["<b>Puzzles</b><br/>/puzzles"]
+  home --> bots["<b>Play bots</b><br/>/play/bots"]
+  home --> analysis["<b>Analysis</b><br/>/analysis"]
+  home --> settings["<b>Settings</b><br/>/settings"]
+  learn --> lesson["<b>Lesson</b><br/>/learn/[unit]/[lesson]"]
+  puzzles --> puzzle["<b>Puzzle player</b><br/>/puzzles/[id]<br/>rated stream"]
+  bots --> botgame["<b>Bot game</b><br/>/play/bots/[bot]<br/>post-game card"]
+  analysis --> share["<b>Share link</b><br/>/analysis?fen= or ?pgn="]
+  lesson -. Analyse .-> analysis
+  puzzle -. Analyse .-> analysis
+  botgame -. Analyse .-> analysis
+  classDef main stroke-width:2px
+  class analysis main
+```
+
+Every board has an Analyse button that opens /analysis at that position. All routes sit under /en/ and /zh/; the language switcher keeps the same page.
 
 A left sidebar (bottom bar on phones) lists the five sections plus the language switch. Home is a dashboard of next-step cards: next lesson, next puzzle, last bot, plus a "Sign up to keep your progress" note.
 

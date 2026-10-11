@@ -1,8 +1,8 @@
 # Chess.com Feature Study — Requirements for a Xiangqi Teaching & Playing Site
 
-> A copy of the project's design document, exported 2026-10-10. Diagrams are not included.
+> This file is the master copy of this design document. It was first drafted in Claude Docs and moved here on 2026-10-10; update it here, in the same commit as the change it describes.
 
-Oct 4, 2026 · @Jet
+Oct 4, 2026 · Jet Zhu
 
 ## Purpose and method
 
