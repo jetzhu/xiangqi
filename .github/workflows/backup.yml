@@ -32,6 +32,11 @@ jobs:
             echo "::error::Set the SUPABASE_DB_URL and BACKUP_PASSPHRASE repository secrets (see the top of this file)."
             exit 1
           fi
+          # Anything else is taken by pg_dump as a database name on this machine.
+          case "$DB_URL" in
+            postgresql://*|postgres://*) ;;
+            *) echo "::error::SUPABASE_DB_URL must be the whole connection string, starting with postgresql://"; exit 1 ;;
+          esac
       - name: Install the newest pg_dump (it can dump any older server)
         run: |
           sudo apt-get install -y postgresql-common
