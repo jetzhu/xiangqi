@@ -1,0 +1,59 @@
+# Weekly backup of the Supabase database (the free plan has none). Dumps the accounts
+# (auth schema) and the site's tables (public schema), encrypts the dump, and keeps it as a
+# workflow artifact for 90 days. Artifacts of a public repository can be downloaded by anyone
+# signed in to GitHub, so the dump is only ever stored encrypted.
+#
+# Needs two repository secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL     the "Session pooler" connection string from the Supabase dashboard
+#                       (Connect button), with the database password filled in
+#   BACKUP_PASSPHRASE   any long passphrase; keep a copy somewhere safe, it's needed to restore
+#
+# Restore steps are in packages/db/README.md.
+name: Back up Supabase
+
+on:
+  schedule:
+    - cron: "41 4 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the secrets are set
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$DB_URL" ] || [ -z "$PASSPHRASE" ]; then
+            echo "::error::Set the SUPABASE_DB_URL and BACKUP_PASSPHRASE repository secrets (see the top of this file)."
+            exit 1
+          fi
+      - name: Install the newest pg_dump (it can dump any older server)
+        run: |
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-18
+      - name: Dump and encrypt
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -eu
+          name="xiangqi-db-$(date -u +%Y-%m-%d)"
+          /usr/lib/postgresql/18/bin/pg_dump "$DB_URL" --schema=public --schema=auth \
+            --no-owner --no-privileges --format=custom --file="$RUNNER_TEMP/$name.dump"
+          echo "$PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 --output "$name.dump.gpg" "$RUNNER_TEMP/$name.dump"
+          rm "$RUNNER_TEMP/$name.dump"
+          ls -l "$name.dump.gpg"
+          echo "NAME=$name" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}
+          path: ${{ env.NAME }}.dump.gpg
+          retention-days: 90
+          if-no-files-found: error
