@@ -6,7 +6,8 @@
 //   node scripts/calibrate.mjs game <red id> <black id>        play one game and print it (not saved)
 //
 // Each neighbouring pair of bots on the ladder plays --games games and each pair two steps
-// apart half as many, colours alternating. Results are appended to calibration/games.jsonl.
+// apart half as many, colours alternating. Results are appended to calibration/games.jsonl,
+// each with both bots' settings: after a bot's settings change, only its games are replayed.
 import { fork } from "node:child_process";
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -50,7 +51,11 @@ async function loadEngine(XiangqiEngine) {
   return XiangqiEngine.create(transport, { coords: "fairy", setup });
 }
 
-const results = () => (existsSync(GAMES_FILE) ? readFileSync(GAMES_FILE, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []);
+/** A bot's playing settings; games played with older settings are left out. */
+const settingsOf = (id) => JSON.stringify(BOTS.find((b) => b.id === id)?.strength ?? null);
+const current = (g) => g.settings?.red === settingsOf(g.red) && g.settings?.black === settingsOf(g.black);
+const results = () =>
+  (existsSync(GAMES_FILE) ? readFileSync(GAMES_FILE, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []).filter(current);
 
 /** Games still to play: [redId, blackId] per game. */
 function schedule(games) {
@@ -112,7 +117,8 @@ async function worker() {
       engines.black.quit();
       process.exit(0);
     }
-    process.send(await playGame(bot(m[0]), bot(m[1]), engines));
+    const settings = { red: settingsOf(m[0]), black: settingsOf(m[1]) };
+    process.send({ ...(await playGame(bot(m[0]), bot(m[1]), engines)), settings });
   });
   process.send("ready");
 }
