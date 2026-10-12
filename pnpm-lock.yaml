@@ -316,6 +316,9 @@ importers:
       '@xq/engine':
         specifier: workspace:*
         version: link:../engine
+      rolldown:
+        specifier: 1.2.12
+        version: 1.2.12
       typescript:
         specifier: 7.0.2
         version: 7.0.2
