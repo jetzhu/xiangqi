@@ -15,7 +15,7 @@ const SUPABASE_STANDIN = `
   alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
   create schema auth;
   grant usage on schema auth to anon, authenticated, service_role;
-  create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}');
+  create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}', email_confirmed_at timestamptz default now());
   create function auth.uid() returns uuid language sql stable as
     $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create function auth.jwt() returns jsonb language sql stable as
@@ -467,3 +467,90 @@ describe("deleting an account (M14)", () => {
     expect((await db.query(`select 1 from auth.users where id = $1`, [F])).rows).toHaveLength(0);
   });
 });
+
+describe("online play groundwork (M15)", () => {
+  const E = "00000000-0000-4000-8000-0000000000e1";
+  const F = "00000000-0000-4000-8000-0000000000f1";
+  const json = async <T>(user: string | null, sql: string): Promise<T> => as(user, async (tx) => (await tx.query<{ j: T }>(`select ${sql} as j`)).rows[0]!.j);
+
+  beforeAll(async () => {
+    await signUp(E, { username: "erin_xq" });
+    await signUp(F, { username: "fang_xq" });
+    await db.query(`update public.profiles set avatar = 'red-horse', country = 'CN' where user_id = $1`, [E]);
+    await db.query(`insert into public.ratings (user_id, kind, rating, rd, games) values ($1, 'blitz', 1234.4, 80, 31), ($1, 'bot', 1000, 60, 20)`, [E]);
+    await db.query(`insert into public.bot_ladder (id, rating) values ('laochen', 800), ('meiling', 1000), ('longwang', 2000)`);
+  });
+
+  it("keeps one rating per online speed", async () => {
+    expect(await errorOfQuery(`insert into public.ratings (user_id, kind, rating, rd) values ('${E}', 'online', 800, 200)`)).toMatch(/ratings_kind_check/);
+    expect(await errorOfQuery(`insert into public.ratings (user_id, kind, rating, rd) values ('${E}', 'rapid', 800, 200)`)).toBe("no error");
+    await db.query(`delete from public.ratings where user_id = $1 and kind = 'rapid'`, [E]);
+  });
+
+  it("shows anyone a public profile, minimal until the player says they're 16 or older", async () => {
+    const before = await json<Record<string, unknown>>(null, `public.public_profile('ERIN_XQ')`);
+    expect(before).toMatchObject({ username: "erin_xq", minimal: true, avatar: null, country: null, member_since: null, ratings: { blitz: { rating: 1234, rd: 80, games: 31 } } });
+    expect(before.ratings).not.toHaveProperty("bot");
+    // The answer is given once; a second answer changes nothing.
+    await as(E, async (tx) => {
+      await tx.exec(`select public.set_age_group(true)`);
+      await tx.exec(`select public.set_age_group(false)`);
+      const row = (await tx.query(`select under16 from public.profiles`)).rows;
+      expect(row).toEqual([{ under16: false }]);
+      expect((await tx.query<{ j: Record<string, unknown> }>(`select public.public_profile('erin_xq') as j`)).rows[0]!.j).toMatchObject({ minimal: false, avatar: "red-horse", country: "CN", me: true });
+    });
+    expect(await json(null, `public.public_profile('nobody_here')`)).toBeNull();
+    expect(await failsAs(E, `update public.profiles set under16 = true`)).toMatch(/permission denied/);
+  });
+
+  it("blocks and unblocks by username, privately", async () => {
+    const out = await as(E, async (tx) => {
+      const q = async (sql: string) => (await tx.query<{ j: unknown }>(`select ${sql} as j`)).rows[0]!.j;
+      const blocked = await q(`public.set_blocked('Fang_XQ', true)`);
+      const self = await q(`public.set_blocked('erin_xq', true)`);
+      const missing = await q(`public.set_blocked('nobody_here', true)`);
+      const list = (await tx.query(`select username from public.my_blocks()`)).rows;
+      const shown = ((await q(`public.public_profile('fang_xq')`)) as { blocked: boolean }).blocked;
+      await q(`public.set_blocked('fang_xq', false)`);
+      const after = (await tx.query(`select username from public.my_blocks()`)).rows;
+      return { blocked, self, missing, list, shown, after };
+    });
+    expect(out).toEqual({ blocked: true, self: false, missing: false, list: [{ username: "fang_xq" }], shown: true, after: [] });
+    expect(await failsAs(E, `select * from public.blocks`)).toMatch(/permission denied/);
+    expect(await failsAs(null, `select public.set_blocked('fang_xq', true)`)).toMatch(/permission denied/);
+  });
+
+  it("opens online play after the age answer and a clean win at the player's level, or 3 long games", async () => {
+    const check = () => json<Record<string, unknown>>(F, `public.online_eligibility()`);
+    expect(await check()).toMatchObject({ verified: true, age_answered: false, level: 800, target: 800, clean_win: false, long_games: 0, eligible: false });
+    await as(F, (tx) => tx.exec(`select public.set_age_group(false)`).then(() => undefined));
+    await db.query(`update public.profiles set under16 = true where user_id = $1`, [F]);
+    const game = (bot: string, rating: number, result: string, helps: number, plies: number) =>
+      db.query(
+        `insert into public.bot_games (user_id, bot_id, bot_rating, player_color, moves, result, helps, rated, started_at)
+         values ($1, $2, $3, 'red', array_fill('h2e2'::text, array[$4::int]), $5, $6, true, now())`,
+        [F, bot, rating, plies, result, helps],
+      );
+    // A win below their level, and a win at their level with a hint, don't count.
+    await game("xiaobing", 250, "win", 0, 30);
+    await game("laochen", 800, "win", 1, 30);
+    expect(await check()).toMatchObject({ age_answered: true, under16: true, clean_win: false, long_games: 2, eligible: false });
+    await game("afu", 400, "loss", 0, 20);
+    expect(await check()).toMatchObject({ long_games: 3, eligible: true });
+    await db.query(`delete from public.bot_games where user_id = $1`, [F]);
+    await game("laochen", 800, "win", 0, 12);
+    expect(await check()).toMatchObject({ clean_win: true, long_games: 0, eligible: true });
+    // Above the ladder, a clean win over the strongest bot is enough.
+    await db.query(`insert into public.ratings (user_id, kind, rating, rd) values ($1, 'bot', 2300, 60)`, [F]);
+    expect(await check()).toMatchObject({ level: 2300, target: 2000, clean_win: false });
+    await game("longwang", 2000, "win", 0, 80);
+    expect(await check()).toMatchObject({ clean_win: true, eligible: true });
+    // Unverified email: not yet.
+    await db.query(`update auth.users set email_confirmed_at = null where id = $1`, [F]);
+    expect(await check()).toMatchObject({ verified: false, eligible: false });
+  });
+});
+
+async function errorOfQuery(sql: string): Promise<string> {
+  return db.query(sql).then(() => "no error", (e: Error) => e.message);
+}

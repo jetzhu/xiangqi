@@ -1,6 +1,7 @@
-// Brings a Supabase project up to date: runs migrations it hasn't had yet, then sets the
-// auth settings and email templates below. Uses the Management API, so it needs only a
-// personal access token (supabase.com/dashboard/account/tokens), never the database password.
+// Brings a Supabase project up to date: runs migrations it hasn't had yet, copies the bot
+// ladder, then sets the auth settings and email templates below. Uses the Management API, so
+// it needs only a personal access token (supabase.com/dashboard/account/tokens), never the
+// database password.
 //
 //   SUPABASE_ACCESS_TOKEN=$(cat ~/.config/xiangqi-supabase-token) node scripts/apply.mjs [--dry-run]
 //
@@ -79,6 +80,24 @@ for (const file of files) {
   const quoted = `$migration$${body}$migration$`;
   // One transaction: the migration and its record land together or not at all.
   await sql(`begin;\n${body}\n;insert into supabase_migrations.schema_migrations (version, name, statements) values ('${version}', '${name}', array[${quoted}]);\ncommit;`);
+}
+
+// The bot ladder (M15): each bot's id and rating label, from content/bots/bots.json, so the
+// database can check "a win against a bot at your level" without trusting the browser.
+const bots = JSON.parse(readFileSync(new URL("../../../content/bots/bots.json", import.meta.url), "utf8"));
+const [{ has_ladder }] = await sql(`select to_regclass('public.bot_ladder') is not null as has_ladder`);
+const ladderNow = new Map(has_ladder ? (await sql("select id, rating from public.bot_ladder")).map((r) => [r.id, r.rating]) : []);
+const ladderChanges = bots.filter((b) => ladderNow.get(b.id) !== b.ratingLabel);
+const ladderGone = [...ladderNow.keys()].filter((id) => !bots.some((b) => b.id === id));
+for (const b of ladderChanges) console.log(`${dryRun ? "would set" : "~"} bot_ladder.${b.id} = ${b.ratingLabel}`);
+for (const id of ladderGone) console.log(`${dryRun ? "would remove" : "-"} bot_ladder.${id}`);
+if (!dryRun && (ladderChanges.length || ladderGone.length)) {
+  const q = (v) => `'${String(v).replaceAll("'", "''")}'`;
+  await sql(`begin;
+    delete from public.bot_ladder where id not in (${bots.map((b) => q(b.id)).join(", ")});
+    insert into public.bot_ladder (id, rating) values ${bots.map((b) => `(${q(b.id)}, ${Number(b.ratingLabel)})`).join(", ")}
+      on conflict (id) do update set rating = excluded.rating;
+    commit;`);
 }
 
 // Auth settings: refuse names the API doesn't know, rather than silently ignoring them.
