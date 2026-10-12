@@ -2,6 +2,7 @@ import { type PieceSet, type ThemeName } from "@xq/board";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Game, type MoveRecord, explainIllegal, parseSquare, squareName, toIccs } from "xiangqi-core";
 import { Board } from "../Board.js";
+import { useNav } from "../nav.js";
 import { type NotationStyle as Notation, announceMove, useSettings, useSound } from "../settings.js";
 
 const T = {
@@ -31,6 +32,7 @@ const T = {
     noClock: "No clock",
     timeout: "ran out of time",
     wins: "wins",
+    online: "Looking for an opponent online? Get ready for online play",
   },
   zh: {
     title: "象棋棋盘演示",
@@ -58,6 +60,7 @@ const T = {
     noClock: "不计时",
     timeout: "超时",
     wins: "胜",
+    online: "想和真人对弈？在线对弈准备",
   },
 } as const;
 
@@ -91,6 +94,7 @@ export function PlayPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [fenInput, setFenInput] = useState("");
   const t = T[lang];
+  const nav = useNav();
 
   const legalMoves = useMemo(() => game.legalMoves().map(toIccs), [game, version]);
   const history = game.history;
@@ -186,6 +190,9 @@ export function PlayPage() {
         <header>
           <h1>{t.title}</h1>
           <p className="sub">{t.sub}</p>
+          <p className="sub">
+            <a href={nav.href("/online")}>{t.online}</a>
+          </p>
         </header>
 
         <div className={`status ${game.result ? "over" : game.turn}`} role="status">

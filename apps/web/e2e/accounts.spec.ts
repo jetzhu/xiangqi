@@ -117,6 +117,7 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
     return row;
   };
   const profile = { ...(opts.profile ?? { username: "Alice_1", username_chosen: true }) };
+  const online = { blocks: [] as string[], under16: null as boolean | null };
   let user = { ...USER, identities: [...USER.identities] };
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, json: body, headers: { "access-control-allow-origin": "*" } });
   await page.route(`${SUPABASE}/**`, async (route) => {
@@ -166,6 +167,38 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
         const r = rating("puzzle");
         tables.puzzle_attempts.unshift({ client_id: a.clientId, puzzle_id: a.puzzleId, score: a.score, rated: false, rating_after: r.rating, at: a.at });
         return json(route, { rated: false, ratingAfter: r.rating, rating: { rating: r.rating, rd: r.rd } });
+      }
+      // Online play groundwork (M15).
+      case "/rest/v1/rpc/my_blocks":
+        return json(route, online.blocks.map((username) => ({ username, blocked_at: "2026-10-12T10:00:00Z" })));
+      case "/rest/v1/rpc/set_blocked": {
+        const name = String(body?.p_username);
+        calls.rpc.push(`set_blocked:${name}:${body?.p_blocked}`);
+        online.blocks = online.blocks.filter((b) => b.toLowerCase() !== name.toLowerCase());
+        if (body?.p_blocked) online.blocks.unshift(name);
+        return json(route, true);
+      }
+      case "/rest/v1/rpc/set_age_group":
+        calls.rpc.push(`set_age_group:${body?.p_sixteen_or_older}`);
+        if (online.under16 === null) online.under16 = !body?.p_sixteen_or_older;
+        return json(route, null);
+      case "/rest/v1/rpc/online_eligibility": {
+        const games = tables.bot_games as { result: string | null; moves: string[]; helps: number; bot_rating: number }[];
+        const long = games.filter((g) => g.result && g.moves.length >= 20).length;
+        const clean = games.some((g) => g.result === "win" && !g.helps && g.bot_rating >= 800);
+        const answered = online.under16 !== null;
+        return json(route, { verified: true, age_answered: answered, under16: online.under16, level: 800, target: 800, clean_win: clean, long_games: long, eligible: answered && (clean || long >= 3) });
+      }
+      case "/rest/v1/rpc/public_profile": {
+        const name = String(body?.p_username).toLowerCase();
+        if (name === profile.username.toLowerCase())
+          return json(route, { username: profile.username, minimal: false, avatar: null, country: "GB", member_since: "2026-10-07T00:00:00Z", ratings: {}, completion: null, checked_games: 0, violation: null, blocked: false, me: true });
+        if (name !== "bob_xq") return json(route, null);
+        return json(route, {
+          username: "bob_xq", minimal: true, avatar: null, country: null, member_since: null,
+          ratings: { blitz: { rating: 1450, rd: 60, games: 42 }, rapid: { rating: 1380, rd: 150, games: 3 } },
+          completion: 98, checked_games: 12, violation: null, blocked: online.blocks.includes("bob_xq"), me: false,
+        });
       }
       case "/rest/v1/rpc/username_problem": {
         const name = String(body?.name).toLowerCase();
@@ -684,7 +717,7 @@ test("profile: avatar, country and a new username, from the account menu", async
   await page.getByRole("button", { name: /Alice_1/ }).click();
   await page.getByRole("link", { name: "Profile" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Alice_1");
-  await expect(page.getByText("Only you can see your profile.")).toBeVisible();
+  await expect(page.getByText("Only you can see this page.")).toBeVisible();
   await expect(page.locator(".stat-card").first()).toContainText("900");
 
   await page.getByRole("button", { name: "Red horse" }).click();
@@ -748,7 +781,7 @@ test("settings → account: password, log out everywhere, download my data", asy
   const [file] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download my data" }).click()]);
   expect(file.suggestedFilename()).toMatch(/^xiangqi-Alice_1-\d{4}-\d\d-\d\d\.json$/);
   const data = JSON.parse(readFileSync((await file.path())!, "utf8"));
-  expect(data).toMatchObject({ account: { email: "alice@example.com" }, lesson_progress: [{ lesson_id: "the-board", status: "mastered" }], ratings: [{ kind: "bot" }, { kind: "puzzle" }] });
+  expect(data).toMatchObject({ account: { email: "alice@example.com" }, lesson_progress: [{ lesson_id: "the-board", status: "mastered" }], ratings: [{ kind: "bot" }, { kind: "puzzle" }], blocks: [] });
 
   await page.getByRole("button", { name: "Log out on all devices" }).click();
   await page.getByRole("button", { name: "Log out everywhere? Click again to confirm" }).click();
@@ -785,4 +818,74 @@ test("deleting the account: username and password, then 10 days; signing in canc
   await expect(page.getByRole("status").filter({ hasText: "Your account will not be deleted" })).toBeVisible();
   expect(calls.rpc).toContain("cancel_account_deletion");
   expect(calls.tables.account_deletions).toEqual([]);
+});
+
+// M15: groundwork for online play.
+
+async function signIn(page: Page) {
+  await page.goto(at("/en/auth/callback/?token_hash=abc123&type=signup"));
+  await expect(page.getByText(/signed in as Alice_1/)).toBeVisible();
+}
+
+test("a public profile shows online ratings and the fair-play record; block and unblock", async ({ page }) => {
+  const calls = await fakeSupabase(page);
+  await signIn(page);
+  await page.goto(at("/en/player/?u=bob_xq"));
+  await expect(page.getByRole("heading", { name: "bob_xq" })).toBeVisible();
+  const ratings = page.getByRole("region", { name: "Online ratings" });
+  await expect(ratings).toContainText("Blitz1450");
+  await expect(ratings).toContainText("Rapid1380?");
+  await expect(ratings).toContainText("Lightning—");
+  await expect(page.getByText("98 %")).toBeVisible();
+  await expect(page.getByText("12 checked, none flagged")).toBeVisible();
+  await page.getByRole("button", { name: "Block" }).click();
+  await expect(page.getByRole("button", { name: "Unblock" })).toBeVisible();
+  expect(calls.rpc).toEqual(["set_blocked:bob_xq:true"]);
+
+  // The blocked list in Settings → Online play, where they can be unblocked.
+  await page.goto(at("/en/settings/?tab=online"));
+  await expect(page.getByRole("link", { name: "bob_xq" })).toBeVisible();
+  await page.getByRole("button", { name: "Unblock" }).click();
+  await expect(page.getByText("Nobody. Block a player from their profile.")).toBeVisible();
+  // Online settings are saved like the others.
+  await page.getByLabel("Don't share my network address").check();
+  await page.getByLabel("Rating range").selectOption("400");
+  await page.reload();
+  await expect(page.getByLabel("Don't share my network address")).toBeChecked();
+  await expect(page.getByLabel("Rating range")).toHaveValue("400");
+
+  // The player's own profile links to the public one.
+  await page.goto(at("/en/profile/"));
+  await page.getByRole("link", { name: "See your public profile" }).click();
+  await expect(page.getByText("This is how other players see you.")).toBeVisible();
+});
+
+test("a guest sees public profiles without the block button; unknown names say so", async ({ page }) => {
+  await fakeSupabase(page);
+  await page.goto(at("/en/player/?u=bob_xq"));
+  await expect(page.getByRole("heading", { name: "bob_xq" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Block" })).toHaveCount(0);
+  await page.goto(at("/en/player/?u=nobody_here"));
+  await expect(page.getByRole("heading", { name: "Player not found" })).toBeVisible();
+});
+
+test("before the first online game: the age question, then a clean win or 3 long bot games", async ({ page }) => {
+  const long = (id: string, result: string) => ({ id, bot_id: "afu", bot_rating: 400, player_color: "red", moves: Array(24).fill("h2e2"), result, reason: "resign", rated: false, helps: 1, started_at: "2026-10-10T10:00:00Z" });
+  const calls = await fakeSupabase(page, { tables: { bot_games: [long("g1", "loss"), long("g2", "win")] as never } });
+  await signIn(page);
+  await page.goto(at("/en/online/"));
+  await expect(page.getByRole("heading", { name: "Before your first online game" })).toBeVisible();
+  await expect(page.getByText("2 of 3 played")).toBeVisible();
+  await page.getByRole("button", { name: "No" }).click();
+  await expect(page.getByText(/Under 16: your public profile shows only your username/)).toBeVisible();
+  expect(calls.rpc).toEqual(["set_age_group:false"]);
+  calls.tables.bot_games.push(long("g3", "draw") as never);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "You're ready for online play" })).toBeVisible();
+});
+
+test("a guest is asked to sign up for online play", async ({ page }) => {
+  await page.goto(at("/en/online/"));
+  await expect(page.getByText("Online play needs a free account.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sign up" }).last()).toBeVisible();
 });

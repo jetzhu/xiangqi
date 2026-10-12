@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AccountSettings, DeletionNotice } from "./account/AccountSettings.js";
 import { useAccount } from "./account/session.js";
 import { useNav } from "./nav.js";
+import { OnlineSettings } from "./online/OnlineSettings.js";
 import { Board } from "./Board.js";
 import { useStore } from "./store/index.js";
 import { type Lang, type NotationStyle, type Settings, useSettings, useT } from "./settings.js";
@@ -23,13 +24,14 @@ export function SettingsPage({ onLanguage }: SettingsPageProps) {
   const [resetStep, setResetStep] = useState<"idle" | "confirm" | "done">("idle");
   const nav = useNav();
   const signedIn = useAccount().state.status === "signedIn";
-  const [tab, setTab] = useState<"board" | "account">("board");
+  const [tab, setTab] = useState<"board" | "online" | "account">("board");
   useEffect(() => {
-    if (nav.params().get("tab") === "account") setTab("account");
+    const t = nav.params().get("tab");
+    if (t === "account" || t === "online") setTab(t);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const go = (next: "board" | "account") => {
+  const go = (next: "board" | "online" | "account") => {
     setTab(next);
-    nav.replace(next === "account" ? "/settings?tab=account" : "/settings");
+    nav.replace(next === "board" ? "/settings" : `/settings?tab=${next}`);
   };
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => update({ [k]: v } as Partial<Settings>);
 
@@ -46,6 +48,7 @@ export function SettingsPage({ onLanguage }: SettingsPageProps) {
             {(
               [
                 ["board", tt("Board and sound", "棋盘与声音")],
+                ["online", tt("Online play", "在线对弈")],
                 ["account", tt("Account", "账号")],
               ] as const
             ).map(([k, label]) => (
@@ -57,6 +60,8 @@ export function SettingsPage({ onLanguage }: SettingsPageProps) {
         )}
         {signedIn && tab === "account" ? (
           <AccountSettings />
+        ) : signedIn && tab === "online" ? (
+          <OnlineSettings />
         ) : (
           <>
             <p className="sub">

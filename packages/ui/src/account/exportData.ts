@@ -22,6 +22,10 @@ export async function exportAccount(sb: SupabaseClient, user: { id: string; emai
     }
     out[table] = rows;
   }
+  // Blocked players (M15) are read through a function, which gives usernames rather than ids.
+  const { data: blocks, error } = await sb.rpc("my_blocks");
+  if (error) throw new Error(`blocks: ${error.message}`);
+  out.blocks = blocks ?? [];
   return new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
 }
 

@@ -3,7 +3,7 @@ import { type Locale, pageMetadata } from "../../../lib/site";
 
 // Rendered on the server, so anyone (and Google's consent-screen check) can read it without
 // running the app. Keep it true to what the code does: packages/db holds what an account stores.
-const UPDATED = "2026-10-09";
+const UPDATED = "2026-10-12";
 const CONTACT = "jianjetzhu@gmail.com";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -48,10 +48,20 @@ function En() {
         <li>
           <strong>Your play:</strong> lesson progress, settings, stars, streak days, games against bots, puzzle attempts, ratings and saved analyses.
         </li>
+        <li>
+          <strong>For online play (opening with v0.3):</strong> whether you are 16 or older (asked once; nothing else about your age), the players you
+          block, and, once you play, your online games with the time of each move and whether the page lost focus, used for clocks and fair play (see the{" "}
+          <a href="../fair-play/">fair play policy</a>).
+        </li>
       </ul>
       <p>
         Accounts are run by <a href="https://supabase.com/privacy">Supabase</a>, which stores this data for us in the United States (AWS, Oregon). Only
-        you can read your account data from the site; the database's access rules block everyone else.
+        you can read your account data from the site; the database's access rules block everyone else. The exception is your <strong>public profile</strong>,
+        which anyone can see: your username and online ratings, and, if you're 16 or older, your avatar, country and when you joined.
+      </p>
+      <p>
+        In online games the two players' browsers normally connect directly, which shows each player's internet (IP) address to the other. Settings →
+        Online play → "Don't share my network address" sends your games through our server instead; players under 16 always play that way.
       </p>
 
       <h2>Google user data</h2>
@@ -112,9 +122,15 @@ function Zh() {
         <li>
           <strong>下棋记录：</strong>课程进度、设置、星级、连续学习天数、人机对局、题目记录、等级分和保存的分析。
         </li>
+        <li>
+          <strong>在线对弈（v0.3 推出）：</strong>你是否已满 16 岁（只问一次，不保存其他年龄信息）、你屏蔽的棋手；开始在线对弈后，还有你的在线对局，以及每步的时间和页面是否离开焦点，用于计时和公平竞技（见<a href="../fair-play/">公平竞技规则</a>）。
+        </li>
       </ul>
       <p>
-        账号服务由 <a href="https://supabase.com/privacy">Supabase</a> 提供，数据存放在美国（AWS 俄勒冈）。只有你本人能在网站上读取自己的账号数据，数据库的访问规则会阻止其他所有人。
+        账号服务由 <a href="https://supabase.com/privacy">Supabase</a> 提供，数据存放在美国（AWS 俄勒冈）。只有你本人能在网站上读取自己的账号数据，数据库的访问规则会阻止其他所有人。例外是你的<strong>公开资料</strong>，任何人都能看到：用户名和在线等级分；如果你已满 16 岁，还有头像、国家或地区以及注册时间。
+      </p>
+      <p>
+        在线对局时，双方浏览器通常会直接连接，这会让对方看到你的网络（IP）地址。在“设置 → 在线对弈”中开启“不向对手透露我的网络地址”后，你的对局将经服务器中转；16 岁以下的棋手始终如此。
       </p>
 
       <h2>Google 用户数据</h2>

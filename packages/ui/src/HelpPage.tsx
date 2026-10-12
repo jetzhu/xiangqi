@@ -186,7 +186,8 @@ export function HelpPage({ version, issuesUrl }: HelpPageProps) {
       </section>
 
       <p className="muted small">
-        <a href={nav.href("/privacy")}>{tt("Privacy policy", "隐私政策")}</a> · <a href={nav.href("/terms")}>{tt("Terms of use", "使用条款")}</a>
+        <a href={nav.href("/privacy")}>{tt("Privacy policy", "隐私政策")}</a> · <a href={nav.href("/terms")}>{tt("Terms of use", "使用条款")}</a> ·{" "}
+        <a href={nav.href("/fair-play")}>{tt("Fair play", "公平竞技")}</a> · <a href={nav.href("/sportsmanship")}>{tt("Sportsmanship", "棋品规则")}</a>
       </p>
       <p className="muted small">
         {tt("Version", "版本")} {version}

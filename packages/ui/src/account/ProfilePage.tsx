@@ -1,6 +1,6 @@
 "use client";
 // Profile (M13): who the player is on the site and how far they've come. Private: only the
-// player sees it, until online play brings public profiles.
+// player sees it. Other players see the public profile (/player, M15).
 import { BOTS, LESSON_ORDER } from "@xq/content";
 import { learningRank } from "@xq/lessons";
 import { PROVISIONAL_RD } from "@xq/puzzles";
@@ -96,7 +96,8 @@ export function ProfilePage() {
           </h1>
           <p className="muted">
             {tt("Member since", "注册于")} {new Date(user.memberSince).toLocaleDateString(lang === "zh" ? "zh-CN" : "en", { year: "numeric", month: "long", day: "numeric" })} ·{" "}
-            {tt("Only you can see your profile.", "个人资料仅你自己可见。")}
+            {tt("Only you can see this page.", "此页仅你自己可见。")}{" "}
+            <a href={nav.href(`/player?u=${encodeURIComponent(user.username)}`)}>{tt("See your public profile", "查看公开资料")}</a>
           </p>
         </div>
       </section>

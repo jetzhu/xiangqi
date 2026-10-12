@@ -26,6 +26,23 @@ export interface Settings {
   confirmMove: boolean;
   /** Keep Red at the bottom even when playing or solving as Black. */
   redAtBottom: boolean;
+  // Online play (v0.3; settled in docs/v0.3-online-design.md). Filters apply both ways.
+  /** Widest rating gap accepted in quick pairing, or "any". */
+  opponentRange: 100 | 200 | 300 | 400 | "any";
+  /** Skip opponents whose rating at that speed is still provisional. */
+  opponentEstablished: boolean;
+  /** Minimum account age of opponents, in days. */
+  opponentAccountAge: 0 | 7 | 30;
+  /** Minimum completion rate (棋品) of opponents, in per cent. */
+  opponentCompletion: 0 | 90 | 95;
+  /** Only opponents with at least 10 fair-play checked games and no finding. */
+  opponentChecked: boolean;
+  /** Queue one move during the opponent's turn (Lightning and Blitz). */
+  premoves: boolean;
+  /** Show the opponent's preset chat phrases. */
+  chat: boolean;
+  /** Relay games through the server so opponents never see this browser's network address. */
+  relayOnly: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -41,6 +58,14 @@ export const DEFAULT_SETTINGS: Settings = {
   animation: "normal",
   confirmMove: false,
   redAtBottom: false,
+  opponentRange: 200,
+  opponentEstablished: false,
+  opponentAccountAge: 0,
+  opponentCompletion: 0,
+  opponentChecked: false,
+  premoves: true,
+  chat: true,
+  relayOnly: false,
 };
 
 /**

@@ -14,6 +14,8 @@ export const AnalysisApp = dynamic(() => import("@xq/ui").then((m) => m.Analysis
 export const PlayApp = dynamic(() => import("@xq/ui").then((m) => m.PlayPage), { ssr: false, loading });
 export const StatsApp = dynamic(() => import("@xq/ui").then((m) => m.StatsPage), { ssr: false, loading });
 export const ProfileApp = dynamic(() => import("@xq/ui").then((m) => m.ProfilePage), { ssr: false, loading });
+export const PlayerApp = dynamic(() => import("@xq/ui").then((m) => m.PlayerPage), { ssr: false, loading });
+export const OnlineApp = dynamic(() => import("@xq/ui").then((m) => m.OnlinePage), { ssr: false, loading });
 export const HelpApp = dynamic(() => import("@xq/ui").then((m) => m.HelpPage), { ssr: false, loading });
 export const SignUpApp = dynamic(() => import("@xq/ui").then((m) => m.SignUpPage), { ssr: false, loading });
 export const LogInApp = dynamic(() => import("@xq/ui").then((m) => m.LogInPage), { ssr: false, loading });

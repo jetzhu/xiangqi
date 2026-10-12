@@ -28,7 +28,7 @@ export const ACCOUNTS =
     : null;
 export const SITE_NAME = { zh: "象棋学堂", en: "Xiangqi School" } as const;
 
-type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "profile" | "signup" | "login" | "resetPassword" | "authCallback" | "privacy" | "terms";
+type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "profile" | "signup" | "login" | "resetPassword" | "authCallback" | "privacy" | "terms" | "player" | "online" | "fairPlay" | "sportsmanship";
 const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; description: Record<Locale, string> }> = {
   home: {
     path: "/",
@@ -75,6 +75,26 @@ const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; desc
     path: "/profile",
     title: { zh: "个人资料", en: "Profile" },
     description: { zh: "你的头像、等级分和学习进度。", en: "Your avatar, ratings and progress." },
+  },
+  player: {
+    path: "/player",
+    title: { zh: "棋手资料", en: "Player profile" },
+    description: { zh: "棋手的公开资料：等级分与公平记录。", en: "A player's public profile: ratings and fair-play record." },
+  },
+  online: {
+    path: "/online",
+    title: { zh: "在线对弈", en: "Play online" },
+    description: { zh: "与水平相近的棋手实时对弈（v0.3 推出）。", en: "Play people of your level in real time (coming with v0.3)." },
+  },
+  fairPlay: {
+    path: "/fair-play",
+    title: { zh: "公平竞技规则", en: "Fair play policy" },
+    description: { zh: "在线对弈中禁止的行为、我们记录什么，以及如何判定和申诉。", en: "What's forbidden in online games, what we record, and how decisions and appeals work." },
+  },
+  sportsmanship: {
+    path: "/sportsmanship",
+    title: { zh: "棋品规则", en: "Sportsmanship policy" },
+    description: { zh: "放弃对局、拖延时间和频繁取消对局的规则。", en: "The rules on abandoning, stalling and aborting games." },
   },
   privacy: {
     path: "/privacy",

@@ -16,4 +16,6 @@ export { StoreProvider, useStore, createStore, defaultStore, browserKV, memoryKV
 export { AccountProvider, useAccount, type AccountConfig, type AccountState } from "./account/session.js";
 export { AccountStoreProvider, SkillQuestion, SyncNotice } from "./account/AccountStore.js";
 export { ProfilePage } from "./account/ProfilePage.js";
+export { PlayerPage } from "./online/PlayerPage.js";
+export { OnlinePage } from "./online/OnlinePage.js";
 export { SignUpPage, LogInPage, ResetPasswordPage, AuthCallbackPage } from "./account/AuthPages.js";
