@@ -71,12 +71,12 @@ test("the stats page invites a new player to play", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Play a bot" })).toBeVisible();
 });
 
-test("a draw can't be offered before 20 moves each", async ({ page }) => {
+test("a draw can't be offered before 10 moves each", async ({ page }) => {
   await page.goto(at("/en/bots/"));
   await page.locator("button.play").click();
   await play(page, "h2e2");
   await expect(page.locator("ol.moves li").first().locator(".mv").nth(1)).not.toHaveText("", { timeout: 30_000 });
   await page.getByRole("button", { name: "Offer draw" }).click();
-  await expect(page.locator(".message")).toHaveText("A draw can be offered after 20 moves each (now 1).");
+  await expect(page.locator(".message")).toHaveText("A draw can be offered after 10 moves each (now 1).");
   await expect(page.getByRole("button", { name: "Resign" })).toBeVisible();
 });

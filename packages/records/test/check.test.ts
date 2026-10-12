@@ -55,10 +55,10 @@ describe("checkBotGame", () => {
     expect(checkBotGame(claim({ result: "win", reason: "resign" }), BOTS)).toMatchObject({ ok: false });
   });
 
-  it("a draw by agreement needs 20 moves each", () => {
-    expect(checkBotGame(claim({ moves: longGame(40), result: "draw", reason: "agreement" }), BOTS).ok).toBe(true);
-    expect(checkBotGame(claim({ moves: longGame(39), result: "draw", reason: "agreement" }), BOTS)).toMatchObject({ ok: false, error: expect.stringMatching(/20 moves each/) });
-    expect(checkBotGame(claim({ moves: longGame(40), result: "win", reason: "agreement" }), BOTS)).toMatchObject({ ok: false });
+  it("a draw by agreement needs 10 moves each", () => {
+    expect(checkBotGame(claim({ moves: longGame(20), result: "draw", reason: "agreement" }), BOTS).ok).toBe(true);
+    expect(checkBotGame(claim({ moves: longGame(19), result: "draw", reason: "agreement" }), BOTS)).toMatchObject({ ok: false, error: expect.stringMatching(/10 moves each/) });
+    expect(checkBotGame(claim({ moves: longGame(20), result: "win", reason: "agreement" }), BOTS)).toMatchObject({ ok: false });
   });
 
   it("on time, the side to move loses", () => {
