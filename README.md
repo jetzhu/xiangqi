@@ -24,6 +24,7 @@ In [`docs/`](docs/):
 - [Requirements study](docs/requirements.md): what makes chess.com work, and what that means for this site
 - [MVP design](docs/mvp-design.md): the guest-first site (milestones M0–M7b)
 - [v0.2 accounts design](docs/v0.2-accounts-design.md): optional accounts and sync (milestones M8–M14)
+- [v0.3 online design](docs/v0.3-online-design.md): playing other people, and fair play (draft for discussion, milestones M15–M20)
 
 ## Layout
 
