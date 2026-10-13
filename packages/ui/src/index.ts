@@ -18,4 +18,7 @@ export { AccountStoreProvider, SkillQuestion, SyncNotice } from "./account/Accou
 export { ProfilePage } from "./account/ProfilePage.js";
 export { PlayerPage } from "./online/PlayerPage.js";
 export { OnlinePage } from "./online/OnlinePage.js";
+export { FriendPage } from "./online/FriendPage.js";
+export { ChallengePage } from "./online/ChallengePage.js";
+export { GamePage } from "./online/GamePage.js";
 export { SignUpPage, LogInPage, ResetPasswordPage, AuthCallbackPage } from "./account/AuthPages.js";

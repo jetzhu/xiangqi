@@ -30,7 +30,7 @@ export function OnlineSettings() {
   return (
     <div className="online-settings">
       <p className="sub">
-        {tt("Online play opens with v0.3; these settings apply from then.", "在线对弈将在 v0.3 推出，以下设置届时生效。")}{" "}
+        {tt("Opponent filters apply to quick pairing, coming with v0.3. The rest apply to your games now.", "对手筛选用于 v0.3 推出的快速匹配；其余设置现在即对你的对局生效。")}{" "}
         <a href={nav.href("/online")}>{tt("Get ready for online play", "在线对弈准备")}</a>
       </p>
 

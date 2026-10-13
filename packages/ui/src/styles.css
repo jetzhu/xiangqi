@@ -442,3 +442,35 @@ button.danger { background: #b3261e; border-color: #b3261e; color: #fff; }
 .age-gate legend { font-weight: 600; margin-bottom: 6px; }
 .age-gate label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; margin-bottom: 8px; }
 .age-gate select { font-weight: normal; }
+
+/* Play a friend and online games (M16) */
+.big { font-size: 17px; padding: 10px 18px; }
+a.button.big { display: inline-block; }
+.tiles { display: flex; flex-wrap: wrap; gap: 12px; }
+.tile-group { display: flex; flex-direction: column; gap: 6px; min-width: 96px; }
+.tile { font-size: 18px; font-weight: 600; padding: 10px 12px; font-variant-numeric: tabular-nums; }
+.tile.selected, .segmented .selected { background: var(--accent); color: #fff; border-color: var(--accent); }
+.segmented { display: inline-flex; gap: 0; }
+.segmented button { border-radius: 0; }
+.segmented button:first-child { border-radius: 6px 0 0 6px; }
+.segmented button:last-child { border-radius: 0 6px 6px 0; }
+.friend-page .options { margin-top: 12px; }
+.friend-page > .primary.big { margin-top: 20px; }
+.challenge-code { font-size: 40px; font-weight: 700; letter-spacing: 0.15em; font-variant-numeric: tabular-nums; margin: 16px 0 8px; }
+.share-link { display: flex; gap: 8px; max-width: 560px; }
+.share-link input { flex: 1; min-width: 0; }
+.challenge-terms { font-size: 18px; }
+.waiting { display: flex; align-items: center; gap: 8px; margin: 16px 0; }
+.waiting .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); animation: xq-pulse 1.2s ease-in-out infinite; }
+@keyframes xq-pulse { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { .waiting .dot { animation: none; } }
+.offer { margin-top: 10px; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 8px; font-size: 14px; }
+.offer button { margin-top: 6px; }
+.phrases { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.phrase { font-size: 13px; padding: 4px 8px; }
+.clock.low { background: #b3261e; }
+.online-game .who a { color: var(--text); font-weight: 600; }
+/* Fixed height, one line, and the chat bubble floating: nothing here may move the board mid-click. */
+.online-game .player-bar { height: 56px; position: relative; }
+.online-game .player-bar .who { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.online-game .player-bar .bubble { position: absolute; left: 50px; top: 46px; z-index: 2; white-space: nowrap; pointer-events: none; }

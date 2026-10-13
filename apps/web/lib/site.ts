@@ -28,7 +28,7 @@ export const ACCOUNTS =
     : null;
 export const SITE_NAME = { zh: "象棋学堂", en: "Xiangqi School" } as const;
 
-type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "profile" | "signup" | "login" | "resetPassword" | "authCallback" | "privacy" | "terms" | "player" | "online" | "fairPlay" | "sportsmanship";
+type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "profile" | "signup" | "login" | "resetPassword" | "authCallback" | "privacy" | "terms" | "player" | "online" | "fairPlay" | "sportsmanship" | "friend" | "challenge" | "game";
 const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; description: Record<Locale, string> }> = {
   home: {
     path: "/",
@@ -84,7 +84,22 @@ const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; desc
   online: {
     path: "/online",
     title: { zh: "在线对弈", en: "Play online" },
-    description: { zh: "与水平相近的棋手实时对弈（v0.3 推出）。", en: "Play people of your level in real time (coming with v0.3)." },
+    description: { zh: "与好友在线对弈；与水平相近的棋手快速匹配将在 v0.3 推出。", en: "Play a friend online; quick pairing with people of your level comes with v0.3." },
+  },
+  friend: {
+    path: "/friend",
+    title: { zh: "与好友对弈", en: "Play a friend" },
+    description: { zh: "生成挑战链接，与好友在线下象棋。", en: "Make a challenge link and play Xiangqi online with a friend." },
+  },
+  challenge: {
+    path: "/challenge",
+    title: { zh: "象棋挑战", en: "Xiangqi challenge" },
+    description: { zh: "好友向你发起了象棋挑战。", en: "A friend has challenged you to a game of Xiangqi." },
+  },
+  game: {
+    path: "/game",
+    title: { zh: "在线对局", en: "Online game" },
+    description: { zh: "一盘在线象棋对局。", en: "An online game of Xiangqi." },
   },
   fairPlay: {
     path: "/fair-play",

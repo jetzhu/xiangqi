@@ -64,6 +64,8 @@ export interface XiangqiBoardProps {
   onSquareClick?: (square: string, button: "left" | "right") => void;
   /** Gold stars on points (lesson "capture the star" challenges). */
   stars?: readonly string[];
+  /** Lets the movable side pick up pieces while it isn't their turn, to queue a premove (moves come from legalMoves). */
+  premove?: boolean;
 }
 
 const ARROW_COLORS: Record<ArrowColor, string> = {
@@ -120,6 +122,7 @@ export function XiangqiBoard({
   ariaLabel = "Xiangqi board",
   onSquareClick,
   stars = [],
+  premove = false,
 }: XiangqiBoardProps) {
   const theme = THEMES[themeName];
   const uid = useId().replace(/:/g, "");
@@ -146,7 +149,7 @@ export function XiangqiBoard({
   }, [position]);
   const pieceAt = (square: string) => pieces.find((p) => p.square === square) ?? null;
 
-  const canMoveColor = (c: Color) => c === turn && (movable === "both" || movable === c);
+  const canMoveColor = (c: Color) => (c === turn || premove) && (movable === "both" || movable === c);
   const destinationsFrom = (from: string) => legalMoves.filter((m) => m.slice(0, 2) === from).map((m) => m.slice(2));
 
   // A new position clears any selection.

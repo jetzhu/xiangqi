@@ -91,6 +91,8 @@ export class OnlineGame {
   lagAdjustedAt: number | null = null;
 
   private lastHeard: number;
+  /** Set once the link to the other browser is up: timers don't run before that. */
+  private begun = false;
   private nextDrawOfferAt = 0;
   private takebackRefusals = 0;
   private takebackWaitUntil = 0;
@@ -290,11 +292,29 @@ export class OnlineGame {
     if (this.claimState(now)?.kind === "final") this.end({ winner: null, reason: "claim-draw" }, now);
   }
 
+  /**
+   * The link to the other browser is up (call each time it comes up). The first time, the
+   * first-move timer starts from now, so time spent loading pages and connecting isn't counted.
+   */
+  begin(now: number) {
+    this.lastHeard = now;
+    if (this.begun) return;
+    this.begun = true;
+    if (this.plies === 0) this.turnStart = now;
+  }
+
+  /** The server settled the game (a dispute, or the other browser's claim): its word is final. */
+  adopt(result: OnlineResult, now: number) {
+    if (!this.result) return this.end(result, now);
+    this.result = result;
+    this.io.changed();
+  }
+
   // Time passing ----------------------------------------------------------------------------
 
   /** Call a few times a second: runs out clocks and timers, and notices an opponent gone quiet. */
   tick(now: number) {
-    if (this.result) return;
+    if (this.result || !this.begun) return;
     const side = this.turn;
     // The opponent's time is up only after the lag allowance, so a move already on its way counts.
     const grace = side === this.opp ? this.lag : 0;
@@ -325,13 +345,19 @@ export class OnlineGame {
 
   // Messages from the other browser ------------------------------------------------------
 
-  receive(msg: LinkMsg, now: number) {
+  /** A sign of life that isn't a message (in a relayed game, the opponent is still on the channel). */
+  alive(now: number) {
     this.lastHeard = now;
-    if (this.away && msg.t !== "bye") {
+    if (this.away) {
       this.away = null;
       this.io.report({ kind: "back" });
       this.io.changed();
     }
+  }
+
+  receive(msg: LinkMsg, now: number) {
+    if (msg.t === "bye") this.lastHeard = now;
+    else this.alive(now);
     switch (msg.t) {
       case "ping":
         return this.io.send({ t: "pong", at: msg.at });

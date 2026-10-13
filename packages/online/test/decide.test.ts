@@ -23,6 +23,8 @@ function match(tc: TimeControl = { base: 300, inc: 3 }, rated = true) {
       },
     );
   const g = { red: make("red"), black: make("black") };
+  g.red.begin(now);
+  g.black.begin(now);
   const startedAt = now;
   const advance = (ms: number) => {
     const end = now + ms;

@@ -1,6 +1,6 @@
 "use client";
-// Play online (M15): online games open in v0.3. Until then this page shows what a player needs
-// before their first online game (decision D9) and asks the one age question online play needs.
+// Play online: what a player needs before their first online game (decision D9, M15), the one
+// age question online play needs, and then the way in (Play a friend, M16).
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useAccount } from "../account/session.js";
 import { useNav } from "../nav.js";
@@ -41,8 +41,8 @@ export function OnlinePage() {
       <h1>{tt("Play online", "在线对弈")}</h1>
       <p className="sub">
         {tt(
-          "Play people of your level in real time, coming with v0.3: Lightning, Blitz and Rapid, each with its own rating.",
-          "与水平相近的棋手实时对弈，将在 v0.3 推出：闪电、超快棋、快棋，各有独立等级分。",
+          "Play a friend now with a challenge link. Quick pairing with people of your level comes with v0.3. Lightning, Blitz and Rapid each have their own rating.",
+          "现在就可以用挑战链接与好友对弈；与水平相近的棋手快速匹配将在 v0.3 推出。闪电、超快棋、快棋各有独立等级分。",
         )}
       </p>
     </>
@@ -110,6 +110,13 @@ export function OnlinePage() {
           </ul>
         </Item>
       </ul>
+      {check.eligible && (
+        <p>
+          <a className="button primary big" href={nav.href("/friend")}>
+            {tt("Play a friend", "与好友对弈")}
+          </a>
+        </p>
+      )}
       {check.age_answered && check.under16 && (
         <p className="muted small">
           {tt(

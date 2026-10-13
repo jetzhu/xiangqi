@@ -27,6 +27,7 @@
     "@xq/content": "workspace:*",
     "@xq/engine": "workspace:*",
     "@xq/lessons": "workspace:*",
+    "@xq/online": "workspace:*",
     "@xq/puzzles": "workspace:*",
     "@xq/records": "workspace:*",
     "idb-keyval": "^6.3.0",

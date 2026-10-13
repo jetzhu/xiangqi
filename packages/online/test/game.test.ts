@@ -22,6 +22,8 @@ function pair(tc: TimeControl = { base: 300, inc: 3 }, opts: { rated?: boolean; 
       },
     );
   const g = { red: make("red"), black: make("black") };
+  g.red.begin(now);
+  g.black.begin(now);
   /** Moves time forward to `t`, delivering messages and ticking both browsers on the way. */
   const advance = (ms: number) => {
     const end = now + ms;
@@ -138,6 +140,18 @@ describe("moves and clocks", () => {
     expect(p.g.red.result).toEqual({ winner: null, reason: "aborted" });
     expect(p.g.black.result).toEqual({ winner: null, reason: "aborted" });
     expect(p.g.red.ratedResult).toBe(false);
+  });
+
+  it("starts the first-move timer only once the link is up", () => {
+    const io = { send: () => {}, report: () => {}, changed: () => {} };
+    const g = new OnlineGame({ me: "red", tc: { base: 120, inc: 1 }, rated: true, now: 0 }, io);
+    g.tick(60_000); // a minute of loading and connecting
+    expect(g.result).toBeNull();
+    expect(g.away).toBeNull();
+    g.begin(60_000);
+    expect(g.firstMoveLeft(65_000)).toBe(15_000);
+    g.tick(80_500);
+    expect(g.result?.reason).toBe("aborted");
   });
 
   it("ends both boards when the rules end the game", () => {

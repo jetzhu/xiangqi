@@ -481,6 +481,9 @@ importers:
       '@xq/lessons':
         specifier: workspace:*
         version: link:../lessons
+      '@xq/online':
+        specifier: workspace:*
+        version: link:../online
       '@xq/puzzles':
         specifier: workspace:*
         version: link:../puzzles
