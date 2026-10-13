@@ -254,8 +254,9 @@ end $$;
 
 /**
  * The queue worker: moves reports into the game log, keeps each browser's end report, and
- * ends games nobody has reported on for 10 minutes (aborted before the first moves, otherwise
- * both players gone: a draw, unrated). Run every few seconds by pg_cron, and by the `game`
+ * ends games nobody has reported on for 10 minutes, unrated: aborted before the first moves;
+ * a draw if both players went without a word; no result if an ending was claimed that the
+ * `game` function couldn't settle. Run every few seconds by pg_cron, and by the `game`
  * function before it reads a log. Returns how many reports it handled.
  */
 create function public.process_game_reports(p_batch int default 200)
@@ -281,10 +282,12 @@ begin
     n := n + 1;
   end loop;
 
-  update public.games g set status = 'over', ended_at = now(), result = case when cardinality(g.moves) < 2 then 'none' else 'draw' end,
-    reason = case when cardinality(g.moves) < 2 then 'aborted' else 'both-away' end
-  where g.status = 'playing' and g.last_report_at < now() - interval '10 minutes'
-    and g.red_end is null and g.black_end is null;
+  update public.games g set status = 'over', ended_at = now(),
+    result = case when g.red_end is null and g.black_end is null and moved.n >= 2 then 'draw' else 'none' end,
+    reason = case when g.red_end is not null or g.black_end is not null then 'no-result' when moved.n < 2 then 'aborted' else 'both-away' end
+  from (select g2.id, (select count(distinct l.ply) from public.game_log l where l.game_id = g2.id and l.kind = 'move') as n
+        from public.games g2 where g2.status = 'playing' and g2.last_report_at < now() - interval '10 minutes') moved
+  where g.id = moved.id;
   return n;
 end $$;
 

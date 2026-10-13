@@ -17,7 +17,7 @@ const ref = process.env.SUPABASE_PROJECT_REF ?? new URL(projectUrl).hostname.spl
 const dryRun = process.argv.includes("--dry-run");
 
 /** Settings per function. verify_jwt is off: the function asks Supabase Auth itself. */
-const FUNCTIONS = { record: { verify_jwt: false } };
+const FUNCTIONS = { record: { verify_jwt: false }, game: { verify_jwt: false } };
 
 export async function bundle(name) {
   const build = await rolldown({
@@ -31,6 +31,7 @@ export async function bundle(name) {
         "@xq/bots": pkg("bots"),
         "@xq/lessons": pkg("lessons"),
         "@xq/records": pkg("records"),
+        "@xq/online": pkg("online"),
       },
       // Sources import siblings as "./x.js" (NodeNext style).
       extensionAlias: { ".js": [".ts", ".js"] },

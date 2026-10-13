@@ -14,6 +14,8 @@ export type OnlineReason =
   | "aborted"
   /** Both players were gone longer than the window. */
   | "both-away"
+  /** The server found an illegal move in the log: a loss for the browser that sent it. */
+  | "illegal-move"
   /** The judge couldn't decide (the server's log has a gap and the browsers disagree). */
   | "no-result";
 
@@ -74,6 +76,8 @@ export function resultText(r: OnlineResult): { en: string; zh: string } {
       return { en: "Draw: both players left", zh: "和棋：双方都已离开" };
     case "no-result":
       return { en: "No result", zh: "无结果" };
+    case "illegal-move":
+      return { en: `${loser.en} made an illegal move`, zh: `${loser.zh}走了违规着法` };
     default:
       return { en: side ? `${side.en} wins` : "Draw", zh: side ? `${side.zh}胜` : "和棋" };
   }
