@@ -20,6 +20,16 @@ const SUPABASE_STANDIN = `
     $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create function auth.jwt() returns jsonb language sql stable as
     $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
+  -- Supabase Queues (pgmq), as far as the migrations use it: one queue, read in order.
+  create schema pgmq;
+  create table pgmq.q (msg_id bigserial primary key, message jsonb not null, archived boolean not null default false);
+  create function pgmq.create(name text) returns void language sql as $$ select $$;
+  create function pgmq.send(name text, msg jsonb) returns setof bigint language sql as
+    $$ insert into pgmq.q (message) values (msg) returning msg_id $$;
+  create function pgmq.read(name text, vt int, qty int) returns table (msg_id bigint, message jsonb) language sql as
+    $$ select msg_id, message from pgmq.q where not archived order by msg_id limit qty $$;
+  create function pgmq.archive(name text, id bigint) returns boolean language sql as
+    $$ update pgmq.q set archived = true where msg_id = id returning true $$;
 `;
 
 const migrations = new URL("../supabase/migrations/", import.meta.url);
@@ -548,6 +558,126 @@ describe("online play groundwork (M15)", () => {
     // Unverified email: not yet.
     await db.query(`update auth.users set email_confirmed_at = null where id = $1`, [F]);
     expect(await check()).toMatchObject({ verified: false, eligible: false });
+  });
+});
+
+describe("play a friend (M16)", () => {
+  const G = "00000000-0000-4000-8000-0000000000a7";
+  const H = "00000000-0000-4000-8000-0000000000b8";
+  /** Runs as a user and keeps the changes. */
+  const commitAs = async <T>(user: string, sql: string, params: unknown[] = []): Promise<T> =>
+    db.transaction(async (tx) => {
+      await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [user]);
+      await tx.exec(`set local role authenticated`);
+      return (await tx.query<{ j: T }>(`select ${sql} as j`, params)).rows[0]!.j;
+    });
+  const errorAs = (user: string | null, sql: string) => failsAs(user, `select ${sql}`);
+
+  beforeAll(async () => {
+    await signUp(G, { username: "gao_xq" });
+    await signUp(H, { username: "hu_xq" });
+    // Both ready for online play: 16 or older, and 3 bot games of 10 moves each.
+    for (const u of [G, H]) {
+      await db.query(`update public.profiles set under16 = false where user_id = $1`, [u]);
+      await db.query(
+        `insert into public.bot_games (user_id, bot_id, bot_rating, player_color, moves, result, helps, rated, started_at)
+         select $1, 'laochen', 800, 'red', array_fill('h2e2'::text, array[30]), 'loss', 0, true, now() from generate_series(1, 3)`,
+        [u],
+      );
+    }
+    await db.query(`insert into public.ratings (user_id, kind, rating, rd, games) values ($1, 'bot', 1111, 70, 25)`, [G]);
+  });
+
+  let code = "";
+  let game = "";
+
+  it("creates a challenge link anyone can look at", async () => {
+    code = await commitAs<string>(G, `public.create_challenge(300, 3, 'red', true, false)`);
+    expect(code).toMatch(/^[2-9A-HJ-NP-Z]{6}$/);
+    const seen = await as(null, async (tx) => (await tx.query<{ j: Record<string, unknown> }>(`select public.challenge_info($1) as j`, [code.toLowerCase()])).rows[0]!.j);
+    expect(seen).toMatchObject({ from: "gao_xq", mine: false, base: 300, inc: 3, color: "red", rated: true, expired: false, game: null, taken: false });
+    // Not ready for online play: no challenges.
+    expect(await errorAs(A, `public.create_challenge(300, 3, 'red', true, false)`)).toMatch(/not ready/);
+    expect(await errorAs(G, `public.create_challenge(301, 3, 'red', true, false)`)).toMatch(/check constraint/);
+  });
+
+  it("keeps the challenger's own challenge to the challenger, and refuses blocked players", async () => {
+    expect(await errorAs(G, `public.accept_challenge('${code}', false)`)).toMatch(/your own/);
+    await db.query(`insert into public.blocks (user_id, blocked_id) values ($1, $2)`, [G, H]);
+    expect(await errorAs(H, `public.accept_challenge('${code}', false)`)).toMatch(/blocked/);
+    await db.query(`delete from public.blocks`);
+  });
+
+  it("starts the game on accepting, with ratings for both players at its speed", async () => {
+    game = await commitAs<string>(H, `public.accept_challenge($1, false)`, [code]);
+    expect(await errorAs(A, `public.accept_challenge('${code}', false)`)).toMatch(/not ready|already taken/);
+    const info = await commitAs<Record<string, unknown>>(G, `public.game_info($1)`, [game]);
+    expect(info).toMatchObject({ me: "red", speed: "blitz", rated: true, relay: false, status: "playing", red: { username: "gao_xq", rating: 1111 }, black: { username: "hu_xq", rating: 800 } });
+    expect(await commitAs(H, `public.challenge_info($1)->>'game'`, [code])).toBe(game);
+    // Someone else sees nothing of it.
+    expect(await commitAs(A, `public.game_info($1)`, [game])).toBeNull();
+    expect(await commitAs(A, `public.challenge_info($1)->>'game'`, [code])).toBeNull();
+    expect(await as(A, async (tx) => (await tx.query(`select id from public.games`)).rows)).toEqual([]);
+    expect(await as(H, async (tx) => (await tx.query(`select id from public.games`)).rows)).toEqual([{ id: game }]);
+  });
+
+  it("relays the game when either player asks, or a player is under 16", async () => {
+    const c2 = await commitAs<string>(G, `public.create_challenge(600, 5, 'random', false, false)`);
+    const g2 = await commitAs<string>(H, `public.accept_challenge($1, true)`, [c2]);
+    expect(await commitAs(G, `public.game_info($1)->'relay'`, [g2])).toBe(true);
+    await db.query(`update public.profiles set under16 = true where user_id = $1`, [H]);
+    const c3 = await commitAs<string>(G, `public.create_challenge(600, 5, 'black', false, false)`);
+    const g3 = await commitAs<string>(H, `public.accept_challenge($1, false)`, [c3]);
+    expect(await commitAs(H, `public.game_info($1)`, [g3])).toMatchObject({ relay: true, me: "red" });
+    await db.query(`update public.profiles set under16 = false where user_id = $1`, [H]);
+  });
+
+  it("queues the players' reports and writes them to the game log, stamped on arrival", async () => {
+    const move = (ply: number, iccs: string) => JSON.stringify({ kind: "move", ply, iccs, clocks: { red: 300000, black: 300000 }, hash: "x" });
+    await commitAs(G, `public.report_game($1, $2)`, [game, move(1, "h2e2")]);
+    await commitAs(H, `public.report_game($1, $2)`, [game, move(1, "h2e2")]);
+    await commitAs(H, `public.report_game($1, $2)`, [game, JSON.stringify({ kind: "end", result: { winner: "red", reason: "resign" }, moves: ["h2e2", "h9g7"], clocks: {} })]);
+    expect(await errorAs(A, `public.report_game('${game}', '{"kind":"move"}')`)).toMatch(/not your game/);
+    expect(await errorAs(G, `public.report_game('${game}', '{"kind":"chat"}')`)).toMatch(/bad report/);
+    expect(await errorAs(G, `public.process_game_reports()`)).toMatch(/permission denied/);
+    const handled = (await db.query<{ n: number }>(`select public.process_game_reports() as n`)).rows[0]!.n;
+    expect(handled).toBe(3);
+    const log = (await db.query<{ by_color: string; kind: string; ply: number | null; at: string }>(`select by_color, kind, ply, at from public.game_log where game_id = $1 order by id`, [game])).rows;
+    expect(log.map((l) => [l.by_color, l.kind, l.ply])).toEqual([["red", "move", 1], ["black", "move", 1], ["black", "end", null]]);
+    expect(log.every((l) => l.at)).toBe(true);
+    const ends = (await db.query(`select red_end, black_end from public.games where id = $1`, [game])).rows[0];
+    expect(ends).toMatchObject({ red_end: null, black_end: { result: { winner: "red", reason: "resign" } } });
+    expect(await failsAs(G, `select * from public.game_log`)).toMatch(/permission denied/);
+  });
+
+  it("saves the result and both ratings once, and only if the ratings haven't changed meanwhile", async () => {
+    const games = async (u: string) => (await db.query<{ games: number }>(`select games from public.ratings where user_id = $1 and kind = 'blitz'`, [u])).rows[0]!.games;
+    const [g0, h0] = [await games(G), await games(H)];
+    const at = new Date().toISOString();
+    const finish = (expected: object) =>
+      db.query<{ ok: boolean }>(`select public.finish_game($1, 'red', 'resign', $2, $3, $4, $5) as ok`, [
+        game,
+        ["h2e2", "h9g7"],
+        { before: 1111, rating: 1150, rd: 180, last_played: at },
+        { before: 800, rating: 770, rd: 180, last_played: at },
+        expected,
+      ]);
+    // A rating that changed since it was read: nothing is saved.
+    await expect(finish({ red: g0 + 1, black: h0 })).rejects.toThrow(/stale/);
+    expect((await db.query(`select status from public.games where id = $1`, [game])).rows[0]).toEqual({ status: "playing" });
+    expect((await finish({ red: g0, black: h0 })).rows[0]!.ok).toBe(true);
+    expect((await finish({ red: g0 + 1, black: h0 + 1 })).rows[0]!.ok).toBe(false);
+    expect([await games(G), await games(H)]).toEqual([g0 + 1, h0 + 1]);
+    expect(await commitAs(H, `public.game_info($1)`, [game])).toMatchObject({ status: "over", result: "red", reason: "resign", moves: ["h2e2", "h9g7"], red_rating_after: 1150, black_rating_after: 770 });
+    expect(await failsAs(G, `select public.finish_game('${game}', 'red', 'resign', '{}', null, null, '{}')`)).toMatch(/permission denied/);
+  });
+
+  it("ends games nobody reports on for 10 minutes", async () => {
+    const c = await commitAs<string>(G, `public.create_challenge(60, 0, 'red', true, false)`);
+    const g = await commitAs<string>(H, `public.accept_challenge($1, false)`, [c]);
+    await db.query(`update public.games set last_report_at = now() - interval '11 minutes' where id = $1`, [g]);
+    await db.query(`select public.process_game_reports()`);
+    expect((await db.query(`select status, result, reason from public.games where id = $1`, [g])).rows[0]).toEqual({ status: "over", result: "none", reason: "aborted" });
   });
 });
 

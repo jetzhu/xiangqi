@@ -17,11 +17,9 @@ describe("time controls", () => {
 });
 
 describe("online rating", () => {
-  it("starts from the bot rating after 10 bot games, else the skill answer, else 800", () => {
-    expect(startingRating({ rating: 1234, games: 10 }, 400).rating).toBe(1234);
-    expect(startingRating({ rating: 1234, games: 9 }, 400).rating).toBe(400);
-    expect(startingRating(null, null).rating).toBe(800);
-    expect(startingRating(null, null).rd).toBe(200);
+  it("starts from the bot rating, else 800", () => {
+    expect(startingRating({ rating: 1234.4 }).rating).toBe(1234);
+    expect(startingRating(null)).toEqual({ rating: 800, rd: 200, games: 0, lastPlayed: null });
   });
 
   it("moves both ratings, the winner up and the loser down", () => {

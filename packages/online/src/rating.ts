@@ -8,17 +8,14 @@ export interface OnlineRating extends Rating {
 }
 
 export const RATING_FLOOR = 100;
-/** A bot rating counts as the starting point once it rests on this many rated bot games. */
-export const BOT_GAMES_FOR_START = 10;
 
 /**
- * Where a player's rating at a speed starts: their bot rating if it rests on 10 or more rated
- * games, otherwise their answer to the skill question at sign-up (800 if skipped). Uncertain
- * either way, so it shows "?" until it settles.
+ * Where a player's rating at a speed starts: their bot rating, which itself starts from the
+ * skill question at sign-up (800 if skipped or never asked). Uncertain, so it shows "?" until
+ * it settles. The database does the same (speed_rating, migration 20261013000000).
  */
-export function startingRating(bot: { rating: number; games: number } | null, skill: number | null): OnlineRating {
-  const rating = bot && bot.games >= BOT_GAMES_FOR_START ? bot.rating : (skill ?? NEW_PLAYER.rating);
-  return { rating: Math.round(rating), rd: NEW_PLAYER.rd, games: 0, lastPlayed: null };
+export function startingRating(bot: { rating: number } | null): OnlineRating {
+  return { rating: Math.round(bot?.rating ?? NEW_PLAYER.rating), rd: NEW_PLAYER.rd, games: 0, lastPlayed: null };
 }
 
 const days = (from: string | null, to: Date) => (from ? Math.max(0, (to.getTime() - Date.parse(from)) / 864e5) : 0);
