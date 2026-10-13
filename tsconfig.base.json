@@ -37,6 +37,9 @@
       ],
       "@xq/records": [
         "./packages/records/src/index.ts"
+      ],
+      "@xq/online": [
+        "./packages/online/src/index.ts"
       ]
     }
   }
