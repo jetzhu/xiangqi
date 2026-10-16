@@ -4,12 +4,13 @@ import { useAccount } from "./account/session.js";
 import { useNav } from "./nav.js";
 import { useSettings, useT } from "./settings.js";
 
-export type Section = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "account" | "privacy" | "terms";
+export type Section = "home" | "learn" | "puzzles" | "bots" | "online" | "analysis" | "play" | "settings" | "help" | "stats" | "account" | "privacy" | "terms";
 
 const ITEMS: { id: Section; path: string; en: string; zh: string }[] = [
   { id: "learn", path: "/learn", en: "Learn", zh: "学习" },
   { id: "puzzles", path: "/puzzles", en: "Puzzles", zh: "题目" },
   { id: "bots", path: "/bots", en: "Play bots", zh: "人机对弈" },
+  { id: "online", path: "/online", en: "Play online", zh: "在线对弈" },
   { id: "analysis", path: "/analysis", en: "Analysis", zh: "分析" },
   { id: "play", path: "/play", en: "Two players", zh: "双人对弈" },
 ];

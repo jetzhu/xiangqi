@@ -40,3 +40,25 @@ test("bot game: Abort before the first move goes back without a result", async (
   await page.getByRole("button", { name: "Abort" }).click();
   await expect(page.locator("button.play")).toBeVisible();
 });
+
+test("two-player: New game clears the board, the moves and the clock", async ({ page }) => {
+  await page.goto(at("/en/play/"));
+  await page.getByLabel("Clock").selectOption("5");
+  await play(page, "h2e2");
+  await play(page, "h9g7");
+  await expect(page.locator("ol.moves li")).toHaveCount(1);
+  await page.getByRole("button", { name: "New game" }).click();
+  await expect(page.getByText("No moves yet.")).toBeVisible();
+  await expect(page.locator(".play-clocks")).toContainText("Red 5:00");
+  await play(page, "h2e2");
+  await expect(page.locator("ol.moves li")).toHaveCount(1);
+});
+
+test("the menu leads to Play online, and keeps it highlighted on the online pages", async ({ page }) => {
+  await page.goto(at("/en/"));
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Play online" }).click();
+  await expect(page).toHaveURL(/\/en\/online\/$/);
+  await expect(page.getByRole("heading", { name: "Play online" })).toBeVisible();
+  await page.goto(at("/en/friend/"));
+  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Play online" })).toHaveAttribute("aria-current", "page");
+});
