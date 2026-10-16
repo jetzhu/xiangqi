@@ -1,7 +1,7 @@
 import { type BrowserContext, type Page, type Route, expect, test } from "@playwright/test";
 import { at, play } from "./helpers.js";
 
-// Play a friend (M16), end to end: two tabs of one browser are the two players. Supabase is a
+// Play a friend (M16) and quick pairing (M17), end to end: two tabs of one browser are the two players. Supabase is a
 // fake shared by both tabs; the two browsers set up their link over a BroadcastChannel instead
 // of Realtime (window.__xqTabSignaling), and then play over a real WebRTC data channel, or over
 // that channel as the relay.
@@ -28,6 +28,12 @@ function world(relay: boolean) {
     challenge: null as null | { base: number; inc: number; color: string; rated: boolean; game: string | null },
     reports: [] as { by: "red" | "black"; report: { kind: string; ply?: number; iccs?: string; result?: { winner: string | null; reason: string } } }[],
     settled: 0,
+    /** Quick pairing: each tab's seek, a "Play anyway" invitation, and whether the two are out of range. */
+    seeks: {} as Partial<Record<"red" | "black", { base: number; inc: number; matched: boolean }>>,
+    invite: false,
+    far: false,
+    sport: { completion: null, last30: { games: 0, abandoned: 0, stalled: 0, aborted: 0, slow_start: 0 }, warning: false, wait_until: null, pool: false },
+    calls: [] as string[],
   };
 }
 type World = ReturnType<typeof world>;
@@ -67,6 +73,52 @@ async function player(page: Page, w: World, who: { id: string; username: string;
         return json(route, {
           id: GAME, me: who.color, red: players.red, black: players.black, base: c.base, inc: c.inc, speed: "lightning", rated: c.rated, relay: w.relay,
           status: "playing", result: null, reason: null, moves: [], red_rating_before: null, red_rating_after: null, black_rating_before: null, black_rating_after: null,
+        });
+      }
+      case "/rest/v1/rpc/my_sportsmanship":
+        return json(route, w.sport);
+      case "/rest/v1/rpc/acknowledge_sportsmanship":
+        w.calls.push("acknowledge");
+        w.sport = { ...w.sport, warning: false };
+        return json(route, null);
+      case "/rest/v1/rpc/seek_counts":
+        return json(route, { "120+1": Object.keys(w.seeks).length });
+      case "/rest/v1/rpc/seek":
+        w.calls.push(`seek:${who.color}:${body!.p_base}+${body!.p_inc}:${JSON.stringify(body!.p_filters)}`);
+        w.seeks[who.color] = { base: body!.p_base as number, inc: body!.p_inc as number, matched: false };
+        return json(route, null);
+      case "/rest/v1/rpc/cancel_seek":
+        // As the database does: a matched seek stays until find_match hands over the game.
+        if (!w.seeks[who.color]?.matched) delete w.seeks[who.color];
+        return json(route, null);
+      case "/rest/v1/rpc/invite_seeker":
+        w.invite = true;
+        return json(route, true);
+      case "/rest/v1/rpc/answer_invite": {
+        w.invite = false;
+        if (!body!.p_accept) return json(route, null);
+        const mine = w.seeks[who.color]!;
+        w.challenge = { base: mine.base, inc: mine.inc, color: "red", rated: true, game: GAME };
+        w.seeks.red!.matched = true;
+        w.seeks.black!.matched = true;
+        delete w.seeks[who.color];
+        return json(route, GAME);
+      }
+      case "/rest/v1/rpc/find_match": {
+        const mine = w.seeks[who.color];
+        const theirs = w.seeks[who.color === "red" ? "black" : "red"];
+        if (!mine) return json(route, { status: "idle" });
+        if (mine.matched || (theirs && !w.far)) {
+          w.challenge = { base: mine.base, inc: mine.inc, color: "red", rated: true, game: GAME };
+          if (theirs) theirs.matched = true;
+          delete w.seeks[who.color];
+          return json(route, { status: "matched", game: GAME });
+        }
+        const other = who.color === "red" ? { username: "bob_xq", rating: 1500, diff: 300 } : { username: "alice_xq", rating: 1200, diff: -300 };
+        return json(route, {
+          status: "searching", window: 50, anyone: false, waited: 3, counts: { "120+1": Object.keys(w.seeks).length },
+          nearest: theirs ? [{ ...other, waited: 3, invited: w.invite && who.color === "red" }] : [],
+          invite: w.invite && who.color === "black" ? { id: 7, rating: 1200, diff: -300, expires_in: 12 } : null,
         });
       }
       case "/rest/v1/rpc/report_game":
@@ -132,6 +184,50 @@ async function startGame(alice: Page, bob: Page) {
   // The challenger's page notices and opens the game.
   await expect(alice).toHaveURL(new RegExp(`/en/game/\\?id=${GAME}`), { timeout: 10_000 });
 }
+
+test("quick pairing: two players seeking on a tile are paired and the game opens", async ({ context }) => {
+  const { w, alice, bob } = await twoPlayers(context, false);
+  await alice.goto(at("/en/online/"));
+  await expect(alice.getByRole("heading", { name: "Quick pairing" })).toBeVisible();
+  await alice.getByRole("button", { name: /^2\+1/ }).click();
+  await expect(alice.getByRole("heading", { name: "Looking for an opponent: 2+1" })).toBeVisible();
+  await expect(alice.getByText("Within ±50 of your rating")).toBeVisible();
+  expect(w.calls).toEqual([`seek:red:120+1:${JSON.stringify({ range: 200, established: false, account_age: 0, completion: 0 })}`]);
+
+  await bob.goto(at("/en/online/"));
+  await bob.getByRole("button", { name: /^2\+1/ }).click();
+  await expect(bob).toHaveURL(new RegExp(`/en/game/\\?id=${GAME}`));
+  await expect(alice).toHaveURL(new RegExp(`/en/game/\\?id=${GAME}`), { timeout: 10_000 });
+  await expect(alice.getByText("bob_xq")).toBeVisible();
+  await expect(bob.getByText("alice_xq")).toBeVisible();
+});
+
+test("quick pairing: play anyway with the nearest player outside the window", async ({ context }) => {
+  const { w, alice, bob } = await twoPlayers(context, false);
+  w.far = true;
+  await alice.goto(at("/en/online/"));
+  await alice.getByRole("button", { name: /^2\+1/ }).click();
+  await bob.goto(at("/en/online/"));
+  await bob.getByRole("button", { name: /^2\+1/ }).click();
+  await expect(alice.getByText("bob_xq, 1500 (+300), waiting 3 s")).toBeVisible();
+  await alice.getByRole("button", { name: "Play anyway" }).click();
+  await expect(alice.getByText("Invited…")).toBeVisible();
+  await expect(bob.getByText("A player rated 1200 (−300) is ready to play you.")).toBeVisible();
+  await bob.getByRole("button", { name: "Accept" }).click();
+  await expect(bob).toHaveURL(new RegExp(`/en/game/\\?id=${GAME}`));
+  await expect(alice).toHaveURL(new RegExp(`/en/game/\\?id=${GAME}`), { timeout: 10_000 });
+});
+
+test("a sportsmanship warning must be acknowledged before quick pairing", async ({ context }) => {
+  const { w, alice } = await twoPlayers(context, false);
+  w.sport = { ...w.sport, completion: 80 as never, last30: { ...w.sport.last30, games: 5, abandoned: 1 }, warning: true };
+  await alice.goto(at("/en/online/"));
+  await expect(alice.getByText("Completion rate: 80 % of your games in the last 90 days. In your last 30 games: left 1.")).toBeVisible();
+  await expect(alice.getByRole("button", { name: /^2\+1/ })).toBeDisabled();
+  await alice.getByRole("button", { name: "I understand" }).click();
+  await expect(alice.getByRole("button", { name: /^2\+1/ })).toBeEnabled();
+  expect(w.calls).toEqual(["acknowledge"]);
+});
 
 for (const relay of [false, true]) {
   test(`play a friend over ${relay ? "the relay" : "a direct link"}: moves, clocks, chat, resign, rated result`, async ({ context }) => {

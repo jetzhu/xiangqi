@@ -9,7 +9,7 @@ import type { SavedAnalysis } from "./storage.js";
 import { useStore } from "../store/index.js";
 import { useAccount } from "../account/session.js";
 import { useEngine } from "./useEngine.js";
-import { LIVE_GAME_KEY } from "../online/live.js";
+import { useLiveGame } from "../online/live.js";
 import { Board } from "../Board.js";
 import { type Nav, useNav } from "../nav.js";
 import { type NotationStyle, announceMove, useSettings, useSound, useT } from "../settings.js";
@@ -75,7 +75,7 @@ export function AnalysisPage() {
   const inCheck = position.isInCheck(position.turn);
   const checkSquare = inCheck ? squareName(position.kings[position.turn === 1 ? 0 : 1]) : null;
 
-  const liveGame = useLiveGame();
+  const liveGame = useLiveGame() !== null;
   const engine = useEngine(engineOn && !liveGame && !editing && !gameOver, current.fen, multipv, 22);
   const best = engine.progress?.lines[0];
   const arrows: Arrow[] = engineOn
@@ -339,22 +339,4 @@ export function AnalysisPage() {
       </aside>
     </div>
   );
-}
-
-/** Whether an online game is in progress in this browser (GamePage keeps the mark fresh). */
-function useLiveGame(): boolean {
-  const read = () => {
-    try {
-      const v = JSON.parse(localStorage.getItem(LIVE_GAME_KEY) ?? "null") as { until?: number } | null;
-      return !!v && typeof v.until === "number" && v.until > Date.now();
-    } catch {
-      return false;
-    }
-  };
-  const [live, setLive] = useState(read);
-  useEffect(() => {
-    const timer = setInterval(() => setLive(read()), 2_000);
-    return () => clearInterval(timer);
-  }, []);
-  return live;
 }

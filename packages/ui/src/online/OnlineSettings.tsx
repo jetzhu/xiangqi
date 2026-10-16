@@ -40,7 +40,7 @@ export function OnlineSettings() {
   return (
     <div className="online-settings">
       <p className="sub">
-        {tt("Opponent filters apply to quick pairing, coming with v0.3. The rest apply to your games now.", "对手筛选用于 v0.3 推出的快速匹配；其余设置现在即对你的对局生效。")}{" "}
+        {tt("Opponent filters apply to quick pairing; the rest to all your online games.", "对手筛选用于快速匹配；其余设置对你的所有在线对局生效。")}{" "}
         <a href={nav.href("/online")}>{tt("Get ready for online play", "在线对弈准备")}</a>
       </p>
 
@@ -82,7 +82,7 @@ export function OnlineSettings() {
         </label>
         <label className="check">
           <input type="checkbox" checked={settings.opponentChecked} onChange={(e) => set("opponentChecked", e.target.checked)} />
-          {tt("Only players with 10 or more fair-play checked games", "只匹配已有 10 盘以上公平性检查的棋手")}
+          {tt("Only players with 10 or more fair-play checked games (from when fair-play checks start)", "只匹配已有 10 盘以上公平性检查的棋手（公平性检查上线后生效）")}
         </label>
       </div>
 

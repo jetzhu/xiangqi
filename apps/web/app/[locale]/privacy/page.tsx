@@ -3,7 +3,7 @@ import { type Locale, pageMetadata } from "../../../lib/site";
 
 // Rendered on the server, so anyone (and Google's consent-screen check) can read it without
 // running the app. Keep it true to what the code does: packages/db holds what an account stores.
-const UPDATED = "2026-10-15";
+const UPDATED = "2026-10-16";
 const CONTACT = "jianjetzhu@gmail.com";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -51,13 +51,15 @@ function En() {
         <li>
           <strong>For online play:</strong> your birth month and year (no day), so that players under 16 get the protections below and lose them by themselves on turning 16; the players you block, the
           challenge links you make, and your online games: the moves, the clock readings each browser reported, and when each report reached us, used to
-          settle results and for fair play (see the <a href="../fair-play/">fair play policy</a>).
+          settle results and for fair play (see the <a href="../fair-play/">fair play policy</a>), and what each game says about sportsmanship
+          (left, stalled, aborted, or a very slow start; see the <a href="../sportsmanship/">sportsmanship policy</a>). While you look for a quick-pairing
+          game, your rating, filters and the time you started are kept until you're paired or stop.
         </li>
       </ul>
       <p>
         Accounts are run by <a href="https://supabase.com/privacy">Supabase</a>, which stores this data for us in the United States (AWS, Oregon). Only
         you can read your account data from the site; the database's access rules block everyone else. The exception is your <strong>public profile</strong>,
-        which anyone can see: your username and online ratings, and, if you're 16 or older, your avatar, country and when you joined. Opponents see your avatar in a game only if you're 16 or older too.
+        which anyone can see: your username, online ratings and completion rate (the share of your recent games you didn't leave, stall or abort), and, if you're 16 or older, your avatar, country and when you joined. Opponents see your avatar in a game only if you're 16 or older too.
       </p>
       <p>
         In online games the two players' browsers normally connect directly, which shows each player's internet (IP) address to the other. Settings →
@@ -125,11 +127,11 @@ function Zh() {
           <strong>下棋记录：</strong>课程进度、设置、星级、连续学习天数、人机对局、题目记录、等级分和保存的分析。
         </li>
         <li>
-          <strong>在线对弈：</strong>你的出生年月（不含日期），用于让 16 岁以下的棋手获得下述保护，并在年满 16 岁时自动解除；你屏蔽的棋手、你生成的挑战链接，以及你的在线对局：着法、双方浏览器报告的时钟读数和每份报告到达服务器的时间，用于判定结果和公平竞技（见<a href="../fair-play/">公平竞技规则</a>）。
+          <strong>在线对弈：</strong>你的出生年月（不含日期），用于让 16 岁以下的棋手获得下述保护，并在年满 16 岁时自动解除；你屏蔽的棋手、你生成的挑战链接，以及你的在线对局：着法、双方浏览器报告的时钟读数和每份报告到达服务器的时间，用于判定结果和公平竞技（见<a href="../fair-play/">公平竞技规则</a>），以及每盘对局的棋品记录（离开、拖延、取消或开局过慢，见<a href="../sportsmanship/">棋品规则</a>）。快速匹配时，你的等级分、筛选条件和开始时间会保存到匹配成功或停止寻找为止。
         </li>
       </ul>
       <p>
-        账号服务由 <a href="https://supabase.com/privacy">Supabase</a> 提供，数据存放在美国（AWS 俄勒冈）。只有你本人能在网站上读取自己的账号数据，数据库的访问规则会阻止其他所有人。例外是你的<strong>公开资料</strong>，任何人都能看到：用户名和在线等级分；如果你已满 16 岁，还有头像、国家或地区以及注册时间。对局中，对手也只有在你已满 16 岁时才能看到你的头像。
+        账号服务由 <a href="https://supabase.com/privacy">Supabase</a> 提供，数据存放在美国（AWS 俄勒冈）。只有你本人能在网站上读取自己的账号数据，数据库的访问规则会阻止其他所有人。例外是你的<strong>公开资料</strong>，任何人都能看到：用户名、在线等级分和完成率（最近对局中你没有离开、拖延或取消的比例）；如果你已满 16 岁，还有头像、国家或地区以及注册时间。对局中，对手也只有在你已满 16 岁时才能看到你的头像。
       </p>
       <p>
         在线对局时，双方浏览器通常会直接连接，这会让对方看到你的网络（IP）地址。在“设置 → 在线对弈”中开启“不向对手透露我的网络地址”后，你的对局将经服务器中转；16 岁以下的棋手始终如此。为了建立直接连接，你的浏览器会向公共 STUN 服务器（由 Google 或 Cloudflare 运营）查询自己的网络地址；该服务器能看到你的 IP 地址，但看不到你的身份或对局内容。

@@ -460,6 +460,18 @@ a.button.big { display: inline-block; }
 .share-link { display: flex; gap: 8px; max-width: 560px; }
 .share-link input { flex: 1; min-width: 0; }
 .challenge-terms { font-size: 18px; }
+/* Quick pairing and sportsmanship (M17) */
+.tile { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.tile.main { border-color: var(--accent); }
+.tile-count { font-size: 12px; font-weight: normal; color: var(--muted); }
+.quick-pair .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.quick-pair .invite { margin: 12px 0; padding: 10px 12px; border: 1px solid var(--accent); border-radius: 8px; }
+.quick-pair .nearest ul { list-style: none; padding: 0; margin: 4px 0 12px; line-height: 2; }
+.quick-pair .nearest button { padding: 2px 10px; }
+.sportsmanship .warning { margin: 8px 0; padding: 10px 12px; border: 1px solid var(--accent); border-radius: 8px; }
+.live-notice { padding: 10px 12px; border: 1px solid var(--accent); border-radius: 8px; }
+.checklist-done { margin: 16px 0; }
+.checklist-done summary { cursor: pointer; font-weight: 600; }
 .waiting { display: flex; align-items: center; gap: 8px; margin: 16px 0; }
 .waiting .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); animation: xq-pulse 1.2s ease-in-out infinite; }
 @keyframes xq-pulse { 50% { opacity: 0.25; } }

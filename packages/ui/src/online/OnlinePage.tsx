@@ -1,19 +1,24 @@
 "use client";
 // Play online: what a player needs before their first online game (decision D9, M15), the one
-// birth month online play needs, and then the way in (Play a friend, M16).
+// birth month online play needs, and then the ways in: quick pairing (M17) and Play a friend
+// (M16), with the player's sportsmanship record.
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useAccount } from "../account/session.js";
 import { useNav } from "../nav.js";
 import { useT } from "../settings.js";
-import { type Eligibility, LONG_GAMES_NEEDED, LONG_GAME_MOVES, onlineEligibility } from "./api.js";
+import { type Eligibility, LONG_GAMES_NEEDED, LONG_GAME_MOVES, type Sportsmanship, acknowledgeSportsmanship, mySportsmanship, onlineEligibility } from "./api.js";
 import { BirthMonthForm, useMonthName } from "./BirthMonth.js";
+import { useLiveGame } from "./live.js";
+import { QuickPair } from "./QuickPair.js";
 
 export function OnlinePage() {
   const { tt } = useT();
   const nav = useNav();
   const account = useAccount();
   const [check, setCheck] = useState<Eligibility | null | "error">(null);
+  const [sport, setSport] = useState<Sportsmanship | null>(null);
   const signedIn = account.state.status === "signedIn";
+  const live = useLiveGame();
 
   const load = useCallback(() => {
     void account
@@ -22,9 +27,18 @@ export function OnlinePage() {
       .then(setCheck)
       .catch(() => setCheck("error"));
   }, [account]);
+  const loadSport = useCallback(() => {
+    void account
+      .client()
+      .then(mySportsmanship)
+      .then(setSport, () => {});
+  }, [account]);
   useEffect(() => {
-    if (signedIn) load();
-  }, [signedIn, load]);
+    if (signedIn) {
+      load();
+      loadSport();
+    }
+  }, [signedIn, load, loadSport]);
 
   const monthName = useMonthName();
 
@@ -33,8 +47,8 @@ export function OnlinePage() {
       <h1>{tt("Play online", "在线对弈")}</h1>
       <p className="sub">
         {tt(
-          "Play a friend now with a challenge link. Quick pairing with people of your level comes with v0.3. Lightning, Blitz and Rapid each have their own rating.",
-          "现在就可以用挑战链接与好友对弈；与水平相近的棋手快速匹配将在 v0.3 推出。闪电、超快棋、快棋各有独立等级分。",
+          "Get paired with a player of about your level, or play a friend with a challenge link. Lightning, Blitz and Rapid each have their own rating.",
+          "与水平相近的棋手快速匹配，或用挑战链接与好友对弈。闪电、超快棋、快棋各有独立等级分。",
         )}
       </p>
     </>
@@ -56,17 +70,9 @@ export function OnlinePage() {
   if (!check) return <p className="muted" style={{ padding: 24 }}>…</p>;
 
   const gamesLeft = Math.max(0, LONG_GAMES_NEEDED - check.long_games);
-
-  return (
-    <div className="online-page">
-      {intro}
-      <h2>
-        {check.eligible
-          ? tt("You're ready for online play", "你已具备在线对弈资格")
-          : check.casual_ok
-            ? tt("Before rated games", "计分对局前")
-            : tt("Before your first online game", "首次在线对弈前")}
-      </h2>
+  const checklist = (
+    <>
+      {!check.eligible && <h2>{check.casual_ok ? tt("Before rated games", "计分对局前") : tt("Before your first online game", "首次在线对弈前")}</h2>}
       <ul className="checklist">
         <Item done={check.verified}>{tt("A verified email", "已验证的邮箱")}</Item>
         <Item done={check.age_answered}>
@@ -92,6 +98,27 @@ export function OnlinePage() {
           </ul>
         </Item>
       </ul>
+    </>
+  );
+
+  return (
+    <div className="online-page">
+      {intro}
+      {live !== null && (
+        <p className="live-notice" role="status">
+          {tt("You have a game in progress.", "你有一盘对局正在进行。")} {live && <a href={nav.href(`/game?id=${live}`)}>{tt("Back to the game", "回到对局")}</a>}
+        </p>
+      )}
+      {check.eligible && <QuickPair level={check.level} sport={sport} onSport={loadSport} busy={live !== null} />}
+      {check.eligible && sport && <SportsmanshipRecord sport={sport} onAcknowledged={loadSport} />}
+      {check.eligible ? (
+        <details className="checklist-done">
+          <summary>{tt("You're ready for online play", "你已具备在线对弈资格")}</summary>
+          {checklist}
+        </details>
+      ) : (
+        checklist
+      )}
       {check.casual_ok && (
         <p>
           <a className="button primary big" href={nav.href("/friend")}>
@@ -123,5 +150,55 @@ function Item({ done, children }: { done: boolean; children: ReactNode }) {
     <li className={done ? "done" : ""}>
       <span aria-hidden>{done ? "✓" : "○"}</span> {children}
     </li>
+  );
+}
+
+/** The player's own sportsmanship record: completion rate, recent labels, and any warning. */
+function SportsmanshipRecord({ sport, onAcknowledged }: { sport: Sportsmanship; onAcknowledged: () => void }) {
+  const { tt } = useT();
+  const account = useAccount();
+  const l = sport.last30;
+  const marks: [number, string][] = (
+    [
+      [l.abandoned, tt("left", "离开")],
+      [l.stalled, tt("stalled", "拖延")],
+      [l.aborted, tt("aborted", "取消")],
+      [l.slow_start, tt("slow start", "开局过慢")],
+    ] as [number, string][]
+  ).filter(([n]) => n > 0);
+  const acknowledge = async () => {
+    await acknowledgeSportsmanship(await account.client()).catch(() => {});
+    onAcknowledged();
+  };
+  return (
+    <section className="sportsmanship" aria-labelledby="h-sport">
+      <h2 id="h-sport">{tt("Your sportsmanship (棋品)", "你的棋品")}</h2>
+      <p>
+        {sport.completion === null
+          ? tt("Completion rate: shown after 5 online games.", "完成率：下满 5 盘在线对局后显示。")
+          : tt(`Completion rate: ${sport.completion} % of your games in the last 90 days.`, `完成率：最近 90 天对局的 ${sport.completion}%。`)}
+        {marks.length > 0 && (
+          <>
+            {" "}
+            {tt("In your last 30 games: ", "最近 30 盘中：")}
+            {marks.map(([n, label]) => `${label} ${n}`).join(tt(", ", "，"))}.
+          </>
+        )}
+      </p>
+      {sport.warning && (
+        <div className="warning" role="alert">
+          <p>
+            {tt(
+              "You recently left a game, or let your clock run out in a lost position instead of resigning. That leaves your opponent waiting. Next time, there'll be a wait before your next quick-pairing game.",
+              "你最近离开了对局，或在败局中拖到超时而不认输，让对手白白等待。再有一次，下一盘快速匹配前需要等待。",
+            )}
+          </p>
+          <button type="button" className="primary" onClick={() => void acknowledge()}>
+            {tt("I understand", "我明白了")}
+          </button>
+        </div>
+      )}
+      {sport.pool && <p className="muted small">{tt("For the next few days you'll be paired with other players who have also left games.", "接下来几天，你将与同样离开过对局的棋手匹配。")}</p>}
+    </section>
   );
 }

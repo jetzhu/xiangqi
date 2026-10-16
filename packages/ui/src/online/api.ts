@@ -1,5 +1,6 @@
 // Calls to the database functions for online play (migrations 20261012000000_online_groundwork.sql
-// for M15, 20261012120000_birth_month.sql, and 20261013000000_play_a_friend.sql for M16) and to the `game` server function.
+// for M15, 20261012120000_birth_month.sql, 20261013000000_play_a_friend.sql for M16, and
+// 20261016000000_quick_pairing.sql for M17) and to the `game` server function.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { OnlineResult, Report } from "@xq/online";
 
@@ -137,3 +138,52 @@ export async function settleGame(sb: SupabaseClient, id: string): Promise<GameVe
   if (error) throw new Error(error.message);
   return data!;
 }
+
+// Quick pairing and sportsmanship (M17, migration 20261016000000_quick_pairing.sql) -----------
+
+/** The opponent filters from Settings → Online play, as seek() takes them. */
+export interface SeekFilters {
+  range: number | null;
+  established: boolean;
+  account_age: number;
+  completion: number;
+}
+
+export interface Seeking {
+  status: "searching";
+  /** How far from the player's rating an opponent may be now; null: no limit. */
+  window: number | null;
+  anyone: boolean;
+  /** Seconds since the search started. */
+  waited: number;
+  /** The nearest players seeking on the same tile but outside the window, for "Play anyway". */
+  nearest: { username: string; rating: number; diff: number; waited: number; invited: boolean }[];
+  /** Someone outside the window wants to play: their rating and the gap, open for `expires_in` s. */
+  invite: { id: number; rating: number; diff: number; expires_in: number } | null;
+  /** Players seeking on each tile, keyed "base+inc" in seconds. */
+  counts: Record<string, number>;
+}
+export type MatchState = { status: "idle" } | { status: "matched"; game: string } | Seeking;
+
+export interface Sportsmanship {
+  /** Per cent of games in the last 90 days not abandoned, stalled or aborted; null under 5 games. */
+  completion: number | null;
+  last30: { games: number; abandoned: number; stalled: number; aborted: number; slow_start: number };
+  /** A warning to acknowledge before seeking again. */
+  warning: boolean;
+  /** A pairing wait: no seeking before this. */
+  wait_until: string | null;
+  /** Matched only with other players under a penalty. */
+  pool: boolean;
+}
+
+export const seek = (sb: SupabaseClient, tc: { base: number; inc: number }, filters: SeekFilters, relay: boolean) =>
+  rpc<null>(sb, "seek", { p_base: tc.base, p_inc: tc.inc, p_filters: filters, p_relay: relay });
+export const findMatch = (sb: SupabaseClient) => rpc<MatchState>(sb, "find_match");
+export const inviteSeeker = (sb: SupabaseClient, username: string) => rpc<boolean>(sb, "invite_seeker", { p_username: username });
+export const answerInvite = (sb: SupabaseClient, id: number, accept: boolean) => rpc<string | null>(sb, "answer_invite", { p_id: id, p_accept: accept });
+export const widenSeek = (sb: SupabaseClient) => rpc<null>(sb, "widen_seek");
+export const cancelSeek = (sb: SupabaseClient) => rpc<null>(sb, "cancel_seek");
+export const seekCounts = (sb: SupabaseClient) => rpc<Record<string, number>>(sb, "seek_counts");
+export const mySportsmanship = (sb: SupabaseClient) => rpc<Sportsmanship>(sb, "my_sportsmanship");
+export const acknowledgeSportsmanship = (sb: SupabaseClient) => rpc<null>(sb, "acknowledge_sportsmanship");

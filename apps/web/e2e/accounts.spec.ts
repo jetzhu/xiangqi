@@ -193,6 +193,10 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
         else [online.born, online.next] = [born, null];
         return json(route, null);
       }
+      case "/rest/v1/rpc/my_sportsmanship":
+        return json(route, { completion: null, last30: { games: 0, abandoned: 0, stalled: 0, aborted: 0, slow_start: 0 }, warning: false, wait_until: null, pool: false });
+      case "/rest/v1/rpc/seek_counts":
+        return json(route, {});
       case "/rest/v1/rpc/online_eligibility": {
         const games = tables.bot_games as { result: string | null; moves: string[]; helps: number; bot_rating: number }[];
         const long = games.filter((g) => g.result && g.moves.length >= 20).length;
@@ -909,7 +913,8 @@ test("before the first online game: the birth month, then a clean win or 3 long 
   await page.goto(at("/en/online/"));
   calls.tables.bot_games.push(long("g3", "draw") as never);
   await page.reload();
-  await expect(page.getByRole("heading", { name: "You're ready for online play" })).toBeVisible();
+  await expect(page.getByText("You're ready for online play")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Quick pairing" })).toBeVisible();
 
   // Settings: when under 16 ends, and a change to an earlier month waits a week and can be withdrawn.
   await page.goto(at("/en/settings/?tab=online"));
