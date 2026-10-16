@@ -62,11 +62,11 @@ export function ChallengePage() {
     </p>
   );
 
-  const accept = async () => {
+  const accept = async (casual = false) => {
     setBusy(true);
     setError(null);
     try {
-      const game = await acceptChallenge(await account.client(), code, settings.relayOnly);
+      const game = await acceptChallenge(await account.client(), code, settings.relayOnly, casual);
       location.assign(nav.href(`/game?id=${game}`));
     } catch (e) {
       const m = e instanceof Error ? e.message : "";
@@ -109,10 +109,20 @@ export function ChallengePage() {
           {tt("Log in or sign up to accept.", "登录或注册后即可接受。")} <a href={`${nav.href("/login")}?next=${encodeURIComponent(`/challenge?c=${code}`)}`}>{tt("Log in", "登录")}</a> ·{" "}
           <a href={nav.href("/signup")}>{tt("Sign up", "注册")}</a>
         </p>
-      ) : check && !check.eligible ? (
+      ) : check && !check.casual_ok ? (
         <p>
-          {tt("Before your first online game there are a few steps.", "首次在线对弈前需要完成几个步骤。")} <a href={nav.href("/online")}>{tt("See what's left", "查看还差什么")}</a>
+          {tt("Before your first online game: a verified email and your birth month.", "首次在线对弈前：请先验证邮箱并填写出生年月。")} <a href={nav.href("/online")}>{tt("See what's left", "查看还差什么")}</a>
         </p>
+      ) : check && info.rated && !check.eligible ? (
+        <>
+          <p>
+            {tt("Rated games need the bot games first.", "计分对局需要先完成人机对局要求。")} <a href={nav.href("/online")}>{tt("See what's left", "查看还差什么")}</a>
+          </p>
+          {error && <p className="form-error">{error}</p>}
+          <button type="button" className="primary big" disabled={busy} onClick={() => void accept(true)}>
+            {tt("Play it as a casual game", "改为休闲对局")}
+          </button>
+        </>
       ) : (
         <>
           {error && <p className="form-error">{error}</p>}

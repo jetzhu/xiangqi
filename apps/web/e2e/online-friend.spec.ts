@@ -50,7 +50,7 @@ async function player(page: Page, w: World, who: { id: string; username: string;
       case "/rest/v1/profiles":
         return json(route, [{ username: who.username, username_chosen: true, avatar: null, country: null }]);
       case "/rest/v1/rpc/online_eligibility":
-        return json(route, { verified: true, age_answered: true, under16: false, level: 1200, target: 1200, clean_win: true, long_games: 3, eligible: true });
+        return json(route, { verified: true, age_answered: true, under16: false, level: 1200, target: 1200, clean_win: true, long_games: 3, casual_ok: true, eligible: true });
       case "/rest/v1/rpc/create_challenge":
         w.challenge = { base: body!.p_base as number, inc: body!.p_inc as number, color: body!.p_color as string, rated: body!.p_rated as boolean, game: null };
         return json(route, CODE);

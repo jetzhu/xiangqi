@@ -668,6 +668,27 @@ describe("play a friend (M16)", () => {
     expect(await as(H, async (tx) => (await tx.query(`select id from public.games`)).rows)).toEqual([{ id: game }]);
   });
 
+  it("lets a new player play casual friend games; rated ones need the bot games from both", async () => {
+    const K = "00000000-0000-4000-8000-0000000000c9";
+    await signUp(K, { username: "kong_xq" });
+    // No birth month yet: nothing.
+    expect(await errorAs(K, `public.create_challenge(600, 5, 'red', false, false)`)).toMatch(/not ready/);
+    await db.query(`update public.profiles set birth_month = '1990-01-01' where user_id = $1`, [K]);
+    expect(await commitAs(K, `public.online_eligibility()`)).toMatchObject({ casual_ok: true, eligible: false });
+    // Casual: make and accept. Rated: neither, unless accepted as casual.
+    const casual = await commitAs<string>(K, `public.create_challenge(600, 5, 'red', false, false)`);
+    expect(await errorAs(K, `public.create_challenge(600, 5, 'red', true, false)`)).toMatch(/not ready/);
+    const g1 = await commitAs<string>(G, `public.accept_challenge($1, false)`, [casual]);
+    expect(await commitAs(G, `public.game_info($1)->'rated'`, [g1])).toBe(false);
+    const rated = await commitAs<string>(G, `public.create_challenge(600, 5, 'red', true, false)`);
+    expect(await errorAs(K, `public.accept_challenge('${rated}', false)`)).toMatch(/not ready/);
+    const g2 = await commitAs<string>(K, `public.accept_challenge($1, false, true)`, [rated]);
+    expect(await commitAs(K, `public.game_info($1)->'rated'`, [g2])).toBe(false);
+    // Unverified: not even casual.
+    await db.query(`update auth.users set email_confirmed_at = null where id = $1`, [K]);
+    expect(await errorAs(K, `public.create_challenge(600, 5, 'red', false, false)`)).toMatch(/not ready/);
+  });
+
   it("relays the game when either player asks, or a player is under 16", async () => {
     const c2 = await commitAs<string>(G, `public.create_challenge(600, 5, 'random', false, false)`);
     const g2 = await commitAs<string>(H, `public.accept_challenge($1, true)`, [c2]);

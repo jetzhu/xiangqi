@@ -202,7 +202,7 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
         const sixteen = online.born && young ? `${Number(online.born.slice(0, 4)) + 16 + (online.born.endsWith("12") ? 1 : 0)}-${String((Number(online.born.slice(5)) % 12) + 1).padStart(2, "0")}-01` : null;
         return json(route, {
           verified: true, age_answered: answered, under16: young, born: online.born, born_next: online.next, born_next_at: online.next && "2026-10-22T10:00:00Z", earlier_used: !!online.next, sixteen_on: sixteen,
-          level: 800, target: 800, clean_win: clean, long_games: long, eligible: answered && (clean || long >= 3),
+          level: 800, target: 800, clean_win: clean, long_games: long, casual_ok: answered, eligible: answered && (clean || long >= 3),
         });
       }
       case "/rest/v1/rpc/public_profile": {
@@ -899,6 +899,14 @@ test("before the first online game: the birth month, then a clean win or 3 long 
   await expect(page.getByText(`Your birth month: March ${year}`)).toBeVisible();
   await expect(page.getByText(/Under 16: your public profile shows only your username.*lifts by itself/)).toBeVisible();
   expect(calls.rpc).toEqual([`set_birth_month:${year}-03`]);
+  // Casual friend games are open now; rated ones wait for the bot games.
+  await expect(page.getByRole("heading", { name: "Before rated games" })).toBeVisible();
+  await expect(page.getByText("Casual games now; rated ones once the steps above are done.")).toBeVisible();
+  await page.getByRole("link", { name: "Play a friend" }).click();
+  await expect(page.getByRole("radio", { name: "Casual" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("radio", { name: "Rated" })).toBeDisabled();
+  await expect(page.getByText("Rated games need the bot games first.")).toBeVisible();
+  await page.goto(at("/en/online/"));
   calls.tables.bot_games.push(long("g3", "draw") as never);
   await page.reload();
   await expect(page.getByRole("heading", { name: "You're ready for online play" })).toBeVisible();

@@ -43,6 +43,9 @@ export interface Eligibility {
   target: number;
   clean_win: boolean;
   long_games: number;
+  /** Ready for casual friend games: a verified email and the birth month. */
+  casual_ok: boolean;
+  /** Ready for rated games and quick pairing: also the bot games (D9). */
   eligible: boolean;
 }
 
@@ -123,7 +126,8 @@ export const createChallenge = (sb: SupabaseClient, c: { base: number; inc: numb
   rpc<string>(sb, "create_challenge", { p_base: c.base, p_inc: c.inc, p_color: c.color, p_rated: c.rated, p_relay: c.relay });
 export const challengeInfo = (sb: SupabaseClient, code: string) => rpc<ChallengeInfo | null>(sb, "challenge_info", { p_code: code });
 export const cancelChallenge = (sb: SupabaseClient, code: string) => rpc<null>(sb, "cancel_challenge", { p_code: code });
-export const acceptChallenge = (sb: SupabaseClient, code: string, relay: boolean) => rpc<string>(sb, "accept_challenge", { p_code: code, p_relay: relay });
+/** `casual`: accept a rated challenge as a casual game (for a player not yet ready for rated games). */
+export const acceptChallenge = (sb: SupabaseClient, code: string, relay: boolean, casual = false) => rpc<string>(sb, "accept_challenge", { p_code: code, p_relay: relay, p_casual: casual });
 export const gameInfo = (sb: SupabaseClient, id: string) => rpc<GameInfo | null>(sb, "game_info", { p_game: id });
 export const reportGame = (sb: SupabaseClient, id: string, report: Report) => rpc<null>(sb, "report_game", { p_game: id, p_report: report });
 

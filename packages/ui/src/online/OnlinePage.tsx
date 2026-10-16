@@ -55,17 +55,18 @@ export function OnlinePage() {
   if (check === "error") return <p className="form-error" style={{ padding: 24 }}>{tt("Couldn't load your progress. Check your connection and try again.", "无法载入进度，请检查网络后重试。")}</p>;
   if (!check) return <p className="muted" style={{ padding: 24 }}>…</p>;
 
-  const Item = ({ done, children }: { done: boolean; children: ReactNode }) => (
-    <li className={done ? "done" : ""}>
-      <span aria-hidden>{done ? "✓" : "○"}</span> {children}
-    </li>
-  );
   const gamesLeft = Math.max(0, LONG_GAMES_NEEDED - check.long_games);
 
   return (
     <div className="online-page">
       {intro}
-      <h2>{check.eligible ? tt("You're ready for online play", "你已具备在线对弈资格") : tt("Before your first online game", "首次在线对弈前")}</h2>
+      <h2>
+        {check.eligible
+          ? tt("You're ready for online play", "你已具备在线对弈资格")
+          : check.casual_ok
+            ? tt("Before rated games", "计分对局前")
+            : tt("Before your first online game", "首次在线对弈前")}
+      </h2>
       <ul className="checklist">
         <Item done={check.verified}>{tt("A verified email", "已验证的邮箱")}</Item>
         <Item done={check.age_answered}>
@@ -91,11 +92,12 @@ export function OnlinePage() {
           </ul>
         </Item>
       </ul>
-      {check.eligible && (
+      {check.casual_ok && (
         <p>
           <a className="button primary big" href={nav.href("/friend")}>
             {tt("Play a friend", "与好友对弈")}
           </a>
+          {!check.eligible && <span className="muted small"> {tt("Casual games now; rated ones once the steps above are done.", "现在可以下休闲对局；完成上述步骤后即可下计分对局。")}</span>}
         </p>
       )}
       {check.age_answered && check.under16 && (
@@ -112,5 +114,14 @@ export function OnlinePage() {
         <a href={nav.href("/settings?tab=online")}>{tt("Online settings", "在线对弈设置")}</a>
       </p>
     </div>
+  );
+}
+
+/** A checklist line. Kept outside OnlinePage so a re-render doesn't remount the birth month form. */
+function Item({ done, children }: { done: boolean; children: ReactNode }) {
+  return (
+    <li className={done ? "done" : ""}>
+      <span aria-hidden>{done ? "✓" : "○"}</span> {children}
+    </li>
   );
 }

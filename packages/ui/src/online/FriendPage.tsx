@@ -1,6 +1,7 @@
 "use client";
 // Play a friend (M16): choose the time, colour and rated or casual, then share the link (or
-// read out the code). The page waits for the friend to accept and then opens the game.
+// read out the code). The page waits for the friend to accept and then opens the game. Casual
+// games need only a verified email and the birth month; rated ones also the bot games (D9).
 import { TILES, type TimeControl, formatTimeControl, speedOf } from "@xq/online";
 import { useCallback, useEffect, useState } from "react";
 import { useAccount } from "../account/session.js";
@@ -28,7 +29,14 @@ export function FriendPage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (signedIn) void account.client().then(onlineEligibility).then(setCheck, () => setCheck("error"));
+    if (signedIn)
+      void account
+        .client()
+        .then(onlineEligibility)
+        .then((c) => {
+          setCheck(c);
+          if (c && !c.eligible) setRated(false);
+        }, () => setCheck("error"));
   }, [signedIn, account]);
 
   // Waiting for the friend: look every 2 s; open the game once they've accepted.
@@ -77,12 +85,12 @@ export function FriendPage() {
   }
   if (check === "error") return <p className="form-error" style={{ padding: 24 }}>{tt("Couldn't load your account. Check your connection and try again.", "无法载入账号，请检查网络后重试。")}</p>;
   if (!check) return <p className="muted" style={{ padding: 24 }}>…</p>;
-  if (!check.eligible) {
+  if (!check.casual_ok) {
     return (
       <div className="online-page">
         <h1>{tt("Play a friend", "与好友对弈")}</h1>
         <p>
-          {tt("A few steps first, so everyone you meet online is a real player.", "先完成几个步骤，确保在线遇到的都是真实棋手。")}{" "}
+          {tt("A verified email and your birth month first.", "请先验证邮箱并填写出生年月。")}{" "}
           <a href={nav.href("/online")}>{tt("See what's left", "查看还差什么")}</a>
         </p>
       </div>
@@ -190,7 +198,7 @@ export function FriendPage() {
 
       <h2>{tt("Rated or casual", "计分或休闲")}</h2>
       <div className="segmented" role="radiogroup" aria-label={tt("Rated or casual", "计分或休闲")}>
-        <button type="button" role="radio" aria-checked={rated} className={rated ? "selected" : ""} onClick={() => setRated(true)}>
+        <button type="button" role="radio" aria-checked={rated} className={rated ? "selected" : ""} disabled={!check.eligible} onClick={() => setRated(true)}>
           {tt("Rated", "计分")}
         </button>
         <button type="button" role="radio" aria-checked={!rated} className={!rated ? "selected" : ""} onClick={() => setRated(false)}>
@@ -198,6 +206,11 @@ export function FriendPage() {
         </button>
       </div>
       <p className="muted small">
+        {!check.eligible && (
+          <>
+            {tt("Rated games need the bot games first.", "计分对局需要先完成人机对局要求。")} <a href={nav.href("/online")}>{tt("See what's left", "查看还差什么")}</a>{" "}
+          </>
+        )}
         {rated
           ? tt(`Changes both players' ${t(SPEED_NAME[speed])} ratings. No takebacks.`, `影响双方的${t(SPEED_NAME[speed])}等级分。不能悔棋。`)
           : tt("No rating change. Takebacks allowed if your friend agrees.", "不影响等级分。对方同意即可悔棋。")}
