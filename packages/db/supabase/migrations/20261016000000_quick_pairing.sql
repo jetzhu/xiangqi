@@ -447,7 +447,7 @@ $$;
 do $$
 begin
   if exists (select 1 from pg_namespace where nspname = 'cron') then
-    perform cron.schedule('clear-seeks', '1 minute', 'select public.clear_seeks()');
+    perform cron.schedule('clear-seeks', '* * * * *', 'select public.clear_seeks()');
   end if;
 end $$;
 
