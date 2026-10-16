@@ -170,7 +170,8 @@ export class OnlineGame {
   // My actions ------------------------------------------------------------------------------
 
   /** Plays my move (ICCS). Returns false if it's illegal, not my turn, or my time has run out. */
-  move(iccs: string, now: number): boolean {
+  /** `blur`: the page lost focus during this turn (for the fair-play record, M18). */
+  move(iccs: string, now: number, blur = false): boolean {
     if (this.result || this.turn !== this.me) return false;
     const moved = this.hasMoved(this.me);
     const used = moved ? now - this.turnStart : 0;
@@ -182,7 +183,7 @@ export class OnlineGame {
     if (moved) this.clocks[this.me] += this.tc.inc * 1000 - used;
     this.afterMove(this.me, now);
     this.io.send({ t: "move", ply: this.plies, iccs, clock: this.clocks[this.me], seen: this.clocks[this.opp], hash: this.hash });
-    this.reportMove();
+    this.reportMove(blur);
     this.checkRules();
     this.io.changed();
     return true;
@@ -496,9 +497,9 @@ export class OnlineGame {
     if (this.takeback?.by === other(mover)) this.takeback = null;
   }
 
-  private reportMove() {
+  private reportMove(blur?: boolean) {
     const last = this.game.history.at(-1)!;
-    this.io.report({ kind: "move", ply: this.plies, iccs: last.iccs, clocks: { ...this.clocks }, hash: this.hash });
+    this.io.report({ kind: "move", ply: this.plies, iccs: last.iccs, clocks: { ...this.clocks }, hash: this.hash, ...(blur ? { blur } : {}) });
   }
 
   private checkRules() {

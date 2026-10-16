@@ -66,6 +66,8 @@ export interface ReviewedMove {
 
 export interface ReviewOptions {
   depth?: number;
+  /** Lines searched per position; the first is the engine's choice. */
+  multipv?: number;
   /** Indexes of moves that are book moves (graded "book" without analysis). */
   isBook?: (index: number) => boolean;
   onProgress?: (done: number, total: number) => void;
@@ -77,17 +79,40 @@ export interface ReviewOptions {
  * more entry than `moves` (the final position).
  */
 export async function reviewGame(engine: XiangqiEngine, fens: string[], moves: string[], options: ReviewOptions = {}): Promise<ReviewedMove[]> {
+  return reviewFromEvals(fens, moves, await analysePositions(engine, fens, options), options);
+}
+
+/** One position's analysis: the engine's move, and the scores of its top lines (Red's view, best first). */
+export interface PositionEval {
+  best: string | null;
+  score: Score;
+  /** The top lines' scores, best first (as many as `multipv` asked for, fewer if fewer legal moves). */
+  scores: Score[];
+}
+
+/**
+ * Analyse each position at a fixed depth. Every search starts from a cleared hash, so with one
+ * thread the same engine build gives the same numbers on every machine (the fair-play check
+ * compares two browsers' results).
+ */
+export async function analysePositions(engine: XiangqiEngine, fens: string[], options: ReviewOptions = {}): Promise<PositionEval[]> {
   const depth = options.depth ?? 8;
-  const evals: { score: Score; best: string | null }[] = [];
+  const multipv = options.multipv ?? 1;
+  const out: PositionEval[] = [];
   for (let i = 0; i < fens.length; i++) {
-    const r = await engine.analyze(fens[i]!, { depth });
-    const line = r.lines[0];
+    const r = await engine.analyze(fens[i]!, { depth, multipv });
+    const lines = [...r.lines].sort((a, b) => a.multipv - b.multipv);
     // No legal move: the side to move has lost.
     const redToMove = fens[i]!.split(/\s+/)[1] !== "b";
-    const score: Score = line ? line.score : { mate: redToMove ? -1 : 1 };
-    evals.push({ score, best: r.bestmove });
+    const score: Score = lines[0] ? lines[0].score : { mate: redToMove ? -1 : 1 };
+    out.push({ best: r.bestmove, score, scores: lines.length ? lines.map((l) => l.score) : [score] });
     options.onProgress?.(i + 1, fens.length);
   }
+  return out;
+}
+
+/** Grades every move from the positions' analyses (`evals[i]` is the position before move i). */
+export function reviewFromEvals(fens: string[], moves: string[], evals: readonly Pick<PositionEval, "best" | "score">[], options: Pick<ReviewOptions, "isBook"> = {}): ReviewedMove[] {
   const out: ReviewedMove[] = [];
   moves.forEach((move, i) => {
     const moverIsRed = fens[i]!.split(/\s+/)[1] !== "b";

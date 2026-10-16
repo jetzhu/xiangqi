@@ -75,6 +75,27 @@ describe("XiangqiEngine with Fairy-Stockfish", () => {
   });
 });
 
+describe("analysePositions", () => {
+  it("gives the same numbers every time with one thread, best line first", async () => {
+    const { analysePositions } = await import("../src/review.js");
+    const g = new Game();
+    const fens = [g.fen];
+    for (const m of ["h2e2", "h9g7", "h0g2", "i9h9"]) {
+      g.move(m);
+      fens.push(g.fen);
+    }
+    engine.setOption("Threads", 1);
+    const a = await analysePositions(engine, fens, { depth: 7, multipv: 3 });
+    const b = await analysePositions(engine, fens, { depth: 7, multipv: 3 });
+    engine.setOption("Threads", 2);
+    expect(b).toEqual(a);
+    for (const p of a) {
+      expect(p.scores).toHaveLength(3);
+      expect(p.scores[0]).toEqual(p.score);
+    }
+  });
+});
+
 describe("reviewGame", () => {
   it("grades a game that hangs a chariot", async () => {
     const { reviewGame } = await import("../src/review.js");

@@ -904,6 +904,103 @@ describe("quick pairing (M17)", () => {
   });
 });
 
+describe("fair play (M18)", () => {
+  const [T, U, V] = ["e7", "e8", "e9"].map((x) => `00000000-0000-4000-8000-0000000000${x}`) as [string, string, string];
+  const q = <T>(sql: string, params: unknown[] = []) => db.query<{ j: T }>(`select ${sql} as j`, params).then((r) => r.rows[0]!.j);
+  const side = (z: number, flags: string[] = [], acc = 70, match = 0.4) => ({ moves: 30, acc, match, z, flags, timing: {} });
+  /** A finished rated game between two players, already checked, `plies` long. */
+  const checked = (red: string, black: string, sides: { red: object; black: object }, opts: { plies?: number; result?: string; ago?: string } = {}) =>
+    q<string>(
+      `public.insert_test_game($1, $2, $3, $4, $5, $6)`,
+      [red, black, opts.plies ?? 60, opts.result ?? "draw", JSON.stringify({ status: "checked", ...sides }), opts.ago ?? "1 hour"],
+    );
+
+  beforeAll(async () => {
+    for (const [u, name] of [[T, "tang_xq"], [U, "ulan_xq"], [V, "vic_xq"]] as const) {
+      await signUp(u, { username: name });
+      await db.query(`update public.profiles set birth_month = '1990-01-01' where user_id = $1`, [u]);
+      await db.query(
+        `insert into public.bot_games (user_id, bot_id, bot_rating, player_color, moves, result, helps, rated, started_at)
+         select $1, 'laochen', 800, 'red', array_fill('h2e2'::text, array[30]), 'loss', 0, true, now() from generate_series(1, 3)`,
+        [u],
+      );
+    }
+    await db.exec(`
+      create function public.insert_test_game(p_red uuid, p_black uuid, p_plies int, p_result text, p_fp jsonb, p_ago interval)
+      returns uuid language sql as $$
+        insert into public.games (red, black, base, inc, speed, rated, relay, status, result, reason, moves, red_rating_before, black_rating_before, fairplay, started_at, ended_at)
+        values (p_red, p_black, 300, 3, 'blitz', true, false, 'over', p_result, 'resign', array_fill('h2e2'::text, array[p_plies]), 1200, 1200, p_fp, now() - p_ago, now() - p_ago)
+        returning id
+      $$;`);
+  });
+
+  it("keeps both browsers' analyses, for the server only", async () => {
+    const g = await checked(T, U, { red: side(0), black: side(0) });
+    expect(await q(`public.save_analysis($1, 'red', '{"v": 1}')`, [g])).toEqual({ red: { v: 1 } });
+    expect(await q(`public.save_analysis($1, 'black', '{"v": 2}')`, [g])).toEqual({ red: { v: 1 }, black: { v: 2 } });
+    expect(await failsAs(T, `select public.save_analysis('${g}', 'red', '{}')`)).toMatch(/permission denied/);
+    expect(await failsAs(T, `select * from public.game_analysis`)).toMatch(/permission denied/);
+    expect(await failsAs(T, `select * from public.fairplay`)).toMatch(/permission denied/);
+    expect(await failsAs(T, `select * from public.fairplay_config`)).toMatch(/permission denied/);
+  });
+
+  it("starts baselines from an estimate and moves them towards the site's own games", async () => {
+    const prior = await q<{ acc: { mean: number }; match: { mean: number }; games: number }>(`public.fairplay_baseline('rapid', 1200)`);
+    expect(prior).toMatchObject({ acc: { mean: 60, sd: 10 }, match: { mean: 0.318 }, games: 0 });
+    for (let i = 0; i < 30; i++) await db.query(`select public.insert_test_game($1, $2, 60, 'draw', $3, '1 day')`, [U, V, JSON.stringify({ status: "checked", red: side(0, [], 80, 0.5), black: side(0, [], 80, 0.5) })]);
+    const b = await q<{ acc: { mean: number }; games: number }>(`public.fairplay_baseline('blitz', 1200)`);
+    expect(b.games).toBeGreaterThanOrEqual(60);
+    expect(b.acc.mean).toBeGreaterThan(70);
+    expect(b.acc.mean).toBeLessThan(80);
+  });
+
+  it("judges a player from many games: likely only with enough games far out of line", async () => {
+    await db.query(`delete from public.games where $1 in (red, black)`, [T]);
+    for (let i = 0; i < 9; i++) await checked(T, V, { red: side(3), black: side(0) });
+    await q(`public.save_fairplay($1, '{"status": "checked", "red": {"z": 3, "flags": []}, "black": {"z": 0, "flags": []}}')`, [await checked(T, V, { red: side(3), black: side(0) })]);
+    const standing = async (u: string) => (await db.query(`select games, score, far, verdict from public.fairplay where user_id = $1 and speed = 'blitz'`, [u])).rows[0];
+    expect(await standing(T)).toMatchObject({ games: 10, verdict: "likely" });
+    // Ten games 3 standard deviations out: 3 × 10 / √10.
+    expect(Number(((await standing(T)) as { score: string }).score)).toBeCloseTo(9.49, 1);
+    expect(await standing(V)).toMatchObject({ verdict: "normal" });
+    // A short game isn't scored, and a first analysis doesn't undo a check.
+    const short = await checked(T, V, { red: side(9), black: side(0) }, { plies: 20 });
+    await q(`public.save_fairplay($1, '{"status": "one"}')`, [short]);
+    expect(await q(`(select fairplay->>'status' from public.games where id = $1)`, [short])).toBe("checked");
+    // Checked games on the profile: long enough, and not far out of line.
+    expect(await q(`public.public_profile('vic_xq')->'checked_games'`)).toBeGreaterThanOrEqual(10);
+    expect(await q(`public.public_profile('tang_xq')->'checked_games'`)).toBe(0);
+  });
+
+  it("matches a likely player only with others in the same position, and applies the checked filter", async () => {
+    await db.exec(`delete from public.seeks;`);
+    for (const u of [T, U, V]) await db.query(`insert into public.ratings (user_id, kind, rating, rd, games) values ($1, 'blitz', 1200, 80, 20) on conflict (user_id, kind) do update set rating = 1200`, [u]);
+    const run = <R>(user: string, sql: string) =>
+      db.transaction(async (tx) => {
+        await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [user]);
+        await tx.exec(`set local role authenticated`);
+        return (await tx.query<{ j: R }>(`select ${sql} as j`)).rows[0]!.j;
+      });
+    const filters = (checked: boolean) => `'${JSON.stringify({ range: 200, established: false, account_age: 0, completion: 0, checked })}'`;
+    await run(T, `public.seek(300, 3, ${filters(false)}, false)`);
+    await run(U, `public.seek(300, 3, ${filters(false)}, false)`);
+    expect(await run(U, `public.find_match()->>'status'`)).toBe("searching");
+    await run(T, `public.cancel_seek()`);
+    // U asks for checked opponents: V has them, and no finding.
+    await run(U, `public.seek(300, 3, ${filters(true)}, false)`);
+    await run(V, `public.seek(300, 3, ${filters(false)}, false)`);
+    expect(await run(V, `public.find_match()->>'status'`)).toBe("matched");
+    await db.exec(`delete from public.seeks;`);
+  });
+
+  it("sends unchecked games of strong players to the moderators after a day", async () => {
+    const g = await q<string>(`public.insert_test_game($1, $2, 60, 'draw', null, '2 days')`, [T, U]);
+    await db.query(`update public.games set red_rating_before = 1900 where id = $1`, [g]);
+    await db.query(`select public.mark_unchecked_games()`);
+    expect(await q(`(select fairplay->>'status' from public.games where id = $1)`, [g])).toBe("missing");
+  });
+});
+
 async function errorOfQuery(sql: string): Promise<string> {
   return db.query(sql).then(() => "no error", (e: Error) => e.message);
 }

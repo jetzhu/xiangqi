@@ -95,7 +95,8 @@ export function movesHash(moves: readonly string[]): string {
 
 /** What a browser reports to the server's queue. */
 export type Report =
-  | { kind: "move"; ply: number; iccs: string; clocks: Clocks; hash: string }
+  /** `blur` (the mover's own moves only, M18): the page lost focus during the mover's turn. */
+  | { kind: "move"; ply: number; iccs: string; clocks: Clocks; hash: string; blur?: boolean }
   /** The opponent has gone quiet over the link (since `since`, ms ago when sent). */
   | { kind: "away"; ms: number }
   | { kind: "back" }

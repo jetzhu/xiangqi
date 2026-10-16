@@ -1,5 +1,6 @@
 // The `game` server function (a Supabase Edge Function, M16): a browser calls it when its game
-// ends, or when the two browsers disagree. It empties the report queue into the log, decides
+// ends, or when the two browsers disagree, and after a rated game with its fair-play analysis
+// (M18: fairplay.ts). It empties the report queue into the log, decides
 // the result from the log (decide.ts), and for a rated game works out both new ratings and saves
 // everything through finish_game (migrations 20261013000000_play_a_friend.sql, and
 // 20261016000000_quick_pairing.sql for the sportsmanship labels). The database is
@@ -7,7 +8,9 @@
 import type { Color } from "xiangqi-core";
 import { type OnlineRating, rateOnlineGame, startingRating } from "../rating.js";
 import { NO_RESULT, type OnlineResult } from "../result.js";
+import { type AnalysisData, analysesAgree, parseAnalysis } from "../fairplay.js";
 import { type Decision, type GameRow, type Labels, type LogRow, decide } from "./decide.js";
+import { type Baseline, type FairplayConfig, type SideScore, scoreGame } from "./fairplay.js";
 
 export interface GameRecord extends GameRow {
   id: string;
@@ -21,7 +24,16 @@ export interface GameRecord extends GameRow {
   redRatingAfter: number | null;
   blackRatingBefore: number | null;
   blackRatingAfter: number | null;
+  /** Once over: the moves, and when it ended (ms). */
+  moves?: string[];
+  endedAt?: number | null;
 }
+
+/** What the server keeps of a game's fair-play check (games.fairplay). */
+export type FairplayRecord =
+  | { status: "one" }
+  | { status: "disagree" }
+  | { status: "checked"; red: SideScore; black: SideScore };
 
 export interface RatingRow {
   rating: number;
@@ -42,6 +54,13 @@ export interface Backend {
   log(id: string): Promise<LogRow[]>;
   rating(user: string, speed: string): Promise<RatingRow | null>;
   /** finish_game; throws Stale if a rating changed. Returns false if the game was already over. */
+  /** Stores one browser's analysis and returns both browsers' analyses so far. */
+  saveAnalysis(game: string, by: Color, data: AnalysisData): Promise<Partial<Record<Color, AnalysisData>>>;
+  /** Honest players of that speed and rating (fairplay_baseline). */
+  baseline(speed: string, rating: number): Promise<Baseline>;
+  config(): Promise<Partial<FairplayConfig>>;
+  /** Saves the check on the game and updates both players' fair-play standing. */
+  saveFairplay(game: string, record: FairplayRecord): Promise<void>;
   finish(args: {
     game: string;
     result: string;
@@ -53,6 +72,9 @@ export interface Backend {
     labels: Labels;
   }): Promise<boolean>;
 }
+
+/** How long after a game its analysis is still taken. */
+export const ANALYSIS_DAYS = 7;
 
 export interface GameOut {
   status: "playing" | "over";
@@ -91,12 +113,16 @@ export async function handle(req: Request, db: Backend, now = Date.now()): Promi
   const user = await db.user(req.headers.get("authorization"));
   if (!user) return json(401, { error: "sign in first" });
   let id: unknown;
+  let analysis: unknown;
   try {
-    id = ((await req.json()) as { game?: unknown })?.game;
+    const body = (await req.json()) as { game?: unknown; analysis?: unknown };
+    id = body?.game;
+    analysis = body?.analysis;
   } catch {
     return json(400, { error: "not JSON" });
   }
   if (typeof id !== "string" || !UUID.test(id)) return json(400, { error: "bad game id" });
+  if (analysis !== undefined) return fairplay(db, user, id, analysis, now);
 
   await db.drain();
   for (let i = 0; i < ATTEMPTS; i++) {
@@ -112,6 +138,37 @@ export async function handle(req: Request, db: Backend, now = Date.now()): Promi
     }
   }
   return json(503, { error: "busy, try again" });
+}
+
+/**
+ * POST { game, analysis }: one browser's analysis of a finished rated game. Once both are in
+ * and agree, both sides are scored; if they disagree, the game waits for a moderator (M19).
+ */
+async function fairplay(db: Backend, user: string, id: string, raw: unknown, now: number): Promise<Response> {
+  const g = await db.game(id);
+  if (!g || (g.red !== user && g.black !== user)) return json(404, { error: "no such game" });
+  if (g.status !== "over" || !g.rated || !g.moves) return json(409, { error: "not a finished rated game" });
+  if (g.endedAt && now - g.endedAt > ANALYSIS_DAYS * 86_400_000) return json(409, { error: "too late" });
+  const data = parseAnalysis(raw, g.moves.length);
+  if (!data) return json(400, { error: "bad analysis" });
+  const by: Color = g.red === user ? "red" : "black";
+  const both = await db.saveAnalysis(id, by, data);
+  if (!both.red || !both.black) {
+    await db.saveFairplay(id, { status: "one" });
+    return json(200, { fairplay: "one" });
+  }
+  if (!analysesAgree(both.red, both.black)) {
+    await db.saveFairplay(id, { status: "disagree" });
+    return json(200, { fairplay: "disagree" });
+  }
+  const [config, redBase, blackBase] = await Promise.all([
+    db.config(),
+    db.baseline(g.speed, g.redRatingBefore ?? 1200),
+    db.baseline(g.speed, g.blackRatingBefore ?? 1200),
+  ]);
+  const scores = scoreGame({ moves: g.moves, analysis: both.red, log: await db.log(id), tc: g.tc, baselines: { red: redBase, black: blackBase }, config });
+  await db.saveFairplay(id, { status: "checked", ...scores });
+  return json(200, { fairplay: "checked" });
 }
 
 async function save(db: Backend, g: GameRecord, d: Extract<Decision, { kind: "over" }>): Promise<GameOut> {
@@ -161,7 +218,7 @@ export function restBackend(url: string, serviceKey: string, fetchFn: typeof fet
   const q = encodeURIComponent;
   type GameDb = {
     id: string; red: string | null; black: string | null; base: number; inc: number; speed: string; rated: boolean; status: "playing" | "over";
-    result: GameRecord["result"]; reason: string | null; started_at: string;
+    result: GameRecord["result"]; reason: string | null; started_at: string; ended_at: string | null; moves: string[];
     red_rating_before: number | null; red_rating_after: number | null; black_rating_before: number | null; black_rating_after: number | null;
   };
   return {
@@ -178,7 +235,7 @@ export function restBackend(url: string, serviceKey: string, fetchFn: typeof fet
       if (!g) return null;
       return {
         id: g.id, red: g.red, black: g.black, speed: g.speed, rated: g.rated, status: g.status, result: g.result, reason: g.reason,
-        tc: { base: g.base, inc: g.inc }, startedAt: Date.parse(g.started_at),
+        tc: { base: g.base, inc: g.inc }, startedAt: Date.parse(g.started_at), moves: g.moves, endedAt: g.ended_at ? Date.parse(g.ended_at) : null,
         redRatingBefore: g.red_rating_before, redRatingAfter: g.red_rating_after, blackRatingBefore: g.black_rating_before, blackRatingAfter: g.black_rating_after,
       };
     },
@@ -188,6 +245,14 @@ export function restBackend(url: string, serviceKey: string, fetchFn: typeof fet
       );
       return rows.map((r) => ({ by: r.by_color, kind: r.kind, ply: r.ply, report: r.report, at: Date.parse(r.at) }));
     },
+    saveAnalysis: async (game, by, data) =>
+      (await rpc("save_analysis", { p_game: game, p_by: by, p_data: data })) as Partial<Record<Color, AnalysisData>>,
+    baseline: async (speed, rating) => (await rpc("fairplay_baseline", { p_speed: speed, p_rating: rating })) as Baseline,
+    async config() {
+      const rows = await get<{ key: string; value: number }>("fairplay_config?select=key,value");
+      return Object.fromEntries(rows.map((r) => [r.key, Number(r.value)])) as Partial<FairplayConfig>;
+    },
+    saveFairplay: async (game, record) => void (await rpc("save_fairplay", { p_game: game, p_record: record })),
     rating: async (user, speed) => (await get<RatingRow>(`ratings?user_id=eq.${q(user)}&kind=eq.${q(speed)}&select=rating,rd,games,last_played`))[0] ?? null,
     finish: async (a) =>
       (await rpc("finish_game", { p_game: a.game, p_result: a.result, p_reason: a.reason, p_moves: a.moves, p_red: a.red, p_black: a.black, p_expected: a.expected, p_labels: a.labels })) === true,

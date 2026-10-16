@@ -198,6 +198,10 @@ describe("the game server function", () => {
       game: async () => game,
       log: async () => log,
       rating: async (u) => ratings[u] ?? null,
+      saveAnalysis: async () => ({}),
+      baseline: async () => ({ acc: { mean: 60, sd: 10 }, match: { mean: 0.3, sd: 0.12 } }),
+      config: async () => ({}),
+      saveFairplay: async () => {},
       finish: async (a) => {
         if (staleOnce) {
           staleOnce = false;
