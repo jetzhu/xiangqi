@@ -23,6 +23,11 @@ export interface OnlineResult {
   /** null: a draw, or no result for "aborted" and "no-result". */
   winner: Color | null;
   reason: OnlineReason;
+  /**
+   * The side at fault, for the sportsmanship record (M17): for "aborted", the side that aborted
+   * or let its first-move timer run out; for "abandoned" and "claim-draw", the side that left.
+   */
+  by?: Color;
 }
 
 /** Endings that leave the game without a result, so unrated whatever was agreed. */
@@ -52,8 +57,11 @@ export function canMate(g: Game, c: Color): boolean {
 }
 
 /** A win for `winner`, or a draw if they have nothing left to mate with (used for time-outs and abandonment). */
-export const winOrDraw = (g: Game, winner: Color, reason: OnlineReason): OnlineResult =>
-  canMate(g, winner) ? { winner, reason } : { winner: null, reason };
+export const winOrDraw = (g: Game, winner: Color, reason: OnlineReason, by?: Color): OnlineResult => ({
+  winner: canMate(g, winner) ? winner : null,
+  reason,
+  ...(by ? { by } : {}),
+});
 
 /** Plain words for a result, from the point of view of nobody in particular. */
 export function resultText(r: OnlineResult): { en: string; zh: string } {

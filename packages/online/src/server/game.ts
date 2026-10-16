@@ -1,12 +1,13 @@
 // The `game` server function (a Supabase Edge Function, M16): a browser calls it when its game
 // ends, or when the two browsers disagree. It empties the report queue into the log, decides
 // the result from the log (decide.ts), and for a rated game works out both new ratings and saves
-// everything through finish_game (migration 20261013000000_play_a_friend.sql). The database is
+// everything through finish_game (migrations 20261013000000_play_a_friend.sql, and
+// 20261016000000_quick_pairing.sql for the sportsmanship labels). The database is
 // reached through `Backend`, so this runs the same in the function and in tests.
 import type { Color } from "xiangqi-core";
 import { type OnlineRating, rateOnlineGame, startingRating } from "../rating.js";
 import { NO_RESULT, type OnlineResult } from "../result.js";
-import { type Decision, type GameRow, type LogRow, decide } from "./decide.js";
+import { type Decision, type GameRow, type Labels, type LogRow, decide } from "./decide.js";
 
 export interface GameRecord extends GameRow {
   id: string;
@@ -41,7 +42,16 @@ export interface Backend {
   log(id: string): Promise<LogRow[]>;
   rating(user: string, speed: string): Promise<RatingRow | null>;
   /** finish_game; throws Stale if a rating changed. Returns false if the game was already over. */
-  finish(args: { game: string; result: string; reason: string; moves: string[]; red: object | null; black: object | null; expected: { red: number; black: number } }): Promise<boolean>;
+  finish(args: {
+    game: string;
+    result: string;
+    reason: string;
+    moves: string[];
+    red: object | null;
+    black: object | null;
+    expected: { red: number; black: number };
+    labels: Labels;
+  }): Promise<boolean>;
 }
 
 export interface GameOut {
@@ -123,6 +133,7 @@ async function save(db: Backend, g: GameRecord, d: Extract<Decision, { kind: "ov
     red: out(red, after?.red),
     black: out(black, after?.black),
     expected: { red: red.stored, black: black.stored },
+    labels: d.labels,
   });
   if (!ok) {
     const saved = await db.game(g.id);
@@ -179,6 +190,6 @@ export function restBackend(url: string, serviceKey: string, fetchFn: typeof fet
     },
     rating: async (user, speed) => (await get<RatingRow>(`ratings?user_id=eq.${q(user)}&kind=eq.${q(speed)}&select=rating,rd,games,last_played`))[0] ?? null,
     finish: async (a) =>
-      (await rpc("finish_game", { p_game: a.game, p_result: a.result, p_reason: a.reason, p_moves: a.moves, p_red: a.red, p_black: a.black, p_expected: a.expected })) === true,
+      (await rpc("finish_game", { p_game: a.game, p_result: a.result, p_reason: a.reason, p_moves: a.moves, p_red: a.red, p_black: a.black, p_expected: a.expected, p_labels: a.labels })) === true,
   };
 }

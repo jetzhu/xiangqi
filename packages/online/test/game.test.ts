@@ -137,8 +137,9 @@ describe("moves and clocks", () => {
   it("aborts, unrated, when the first move doesn't come in time", () => {
     const p = pair({ base: 300, inc: 3 });
     p.advance(31_000);
-    expect(p.g.red.result).toEqual({ winner: null, reason: "aborted" });
-    expect(p.g.black.result).toEqual({ winner: null, reason: "aborted" });
+    // Red didn't move: Red is at fault, for the sportsmanship record.
+    expect(p.g.red.result).toEqual({ winner: null, reason: "aborted", by: "red" });
+    expect(p.g.black.result).toEqual({ winner: null, reason: "aborted", by: "red" });
     expect(p.g.red.ratedResult).toBe(false);
   });
 
@@ -187,7 +188,8 @@ describe("resign, abort, draw", () => {
     expect(p.g.black.canAbort()).toBe(true);
     p.g.black.abort(p.now);
     p.advance(100);
-    expect(p.g.red.result?.reason).toBe("aborted");
+    expect(p.g.red.result).toEqual({ winner: null, reason: "aborted", by: "black" });
+    expect(p.g.black.result).toEqual({ winner: null, reason: "aborted", by: "black" });
     const q = pair();
     q.play(OPENING.slice(0, 2));
     expect(q.g.red.canAbort()).toBe(false);
@@ -305,7 +307,7 @@ describe("disconnects", () => {
     p.advance(42_000);
     expect(p.g.black.claimState(p.now)?.kind).toBe("final");
     p.g.black.claimWin(p.now);
-    expect(p.g.black.result).toEqual({ winner: "black", reason: "abandoned" });
+    expect(p.g.black.result).toEqual({ winner: "black", reason: "abandoned", by: "red" });
   });
 
   it("in longer games allows an early claim after 1 min, then gives a last 30 s", () => {
@@ -320,7 +322,7 @@ describe("disconnects", () => {
     expect(p.g.red.claimState(p.now)?.kind).toBe("last-chance");
     expect(p.g.red.result).toBeNull();
     p.advance(30_100);
-    expect(p.g.red.result).toEqual({ winner: "red", reason: "abandoned" });
+    expect(p.g.red.result).toEqual({ winner: "red", reason: "abandoned", by: "black" });
   });
 
   it("cuts the window to 10 s when the opponent closed the tab", () => {
@@ -332,7 +334,7 @@ describe("disconnects", () => {
     expect(p.g.red.away?.windowMs).toBe(10_000);
     p.advance(10_000);
     p.g.red.claimDraw(p.now);
-    expect(p.g.red.result).toEqual({ winner: null, reason: "claim-draw" });
+    expect(p.g.red.result).toEqual({ winner: null, reason: "claim-draw", by: "black" });
   });
 
   it("brings a reloaded page up to date from the other browser", () => {

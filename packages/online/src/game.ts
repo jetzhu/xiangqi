@@ -197,7 +197,7 @@ export class OnlineGame {
   abort(now: number) {
     if (!this.canAbort()) return;
     this.io.send({ t: "abort" });
-    this.end({ winner: null, reason: "aborted" }, now);
+    this.end({ winner: null, reason: "aborted", by: this.me }, now);
   }
 
   offerDraw(now: number) {
@@ -280,7 +280,7 @@ export class OnlineGame {
   /** Claims the win with the opponent away: at once if their window is over, else it starts their last 30 s. */
   claimWin(now: number) {
     const s = this.claimState(now);
-    if (s?.kind === "final") this.end(winOrDraw(this.game, this.me, "abandoned"), now);
+    if (s?.kind === "final") this.end(winOrDraw(this.game, this.me, "abandoned", this.opp), now);
     else if (s?.kind === "early" && this.away) {
       this.away.claimedAt = now;
       this.io.changed();
@@ -289,7 +289,7 @@ export class OnlineGame {
 
   /** Claims a draw once the opponent's window is over. */
   claimDraw(now: number) {
-    if (this.claimState(now)?.kind === "final") this.end({ winner: null, reason: "claim-draw" }, now);
+    if (this.claimState(now)?.kind === "final") this.end({ winner: null, reason: "claim-draw", by: this.opp }, now);
   }
 
   /**
@@ -321,7 +321,7 @@ export class OnlineGame {
     if (!this.hasMoved(side)) {
       if (now - this.turnStart > this.firstMoveMs + grace) {
         if (side === this.opp) this.io.send({ t: "flag" });
-        return this.end({ winner: null, reason: "aborted" }, now);
+        return this.end({ winner: null, reason: "aborted", by: side }, now);
       }
     } else if (this.clock(side, now) <= -grace) {
       if (side === this.opp) this.io.send({ t: "flag" });
@@ -331,7 +331,7 @@ export class OnlineGame {
 
     if (!this.away && now - this.lastHeard > AWAY_AFTER_MS) this.goneQuiet(this.lastHeard, false, now);
     if (this.away?.claimedAt != null && now >= Math.min(this.away.since + this.away.windowMs, this.away.claimedAt + LAST_CHANCE_MS)) {
-      this.end(winOrDraw(this.game, this.me, "abandoned"), now);
+      this.end(winOrDraw(this.game, this.me, "abandoned", this.opp), now);
     }
   }
 
@@ -377,7 +377,7 @@ export class OnlineGame {
         if (this.canResign()) this.end({ winner: this.me, reason: "resign" }, now);
         return;
       case "abort":
-        if (this.canAbort()) this.end({ winner: null, reason: "aborted" }, now);
+        if (this.canAbort()) this.end({ winner: null, reason: "aborted", by: this.opp }, now);
         return;
       case "offer-draw":
         if (this.drawOffer === this.me) return this.end({ winner: null, reason: "agreement" }, now);

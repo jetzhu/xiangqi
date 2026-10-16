@@ -33,8 +33,25 @@ export interface GameRow {
   startedAt: number;
 }
 
+/**
+ * Sportsmanship labels (docs/v0.3-online-design.md, "Sportsmanship"): left and didn't come back;
+ * let the clock run down in a lost position after idling longer than the reconnect window;
+ * aborted, or let the first-move timer run out; spent over half the base time on one of the
+ * first 10 moves. The first three count against the completion rate.
+ */
+export type Label = "abandoned" | "stalled" | "aborted" | "slow-start";
+export type Labels = Partial<Record<Color, Label[]>>;
+
 export type Decision =
-  | { kind: "over"; result: OnlineResult; moves: string[]; rated: boolean; /** A claim that the log contradicted: flag for fair-play review. */ flagged: Color | null }
+  | {
+      kind: "over";
+      result: OnlineResult;
+      moves: string[];
+      rated: boolean;
+      /** A claim that the log contradicted: flag for fair-play review. */
+      flagged: Color | null;
+      labels: Labels;
+    }
   | { kind: "pending"; why: string };
 
 /** Network slack allowed when comparing a browser's timing with the server's time stamps. */
@@ -80,6 +97,7 @@ export function decide(game: GameRow, log: readonly LogRow[], now: number): Deci
     moves,
     rated: game.rated && !NO_RESULT.has(result.reason) && moves.length >= MIN_RATED_PLIES,
     flagged,
+    labels: labelsOf(game, log, fromLog, result, moves),
   });
 
   // An illegal move in the log loses the game for the browser that made it.
@@ -108,7 +126,9 @@ export function decide(game: GameRow, log: readonly LogRow[], now: number): Deci
   // Both browsers say the same: accepted (after the checks on what a pair could fake together).
   if (red && black && sameResult(red.end.result, black.end.result)) {
     const moves = movesOf(red.end) ?? movesOf(black.end) ?? fromLog.moves;
-    const r = red.end.result;
+    // Who was at fault counts only if both browsers name the same side.
+    const { by: _, ...plain } = red.end.result;
+    const r: OnlineResult = red.end.result.by && red.end.result.by === black.end.result.by ? red.end.result : plain;
     if (r.reason === "aborted" && moves.length >= 2) return over({ winner: null, reason: "no-result" }, moves);
     if (r.reason === "agreement" && game.rated && moves.length < 20) return over({ winner: null, reason: "no-result" }, moves);
     return over(r, moves);
@@ -138,7 +158,10 @@ export function decide(game: GameRow, log: readonly LogRow[], now: number): Deci
         // Only my own resignation needs no witness.
         return r.winner === opp ? over(r, moves) : { kind: "pending", why: "resignation not confirmed" };
       case "aborted":
-        return moves.length < 2 ? over({ winner: null, reason: "aborted" }, moves) : over({ winner: null, reason: "no-result" }, moves, by);
+        // Alone, a browser is believed only about its own abort.
+        return moves.length < 2
+          ? over({ winner: null, reason: "aborted", ...(r.by === by ? { by } : {}) }, moves)
+          : over({ winner: null, reason: "no-result" }, moves, by);
       case "agreement":
         return { kind: "pending", why: "draw not confirmed by the other player" };
       case "timeout": {
@@ -162,7 +185,7 @@ export function decide(game: GameRow, log: readonly LogRow[], now: number): Deci
         const needed = window > EARLY_CLAIM_MIN_WINDOW_MS ? EARLY_CLAIM_AFTER_MS + LAST_CHANCE_MS : window;
         // A closed tab cuts the wait to 10 s; the server can't see that, so it accepts 10 s and flags short waits for review.
         const silent = endAt - lastHeard + TIMELINE_SLACK_MS;
-        const result: OnlineResult = r.reason === "claim-draw" ? { winner: null, reason: "claim-draw" } : winOrDraw(g, by, "abandoned");
+        const result: OnlineResult = r.reason === "claim-draw" ? { winner: null, reason: "claim-draw", by: opp } : winOrDraw(g, by, "abandoned", opp);
         if (silent >= needed) return over(result, moves);
         if (silent >= 10_000) return over(result, moves, silent < needed ? by : null);
         return { kind: "pending", why: "opponent not silent long enough" };
@@ -171,6 +194,30 @@ export function decide(game: GameRow, log: readonly LogRow[], now: number): Deci
         return { kind: "pending", why: `"${r.reason}" isn't something one browser can claim` };
     }
   }
+}
+
+/** The sportsmanship labels a finished game earns each side. */
+function labelsOf(game: GameRow, log: readonly LogRow[], fl: ReturnType<typeof movesFromLog>, result: OnlineResult, moves: readonly string[]): Labels {
+  const out: Labels = {};
+  const add = (c: Color, l: Label) => {
+    if (!out[c]?.includes(l)) (out[c] ??= []).push(l);
+  };
+  if (result.by && (result.reason === "aborted" || result.reason === "abandoned" || result.reason === "claim-draw")) {
+    add(result.by, result.reason === "aborted" ? "aborted" : "abandoned");
+  }
+  // Stalling: lost on time, behind on material, after a final turn longer than the reconnect window.
+  const g = replay(moves);
+  if (result.reason === "timeout" && g) {
+    const loser = g.turn;
+    const m = material(g);
+    const last = lastMoveBy(log, other(loser), moves.length);
+    if (last && m[loser] < m[other(loser)] && last.clocks[loser] > reconnectWindowMs(game.tc)) add(loser, "stalled");
+  }
+  // Each side's first 10 moves (plies 2 to 20; the first move has its own timer), timed by arrival.
+  for (let ply = 2; ply <= Math.min(20, fl.at.length); ply++) {
+    if (fl.at[ply - 1]! - fl.at[ply - 2]! > (game.tc.base * 1000) / 2) add(ply % 2 === 1 ? "red" : "black", "slow-start");
+  }
+  return out;
 }
 
 function lastMoveBy(log: readonly LogRow[], mover: Color, plies: number): { at: number; clocks: Clocks } | null {

@@ -112,7 +112,7 @@ describe("deciding a result from the log", () => {
     m.advance(48_000);
     m.g.black.claimWin(m.now);
     m.advance(100);
-    expect(m.g.black.result).toEqual({ winner: "black", reason: "abandoned" });
+    expect(m.g.black.result).toEqual({ winner: "black", reason: "abandoned", by: "red" });
     expect(decide(m.row, m.log, m.now)).toMatchObject({ kind: "over", result: { winner: "black", reason: "abandoned" }, rated: true, flagged: null });
 
     const n = match({ base: 300, inc: 3 });
@@ -120,6 +120,42 @@ describe("deciding a result from the log", () => {
     n.advance(5_000);
     n.log.push({ by: "black", kind: "end", ply: null, report: { kind: "end", result: { winner: "black", reason: "abandoned" }, moves: OPENING.slice(0, 4), clocks: { red: 1, black: 1 } }, at: n.now });
     expect(decide(n.row, n.log, n.now)).toMatchObject({ kind: "pending" });
+  });
+
+  it("labels sportsmanship: abandoning, aborting, stalling and slow starts", () => {
+    // Left and didn't come back.
+    const a = match();
+    a.play(OPENING.slice(0, 4));
+    a.reporting = { red: false, black: true };
+    a.linkUp = false;
+    a.advance(48_000);
+    a.g.black.claimWin(a.now);
+    a.advance(100);
+    expect(decide(a.row, a.log, a.now)).toMatchObject({ labels: { red: ["abandoned"] } });
+
+    // Let the first-move timer run out: both browsers say Red.
+    const b = match();
+    b.advance(31_000);
+    expect(decide(b.row, b.log, b.now)).toMatchObject({ result: { reason: "aborted", by: "red" }, labels: { red: ["aborted"] } });
+    // Alone, a browser can't pin an abort on the other side.
+    const c = match();
+    c.log.push({ by: "black", kind: "end", ply: null, report: { kind: "end", result: { winner: null, reason: "aborted", by: "red" }, moves: [], clocks: { red: 1, black: 1 } }, at: c.now });
+    expect(decide(c.row, c.log, c.now)).toMatchObject({ result: { reason: "aborted" }, labels: {} });
+
+    // Down a soldier, Black lets 5 minutes run out rather than resign.
+    const d = match();
+    d.play(["h2e2", "h9g7", "e2e6"]);
+    d.advance(301_000);
+    expect(decide(d.row, d.log, d.now)).toMatchObject({ result: { winner: "red", reason: "timeout" }, labels: { black: ["stalled"] } });
+
+    // Over half the base time on an early move.
+    const e = match();
+    e.play(OPENING.slice(0, 2));
+    e.advance(160_000);
+    e.play(OPENING.slice(2, 4));
+    e.g.black.resign(e.now);
+    e.advance(200);
+    expect(decide(e.row, e.log, e.now)).toMatchObject({ result: { reason: "resign" }, labels: { red: ["slow-start"] } });
   });
 
   it("finds an illegal move in the log and gives the game to the other side", () => {

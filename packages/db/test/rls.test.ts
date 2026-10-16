@@ -15,7 +15,7 @@ const SUPABASE_STANDIN = `
   alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
   create schema auth;
   grant usage on schema auth to anon, authenticated, service_role;
-  create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}', email_confirmed_at timestamptz default now());
+  create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}', email_confirmed_at timestamptz default now(), created_at timestamptz default now());
   create function auth.uid() returns uuid language sql stable as
     $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create function auth.jwt() returns jsonb language sql stable as
@@ -746,6 +746,161 @@ describe("play a friend (M16)", () => {
     await db.query(`update public.games set last_report_at = now() - interval '11 minutes' where id = $1`, [g]);
     await db.query(`select public.process_game_reports()`);
     expect((await db.query(`select status, result, reason from public.games where id = $1`, [g])).rows[0]).toEqual({ status: "over", result: "none", reason: "aborted" });
+  });
+});
+
+describe("quick pairing (M17)", () => {
+  const [P, Q, R, S] = ["d1", "d2", "d3", "d4"].map((x) => `00000000-0000-4000-8000-0000000000${x}`) as [string, string, string, string];
+  const run = async <T>(user: string, sql: string, params: unknown[] = []): Promise<T> =>
+    db.transaction(async (tx) => {
+      await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [user]);
+      await tx.exec(`set local role authenticated`);
+      return (await tx.query<{ j: T }>(`select ${sql} as j`, params)).rows[0]!.j;
+    });
+  const errorOf = (user: string, sql: string) => failsAs(user, `select ${sql}`);
+  const seek = (user: string, filters: object = {}, tile = "300, 3") => run(user, `public.seek(${tile}, $1, false)`, [JSON.stringify({ range: 200, established: false, account_age: 0, completion: 0, ...filters })]);
+  type Found = { status: string; game?: string; window?: number; nearest?: { username: string; diff: number }[]; invite?: { id: number; diff: number } | null; counts?: Record<string, number> };
+  const find = (user: string) => run<Found>(user, `public.find_match()`);
+  const rate = (user: string, rating: number, games = 20) =>
+    db.query(`insert into public.ratings (user_id, kind, rating, rd, games) values ($1, 'blitz', $2, 80, $3)
+              on conflict (user_id, kind) do update set rating = excluded.rating, games = excluded.games`, [user, rating, games]);
+  const reset = () => db.exec(`delete from public.seeks; delete from public.seek_invites; delete from public.blocks;`);
+
+  beforeAll(async () => {
+    for (const [u, name] of [[P, "pan_xq"], [Q, "qin_xq"], [R, "ren_xq"], [S, "shi_xq"]] as const) {
+      await signUp(u, { username: name });
+      await db.query(`update public.profiles set birth_month = '1990-01-01' where user_id = $1`, [u]);
+      await db.query(
+        `insert into public.bot_games (user_id, bot_id, bot_rating, player_color, moves, result, helps, rated, started_at)
+         select $1, 'laochen', 800, 'red', array_fill('h2e2'::text, array[30]), 'loss', 0, true, now() from generate_series(1, 3)`,
+        [u],
+      );
+    }
+  });
+
+  it("seeks only on a tile, once ready for rated play", async () => {
+    expect(await errorOf(P, `public.seek(300, 2, '{}', false)`)).toMatch(/not a tile/);
+    expect(await errorOf(P, `public.seek(300, 3, '{"range": 150}', false)`)).toMatch(/bad filters/);
+    expect(await errorOf(A, `public.seek(300, 3, '{}', false)`)).toMatch(/not ready/);
+    expect(await failsAs(null, `select public.find_match()`)).toMatch(/permission denied/);
+    expect(await find(P)).toEqual({ status: "idle" });
+  });
+
+  it("pairs the nearest rating inside both windows, in one step", async () => {
+    await reset();
+    await rate(P, 1200);
+    await rate(Q, 1230);
+    await rate(R, 1500);
+    await seek(R);
+    await seek(P);
+    expect(await find(P)).toMatchObject({ status: "searching", window: 50, counts: { "300+3": 2 } });
+    await seek(Q);
+    const q = await find(Q);
+    expect(q).toMatchObject({ status: "matched" });
+    expect(await find(P)).toEqual({ status: "matched", game: q.game });
+    expect(await find(P)).toEqual({ status: "idle" });
+    expect(await run(P, `public.game_info($1)`, [q.game])).toMatchObject({ rated: true, speed: "blitz", base: 300, inc: 3, status: "playing" });
+  });
+
+  it("widens the window with waiting, and lists the nearest players outside it", async () => {
+    await reset();
+    await rate(P, 1200);
+    await rate(R, 1390);
+    await seek(P);
+    await seek(R);
+    const p = await find(P);
+    expect(p).toMatchObject({ status: "searching", window: 50, nearest: [{ username: "ren_xq", rating: 1390, diff: 190 }] });
+    // 30 s later: ±200, so they're paired.
+    await db.query(`update public.seeks set created_at = now() - interval '30 seconds'`);
+    expect(await find(P)).toMatchObject({ status: "matched" });
+  });
+
+  it("plays anyway when both accept, and widens to anyone within the filter", async () => {
+    await reset();
+    await rate(P, 1200);
+    await rate(R, 1500);
+    await seek(P);
+    await seek(R);
+    expect(await run(P, `public.invite_seeker('REN_XQ')`)).toBe(true);
+    expect((await find(P)).nearest).toMatchObject([{ username: "ren_xq", invited: true }]);
+    const r = await find(R);
+    expect(r.invite).toMatchObject({ diff: -300 });
+    expect(await run(S, `public.answer_invite($1, true)`, [r.invite!.id])).toBeNull(); // not theirs
+    const game = await run<string>(R, `public.answer_invite($1, true)`, [r.invite!.id]);
+    expect(await find(P)).toEqual({ status: "matched", game });
+    // "Anyone" still keeps the player's own range filter.
+    await reset();
+    await seek(P, { range: 300 });
+    await seek(R);
+    await run(P, `public.widen_seek()`);
+    await run(R, `public.widen_seek()`);
+    expect(await find(P)).toMatchObject({ status: "searching", window: 300 });
+    await seek(R, { range: null });
+    await run(R, `public.widen_seek()`);
+    await seek(P, { range: null });
+    await run(P, `public.widen_seek()`);
+    expect(await find(P)).toMatchObject({ status: "matched" });
+  });
+
+  it("applies filters both ways, blocks, and only live seeks", async () => {
+    await reset();
+    await rate(P, 1200);
+    await rate(Q, 1210, 3);
+    await seek(P, { established: true });
+    await seek(Q);
+    expect(await find(P)).toMatchObject({ status: "searching", nearest: [] });
+    await seek(P);
+    await db.query(`insert into public.blocks (user_id, blocked_id) values ($1, $2)`, [Q, P]);
+    expect(await find(P)).toMatchObject({ status: "searching", nearest: [] });
+    await db.query(`delete from public.blocks`);
+    await db.query(`update public.seeks set seen_at = now() - interval '20 seconds' where user_id = $1`, [Q]);
+    expect(await find(P)).toMatchObject({ status: "searching", counts: { "300+3": 1 } });
+    await run(Q, `public.find_match()`);
+    expect(await find(P)).toMatchObject({ status: "matched" });
+    await db.query(`update public.seeks set seen_at = now() - interval '2 minutes'`);
+    await db.query(`select public.clear_seeks()`);
+    expect((await db.query(`select count(*)::int as n from public.seeks`)).rows[0]).toEqual({ n: 0 });
+  });
+
+  it("keeps a sportsmanship record: a warning, then pairing waits, and the completion rate", async () => {
+    await reset();
+    const game = (user: string, opp: string, labels: object, endedAgo = "1 hour") =>
+      db.query(
+        `insert into public.games (red, black, base, inc, speed, rated, relay, status, result, reason, labels, started_at, ended_at)
+         values ($1, $2, 300, 3, 'blitz', true, false, 'over', 'black', 'abandoned', $3, now() - $4::interval, now() - $4::interval)`,
+        [user, opp, JSON.stringify(labels), endedAgo],
+      );
+    for (let i = 0; i < 4; i++) await game(S, R, {}, "2 days");
+    expect(await run(S, `public.my_sportsmanship()`)).toMatchObject({ completion: null, warning: false, wait_until: null, pool: false });
+    await game(S, R, { red: ["abandoned"] });
+    expect(await run(S, `public.my_sportsmanship()`)).toMatchObject({ completion: 80, warning: true, last30: { games: 5, abandoned: 1 } });
+    expect(await errorOf(S, `public.seek(300, 3, '{}', false)`)).toMatch(/sportsmanship/);
+    expect(await as(null, async (tx) => (await tx.query<{ j: unknown }>(`select public.public_profile('shi_xq') as j`)).rows[0]!.j)).toMatchObject({ completion: 80 });
+    await run(S, `public.acknowledge_sportsmanship()`);
+    expect(await run(S, `public.my_sportsmanship()`)).toMatchObject({ warning: false, wait_until: null, pool: false });
+    await seek(S);
+    // Another within 3 days: a 10-minute wait, then matched with others who do the same.
+    await game(S, R, { red: ["stalled"] }, "0 seconds");
+    const sport = await run<{ wait_until: string; pool: boolean }>(S, `public.my_sportsmanship()`);
+    expect(Date.parse(sport.wait_until) - Date.now()).toBeGreaterThan(8 * 60_000);
+    expect(sport.pool).toBe(true);
+    expect(await errorOf(S, `public.seek(300, 3, '{}', false)`)).toMatch(/sportsmanship/);
+    // 20 minutes on, the wait is over; the pool stays for 3 days.
+    await db.query(`update public.profiles set sport_warned_at = sport_warned_at - interval '20 minutes' where user_id = $1`, [S]);
+    await db.query(`update public.games set ended_at = ended_at - interval '20 minutes' where red = $1 and labels ? 'red'`, [S]);
+    expect(await run(S, `public.my_sportsmanship()`)).toMatchObject({ wait_until: null, pool: true });
+  });
+
+  it("gives Red to whoever had Black more often", async () => {
+    await reset();
+    await db.query(`delete from public.games where $1 in (red, black) or $2 in (red, black)`, [P, Q]);
+    await rate(P, 1200);
+    await rate(Q, 1200);
+    await db.query(`insert into public.games (red, black, base, inc, speed, rated, relay) values ($1, $2, 300, 3, 'blitz', true, false)`, [P, Q]);
+    await seek(P);
+    await seek(Q);
+    const game = (await find(Q)).game!;
+    expect(await run(Q, `public.game_info($1)->>'me'`, [game])).toBe("red");
   });
 });
 
