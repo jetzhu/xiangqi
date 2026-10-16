@@ -190,7 +190,7 @@ begin
     red := me; black := c.from_user;
   end if;
   relay := c.relay or coalesce(p_relay, false)
-    or exists (select 1 from public.profiles p where p.user_id in (red, black) and p.under16 is not false);
+    or exists (select 1 from public.profiles p where p.user_id in (red, black) and public.is_under16(p));
   insert into public.games (red, black, base, inc, speed, rated, relay)
   values (red, black, c.base, c.inc, public.speed_of(c.base, c.inc), c.rated, relay)
   returning id into game;
@@ -206,8 +206,8 @@ returns jsonb language sql stable security definer set search_path = '' as $$
   select jsonb_build_object(
     'id', g.id,
     'me', public.my_color(g.id),
-    'red', jsonb_build_object('username', pr.username, 'avatar', pr.avatar, 'rating', round(rr.rating), 'rd', round(rr.rd)),
-    'black', jsonb_build_object('username', pb.username, 'avatar', pb.avatar, 'rating', round(rb.rating), 'rd', round(rb.rd)),
+    'red', jsonb_build_object('username', pr.username, 'avatar', case when not public.is_under16(pr) then pr.avatar end, 'rating', round(rr.rating), 'rd', round(rr.rd)),
+    'black', jsonb_build_object('username', pb.username, 'avatar', case when not public.is_under16(pb) then pb.avatar end, 'rating', round(rb.rating), 'rd', round(rb.rd)),
     'base', g.base, 'inc', g.inc, 'speed', g.speed, 'rated', g.rated, 'relay', g.relay,
     'status', g.status, 'result', g.result, 'reason', g.reason, 'moves', to_jsonb(g.moves),
     'red_rating_before', g.red_rating_before, 'red_rating_after', g.red_rating_after,

@@ -415,7 +415,7 @@ button.wide { width: 100%; padding: 10px; font-size: 16px; }
 .checklist ul { list-style: none; padding-left: 22px; margin: 4px 0; }
 .checklist li > span[aria-hidden] { display: inline-block; width: 1.2em; color: var(--muted); }
 .checklist li.done > span[aria-hidden] { color: #2e8b57; font-weight: 700; }
-.age-question button { padding: 2px 12px; }
+.birth-month fieldset { border: 0; padding: 0; margin: 4px 0; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .online-settings h2 { font-size: 16px; margin: 20px 0 6px; }
 .online-settings .check { display: flex; gap: 8px; align-items: center; }
 .block-list { padding-left: 18px; }

@@ -1,10 +1,12 @@
 "use client";
-// Settings → Online play (M15): opponent filters, game options, network address, blocked players.
-import { useEffect, useState } from "react";
+// Settings → Online play (M15): opponent filters, game options, network address, birth month,
+// blocked players.
+import { useCallback, useEffect, useState } from "react";
 import { useAccount } from "../account/session.js";
 import { useNav } from "../nav.js";
 import { type Settings, useSettings, useT } from "../settings.js";
-import { myBlocks, setBlocked } from "./api.js";
+import { type Eligibility, myBlocks, onlineEligibility, setBlocked } from "./api.js";
+import { BirthMonthSetting } from "./BirthMonth.js";
 
 export function OnlineSettings() {
   const { settings, update } = useSettings();
@@ -12,6 +14,14 @@ export function OnlineSettings() {
   const nav = useNav();
   const account = useAccount();
   const [blocks, setBlocks] = useState<{ username: string }[] | null>(null);
+  const [check, setCheck] = useState<Eligibility | null>(null);
+  const loadCheck = useCallback(() => {
+    void account
+      .client()
+      .then(onlineEligibility)
+      .then(setCheck, () => {});
+  }, [account]);
+  useEffect(loadCheck, [loadCheck]);
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => update({ [k]: v } as Partial<Settings>);
 
   useEffect(() => {
@@ -97,6 +107,8 @@ export function OnlineSettings() {
           "对局通常让双方浏览器直接连接，这会让对方看到你的网络（IP）地址。开启后，你的对局将通过服务器中转。16 岁以下的棋手始终如此。",
         )}
       </p>
+
+      {check && <BirthMonthSetting check={check} onSaved={loadCheck} />}
 
       <h2>{tt("Blocked players", "已屏蔽的棋手")}</h2>
       {blocks === null ? (

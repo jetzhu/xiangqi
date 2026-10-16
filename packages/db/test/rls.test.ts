@@ -497,20 +497,68 @@ describe("online play groundwork (M15)", () => {
     await db.query(`delete from public.ratings where user_id = $1 and kind = 'rapid'`, [E]);
   });
 
-  it("shows anyone a public profile, minimal until the player says they're 16 or older", async () => {
+  it("shows anyone a public profile, minimal until the player's birth month says they're 16 or older", async () => {
     const before = await json<Record<string, unknown>>(null, `public.public_profile('ERIN_XQ')`);
     expect(before).toMatchObject({ username: "erin_xq", minimal: true, avatar: null, country: null, member_since: null, ratings: { blitz: { rating: 1234, rd: 80, games: 31 } } });
     expect(before.ratings).not.toHaveProperty("bot");
-    // The answer is given once; a second answer changes nothing.
     await as(E, async (tx) => {
-      await tx.exec(`select public.set_age_group(true)`);
-      await tx.exec(`select public.set_age_group(false)`);
-      const row = (await tx.query(`select under16 from public.profiles`)).rows;
-      expect(row).toEqual([{ under16: false }]);
+      await tx.exec(`select public.set_birth_month(1990, 5)`);
+      expect((await tx.query(`select birth_month from public.profiles`)).rows).toEqual([{ birth_month: new Date("1990-05-01T00:00:00Z") }]);
       expect((await tx.query<{ j: Record<string, unknown> }>(`select public.public_profile('erin_xq') as j`)).rows[0]!.j).toMatchObject({ minimal: false, avatar: "red-horse", country: "CN", me: true });
     });
     expect(await json(null, `public.public_profile('nobody_here')`)).toBeNull();
-    expect(await failsAs(E, `update public.profiles set under16 = true`)).toMatch(/permission denied/);
+    expect(await failsAs(E, `update public.profiles set birth_month = '1990-01-01'`)).toMatch(/permission denied/);
+    expect(await failsAs(E, `select public.set_birth_month(2010, 13)`)).toMatch(/bad birth month/);
+    expect(await failsAs(E, `select public.set_birth_month(2999, 1)`)).toMatch(/bad birth month/);
+    expect(await failsAs(null, `select public.set_birth_month(1990, 1)`)).toMatch(/permission denied/);
+    expect(await failsAs(E, `select public.is_under16(p) from public.profiles p`)).toMatch(/permission denied/);
+  });
+
+  it("turns 16 on the first day of the month after the birth month, with nothing to run", async () => {
+    const age = async (born: string) => {
+      await db.query(`update public.profiles set birth_month = $2 where user_id = $1`, [E, born]);
+      return json<{ under16: boolean; born: string; sixteen_on: string | null }>(E, `public.online_eligibility()`);
+    };
+    const month = (back: string) => db.query<{ d: string }>(`select to_char(date_trunc('month', now() - $1::interval), 'YYYY-MM-DD') as d`, [back]).then((r) => r.rows[0]!.d);
+    // Born this month 16 years ago: the birthday may not have come yet, so still under 16.
+    const thisMonth = await month("16 years");
+    expect(await age(thisMonth)).toMatchObject({ under16: true, born: thisMonth.slice(0, 7), sixteen_on: expect.stringMatching(/-01$/) });
+    expect(await age(await month("16 years 1 month"))).toMatchObject({ under16: false, sixteen_on: null });
+    await db.query(`update public.profiles set birth_month = null where user_id = $1`, [E]);
+  });
+
+  it("changes the birth month: later at once, earlier once while under 16 and after a week", async () => {
+    const state = () => json<Record<string, unknown>>(E, `public.online_eligibility()`);
+    const set = (y: number, m: number) =>
+      db.transaction(async (tx) => {
+        await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [E]);
+        await tx.exec(`set local role authenticated`);
+        await tx.exec(`select public.set_birth_month(${y}, ${m})`);
+      });
+    const year = new Date().getUTCFullYear();
+    await set(year - 12, 6);
+    expect(await state()).toMatchObject({ age_answered: true, under16: true, born: `${year - 12}-06`, born_next: null, earlier_used: false });
+    // Later (younger): at once, any number of times.
+    await set(year - 11, 6);
+    expect(await state()).toMatchObject({ born: `${year - 11}-06`, born_next: null, earlier_used: false });
+    // Earlier (older) while under 16: waits a week, and can be withdrawn, which gives the chance back.
+    await set(1990, 1);
+    expect(await state()).toMatchObject({ under16: true, born: `${year - 11}-06`, born_next: "1990-01", earlier_used: true });
+    await set(year - 11, 6);
+    expect(await state()).toMatchObject({ born: `${year - 11}-06`, born_next: null, earlier_used: false });
+    // While it waits it can be changed again; once the week is up it counts, and there's no second time.
+    await set(1990, 1);
+    await set(1991, 2);
+    expect(await state()).toMatchObject({ born_next: "1991-02" });
+    await db.query(`update public.profiles set birth_month_next_at = now() - interval '1 second' where user_id = $1`, [E]);
+    expect(await state()).toMatchObject({ under16: false, born: "1991-02", born_next: null, earlier_used: true });
+    // Once 16: any change applies at once.
+    await set(1985, 3);
+    expect(await state()).toMatchObject({ under16: false, born: "1985-03", born_next: null });
+    await set(year - 10, 1);
+    expect(await state()).toMatchObject({ under16: true, born: `${year - 10}-01` });
+    expect(await failsAs(E, `select public.set_birth_month(1990, 1)`)).toMatch(/already corrected/);
+    await db.query(`update public.profiles set birth_month = null, birth_month_next = null, birth_month_next_at = null, birth_month_earlier_used = false where user_id = $1`, [E]);
   });
 
   it("blocks and unblocks by username, privately", async () => {
@@ -533,8 +581,7 @@ describe("online play groundwork (M15)", () => {
   it("opens online play after the age answer and a clean win at the player's level, or 3 long games", async () => {
     const check = () => json<Record<string, unknown>>(F, `public.online_eligibility()`);
     expect(await check()).toMatchObject({ verified: true, age_answered: false, level: 800, target: 800, clean_win: false, long_games: 0, eligible: false });
-    await as(F, (tx) => tx.exec(`select public.set_age_group(false)`).then(() => undefined));
-    await db.query(`update public.profiles set under16 = true where user_id = $1`, [F]);
+    await db.query(`update public.profiles set birth_month = date_trunc('month', now() - interval '10 years') where user_id = $1`, [F]);
     const game = (bot: string, rating: number, result: string, helps: number, plies: number) =>
       db.query(
         `insert into public.bot_games (user_id, bot_id, bot_rating, player_color, moves, result, helps, rated, started_at)
@@ -578,7 +625,7 @@ describe("play a friend (M16)", () => {
     await signUp(H, { username: "hu_xq" });
     // Both ready for online play: 16 or older, and 3 bot games of 10 moves each.
     for (const u of [G, H]) {
-      await db.query(`update public.profiles set under16 = false where user_id = $1`, [u]);
+      await db.query(`update public.profiles set birth_month = '1990-01-01' where user_id = $1`, [u]);
       await db.query(
         `insert into public.bot_games (user_id, bot_id, bot_rating, player_color, moves, result, helps, rated, started_at)
          select $1, 'laochen', 800, 'red', array_fill('h2e2'::text, array[30]), 'loss', 0, true, now() from generate_series(1, 3)`,
@@ -625,11 +672,11 @@ describe("play a friend (M16)", () => {
     const c2 = await commitAs<string>(G, `public.create_challenge(600, 5, 'random', false, false)`);
     const g2 = await commitAs<string>(H, `public.accept_challenge($1, true)`, [c2]);
     expect(await commitAs(G, `public.game_info($1)->'relay'`, [g2])).toBe(true);
-    await db.query(`update public.profiles set under16 = true where user_id = $1`, [H]);
+    await db.query(`update public.profiles set birth_month = date_trunc('month', now() - interval '10 years') where user_id = $1`, [H]);
     const c3 = await commitAs<string>(G, `public.create_challenge(600, 5, 'black', false, false)`);
     const g3 = await commitAs<string>(H, `public.accept_challenge($1, false)`, [c3]);
     expect(await commitAs(H, `public.game_info($1)`, [g3])).toMatchObject({ relay: true, me: "red" });
-    await db.query(`update public.profiles set under16 = false where user_id = $1`, [H]);
+    await db.query(`update public.profiles set birth_month = '1990-01-01' where user_id = $1`, [H]);
   });
 
   it("queues the players' reports and writes them to the game log, stamped on arrival", async () => {

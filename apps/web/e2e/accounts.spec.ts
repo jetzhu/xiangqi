@@ -97,6 +97,13 @@ interface FakeOptions {
   tables?: Partial<Tables>;
 }
 
+/** Under 16 on a YYYY-MM birth month: 16 from the first day of the month after. */
+const under16 = (born: string) => {
+  const [y, m] = born.split("-").map(Number) as [number, number];
+  const now = new Date();
+  return now.getFullYear() * 12 + now.getMonth() < (y + 16) * 12 + m;
+};
+
 async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> {
   const tables: Tables = {
     lesson_progress: [],
@@ -117,7 +124,7 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
     return row;
   };
   const profile = { ...(opts.profile ?? { username: "Alice_1", username_chosen: true }) };
-  const online = { blocks: [] as string[], under16: null as boolean | null };
+  const online = { blocks: [] as string[], born: null as string | null, next: null as string | null };
   let user = { ...USER, identities: [...USER.identities] };
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, json: body, headers: { "access-control-allow-origin": "*" } });
   await page.route(`${SUPABASE}/**`, async (route) => {
@@ -178,16 +185,25 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
         if (body?.p_blocked) online.blocks.unshift(name);
         return json(route, true);
       }
-      case "/rest/v1/rpc/set_age_group":
-        calls.rpc.push(`set_age_group:${body?.p_sixteen_or_older}`);
-        if (online.under16 === null) online.under16 = !body?.p_sixteen_or_older;
+      case "/rest/v1/rpc/set_birth_month": {
+        // As the database does it: an earlier month while under 16 waits a week.
+        const born = `${body?.p_year}-${String(body?.p_month).padStart(2, "0")}`;
+        calls.rpc.push(`set_birth_month:${born}`);
+        if (online.born && born < online.born && under16(online.born)) online.next = born;
+        else [online.born, online.next] = [born, null];
         return json(route, null);
+      }
       case "/rest/v1/rpc/online_eligibility": {
         const games = tables.bot_games as { result: string | null; moves: string[]; helps: number; bot_rating: number }[];
         const long = games.filter((g) => g.result && g.moves.length >= 20).length;
         const clean = games.some((g) => g.result === "win" && !g.helps && g.bot_rating >= 800);
-        const answered = online.under16 !== null;
-        return json(route, { verified: true, age_answered: answered, under16: online.under16, level: 800, target: 800, clean_win: clean, long_games: long, eligible: answered && (clean || long >= 3) });
+        const answered = online.born !== null;
+        const young = !online.born || under16(online.born);
+        const sixteen = online.born && young ? `${Number(online.born.slice(0, 4)) + 16 + (online.born.endsWith("12") ? 1 : 0)}-${String((Number(online.born.slice(5)) % 12) + 1).padStart(2, "0")}-01` : null;
+        return json(route, {
+          verified: true, age_answered: answered, under16: young, born: online.born, born_next: online.next, born_next_at: online.next && "2026-10-22T10:00:00Z", earlier_used: !!online.next, sixteen_on: sixteen,
+          level: 800, target: 800, clean_win: clean, long_games: long, eligible: answered && (clean || long >= 3),
+        });
       }
       case "/rest/v1/rpc/public_profile": {
         const name = String(body?.p_username).toLowerCase();
@@ -869,19 +885,33 @@ test("a guest sees public profiles without the block button; unknown names say s
   await expect(page.getByRole("heading", { name: "Player not found" })).toBeVisible();
 });
 
-test("before the first online game: the age question, then a clean win or 3 long bot games", async ({ page }) => {
+test("before the first online game: the birth month, then a clean win or 3 long bot games", async ({ page }) => {
   const long = (id: string, result: string) => ({ id, bot_id: "afu", bot_rating: 400, player_color: "red", moves: Array(24).fill("h2e2"), result, reason: "resign", rated: false, helps: 1, started_at: "2026-10-10T10:00:00Z" });
   const calls = await fakeSupabase(page, { tables: { bot_games: [long("g1", "loss"), long("g2", "win")] as never } });
   await signIn(page);
   await page.goto(at("/en/online/"));
   await expect(page.getByRole("heading", { name: "Before your first online game" })).toBeVisible();
   await expect(page.getByText("2 of 3 played")).toBeVisible();
-  await page.getByRole("button", { name: "No" }).click();
-  await expect(page.getByText(/Under 16: your public profile shows only your username/)).toBeVisible();
-  expect(calls.rpc).toEqual(["set_age_group:false"]);
+  const year = new Date().getFullYear() - 10;
+  await page.getByLabel("Month").selectOption("3");
+  await page.getByLabel("Year").selectOption(String(year));
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText(`Your birth month: March ${year}`)).toBeVisible();
+  await expect(page.getByText(/Under 16: your public profile shows only your username.*lifts by itself/)).toBeVisible();
+  expect(calls.rpc).toEqual([`set_birth_month:${year}-03`]);
   calls.tables.bot_games.push(long("g3", "draw") as never);
   await page.reload();
   await expect(page.getByRole("heading", { name: "You're ready for online play" })).toBeVisible();
+
+  // Settings: when under 16 ends, and a change to an earlier month waits a week and can be withdrawn.
+  await page.goto(at("/en/settings/?tab=online"));
+  await expect(page.getByText(`March ${year}. Under 16 until April 1, ${year + 16}, when this lifts by itself.`)).toBeVisible();
+  await page.getByLabel("Year").selectOption("1990");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Changing to March 1990 on October 22, 2026.")).toBeVisible();
+  await page.getByRole("button", { name: "Keep the current month" }).click();
+  await expect(page.getByText(/Changing to/)).toHaveCount(0);
+  expect(calls.rpc.slice(1)).toEqual(["set_birth_month:1990-03", `set_birth_month:${year}-03`]);
 });
 
 test("a guest is asked to sign up for online play", async ({ page }) => {

@@ -6,6 +6,7 @@ import { type FormEvent, type ReactNode, useEffect, useId, useMemo, useRef, useS
 import { useNav } from "../nav.js";
 import { COUNTRIES } from "./avatar.js";
 import { ageChecked, markAgeChecked, minAgeFor, oldEnough } from "./age.js";
+import { BirthMonthFields } from "./BirthMonthFields.js";
 import { useT } from "../settings.js";
 import { type Account, PROVIDERS, type Provider, useAccount } from "./session.js";
 
@@ -907,7 +908,6 @@ export function ChangeUsername() {
  */
 export function AgeGate({ onPass, onFail }: { onPass: () => void; onFail: (minAge: number) => void }) {
   const { tt, lang } = useT();
-  const now = new Date().getFullYear();
   const [year, setYear] = useState("");
   const [month, setMonth] = useState("");
   const [country, setCountry] = useState("");
@@ -921,7 +921,6 @@ export function AgeGate({ onPass, onFail }: { onPass: () => void; onFail: (minAg
     }
   }, [locale]);
   const countries = useMemo(() => [...COUNTRIES].sort((a, b) => names(a).localeCompare(names(b), locale)), [names, locale]);
-  const months = useMemo(() => Array.from({ length: 12 }, (_, i) => new Date(2000, i, 1).toLocaleDateString(locale, { month: "long" })), [locale]);
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (oldEnough(Number(year), Number(month), country)) {
@@ -934,22 +933,7 @@ export function AgeGate({ onPass, onFail }: { onPass: () => void; onFail: (minAg
       <p className="muted">{tt("First, so we follow the rules for young players where you live:", "首先，为了遵守你所在地区关于未成年人的规定：")}</p>
       <fieldset>
         <legend>{tt("Your birthday", "你的出生年月")}</legend>
-        <select aria-label={tt("Month", "月")} value={month} onChange={(e) => setMonth(e.target.value)} required>
-          <option value="">{tt("Month", "月")}</option>
-          {months.map((m, i) => (
-            <option key={m} value={i + 1}>
-              {m}
-            </option>
-          ))}
-        </select>
-        <select aria-label={tt("Year", "年")} value={year} onChange={(e) => setYear(e.target.value)} required>
-          <option value="">{tt("Year", "年")}</option>
-          {Array.from({ length: 100 }, (_, i) => now - i).map((y) => (
-            <option key={y} value={y}>
-              {y}
-            </option>
-          ))}
-        </select>
+        <BirthMonthFields year={year} month={month} onYear={setYear} onMonth={setMonth} />
       </fieldset>
       <label>
         {tt("Country or region", "国家或地区")}

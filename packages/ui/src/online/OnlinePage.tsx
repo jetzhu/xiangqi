@@ -1,18 +1,18 @@
 "use client";
 // Play online: what a player needs before their first online game (decision D9, M15), the one
-// age question online play needs, and then the way in (Play a friend, M16).
+// birth month online play needs, and then the way in (Play a friend, M16).
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useAccount } from "../account/session.js";
 import { useNav } from "../nav.js";
 import { useT } from "../settings.js";
-import { type Eligibility, LONG_GAMES_NEEDED, LONG_GAME_MOVES, onlineEligibility, setAgeGroup } from "./api.js";
+import { type Eligibility, LONG_GAMES_NEEDED, LONG_GAME_MOVES, onlineEligibility } from "./api.js";
+import { BirthMonthForm, useMonthName } from "./BirthMonth.js";
 
 export function OnlinePage() {
   const { tt } = useT();
   const nav = useNav();
   const account = useAccount();
   const [check, setCheck] = useState<Eligibility | null | "error">(null);
-  const [saving, setSaving] = useState(false);
   const signedIn = account.state.status === "signedIn";
 
   const load = useCallback(() => {
@@ -26,15 +26,7 @@ export function OnlinePage() {
     if (signedIn) load();
   }, [signedIn, load]);
 
-  const answer = async (sixteenOrOlder: boolean) => {
-    setSaving(true);
-    try {
-      await setAgeGroup(await account.client(), sixteenOrOlder);
-      load();
-    } finally {
-      setSaving(false);
-    }
-  };
+  const monthName = useMonthName();
 
   const intro = (
     <>
@@ -77,19 +69,8 @@ export function OnlinePage() {
       <ul className="checklist">
         <Item done={check.verified}>{tt("A verified email", "已验证的邮箱")}</Item>
         <Item done={check.age_answered}>
-          {tt("Your age group", "年龄段")}
-          {!check.age_answered && (
-            <span className="age-question">
-              {" "}
-              {tt("Are you 16 or older?", "你是否已年满 16 岁？")}{" "}
-              <button type="button" disabled={saving} onClick={() => void answer(true)}>
-                {tt("Yes", "是")}
-              </button>{" "}
-              <button type="button" disabled={saving} onClick={() => void answer(false)}>
-                {tt("No", "否")}
-              </button>
-            </span>
-          )}
+          {tt("Your birth month", "你的出生年月")}
+          {check.born ? `: ${monthName(check.born)}` : <BirthMonthForm check={check} onSaved={load} label={tt("Your birth month", "你的出生年月")} />}
         </Item>
         <Item done={check.clean_win || gamesLeft === 0}>
           {tt("One of these:", "以下任意一项：")}
@@ -120,8 +101,8 @@ export function OnlinePage() {
       {check.age_answered && check.under16 && (
         <p className="muted small">
           {tt(
-            "Under 16: your public profile shows only your username and ratings, and your games always go through our server, so opponents never see your network address.",
-            "16 岁以下：公开资料只显示用户名和等级分；你的对局始终经服务器中转，对手看不到你的网络地址。",
+            "Under 16: your public profile shows only your username and ratings, and your games always go through our server, so opponents never see your network address. This lifts by itself when you turn 16.",
+            "16 岁以下：公开资料只显示用户名和等级分；你的对局始终经服务器中转，对手看不到你的网络地址。年满 16 岁后自动解除。",
           )}
         </p>
       )}

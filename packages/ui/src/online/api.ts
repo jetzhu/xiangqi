@@ -1,5 +1,5 @@
 // Calls to the database functions for online play (migrations 20261012000000_online_groundwork.sql
-// for M15 and 20261013000000_play_a_friend.sql for M16) and to the `game` server function.
+// for M15, 20261012120000_birth_month.sql, and 20261013000000_play_a_friend.sql for M16) and to the `game` server function.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { OnlineResult, Report } from "@xq/online";
 
@@ -8,7 +8,7 @@ export const SPEEDS: Speed[] = ["lightning", "blitz", "rapid"];
 
 export interface PublicProfile {
   username: string;
-  /** Under 16, or not said: only the username and ratings are shown. */
+  /** Under 16, or no birth month given: only the username and ratings are shown. */
   minimal: boolean;
   avatar: string | null;
   country: string | null;
@@ -26,8 +26,18 @@ export interface PublicProfile {
 
 export interface Eligibility {
   verified: boolean;
+  /** The birth month is given. */
   age_answered: boolean;
-  under16: boolean | null;
+  /** Under 16, or not said. */
+  under16: boolean;
+  /** The birth month that counts now, YYYY-MM, and a change to an earlier one that waits a week. */
+  born: string | null;
+  born_next: string | null;
+  born_next_at: string | null;
+  /** The one change to an earlier month allowed while under 16 is used. */
+  earlier_used: boolean;
+  /** The day an under-16 player turns 16 here (YYYY-MM-DD). */
+  sixteen_on: string | null;
   /** The player's level (their bot rating) and the bot rating a qualifying win needs. */
   level: number;
   target: number;
@@ -48,7 +58,7 @@ async function rpc<T>(sb: SupabaseClient, fn: string, args?: object): Promise<T>
 
 export const publicProfile = (sb: SupabaseClient, username: string) => rpc<PublicProfile | null>(sb, "public_profile", { p_username: username });
 export const onlineEligibility = (sb: SupabaseClient) => rpc<Eligibility | null>(sb, "online_eligibility");
-export const setAgeGroup = (sb: SupabaseClient, sixteenOrOlder: boolean) => rpc<null>(sb, "set_age_group", { p_sixteen_or_older: sixteenOrOlder });
+export const setBirthMonth = (sb: SupabaseClient, year: number, month: number) => rpc<null>(sb, "set_birth_month", { p_year: year, p_month: month });
 export const setBlocked = (sb: SupabaseClient, username: string, blocked: boolean) => rpc<boolean>(sb, "set_blocked", { p_username: username, p_blocked: blocked });
 export const myBlocks = (sb: SupabaseClient) => rpc<{ username: string; blocked_at: string }[]>(sb, "my_blocks");
 
