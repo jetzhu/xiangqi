@@ -106,6 +106,7 @@ export function QuickPair({ level, sport, onSport, busy }: { level: number; spor
     established: settings.opponentEstablished,
     account_age: settings.opponentAccountAge,
     completion: settings.opponentCompletion,
+    checked: settings.opponentChecked,
   });
 
   const start = async (next: TimeControl) => {

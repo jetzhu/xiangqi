@@ -4,7 +4,7 @@ import { type Locale, pageMetadata } from "../../../lib/site";
 // The fair-play policy for online games (v0.3; docs/v0.3-online-design.md, "Fair play").
 // Rendered on the server so it can be read without running the app. Exact detection
 // thresholds stay private, as on every big site.
-const UPDATED = "2026-10-12";
+const UPDATED = "2026-10-16";
 const CONTACT = "jianjetzhu@gmail.com";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -19,7 +19,7 @@ function En() {
   return (
     <article className="help legal">
       <h1>Fair play policy</h1>
-      <p className="muted">Last updated {UPDATED} · Online play opens with v0.3</p>
+      <p className="muted">Last updated {UPDATED}</p>
       <p>
         Online games are between you and the other player: no engine, no helper, no second account. This page says what's forbidden, what we record to
         check it, and how decisions and appeals work. Our aim is to stop cheating paying off without making honest players feel watched or accused.
@@ -37,7 +37,10 @@ function En() {
       <h2>What we record</h2>
       <ul>
         <li>For every move: when our server received it, how long you thought, and whether the page lost focus while it was your move.</li>
-        <li>After the game: an engine analysis of the moves, made in the two players' browsers, which you also get as your Game Review.</li>
+        <li>
+          After the game: an engine analysis of the moves, made in the two players' browsers, which you also get as your Game Review. For rated games
+          your browser sends it to us, and we compare it with your opponent's.
+        </li>
       </ul>
       <p>We don't record mouse movement, your clipboard, other programs or your camera.</p>
 
@@ -75,7 +78,7 @@ function Zh() {
   return (
     <article className="help legal">
       <h1>公平竞技规则</h1>
-      <p className="muted">更新于 {UPDATED} · 在线对弈将在 v0.3 推出</p>
+      <p className="muted">更新于 {UPDATED}</p>
       <p>
         在线对局只属于你和对手：不用引擎、不找人帮忙、不用第二个账号。本页说明哪些行为被禁止、我们为核查记录什么，以及如何判定和申诉。我们的目标是让作弊得不偿失，同时不让诚实的棋手感到被监视或被冤枉。
       </p>
@@ -92,7 +95,7 @@ function Zh() {
       <h2>我们记录什么</h2>
       <ul>
         <li>每一步：服务器收到的时间、你的思考时间，以及轮到你走时页面是否离开过焦点。</li>
-        <li>对局结束后：由双方浏览器完成的引擎分析，你也会把它作为复盘结果看到。</li>
+        <li>对局结束后：由双方浏览器完成的引擎分析，你也会把它作为复盘结果看到。计分对局的分析会由你的浏览器发送给我们，并与对手的分析核对。</li>
       </ul>
       <p>我们不记录鼠标移动、剪贴板、其他程序或摄像头。</p>
 

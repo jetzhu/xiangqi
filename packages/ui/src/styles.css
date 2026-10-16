@@ -486,3 +486,7 @@ a.button.big { display: inline-block; }
 .online-game .player-bar { height: 56px; position: relative; }
 .online-game .player-bar .who { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .online-game .player-bar .bubble { position: absolute; left: 50px; top: 46px; z-index: 2; white-space: nowrap; pointer-events: none; }
+/* Game Review after an online game (M18) */
+.game-review { margin-top: 12px; }
+.game-review h3 { margin: 0 0 4px; font-size: 15px; }
+.grade-counts { list-style: none; padding: 0; margin: 4px 0; display: grid; grid-template-columns: repeat(3, auto); gap: 2px 12px; font-size: 14px; }

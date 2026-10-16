@@ -13,7 +13,7 @@ import {
   formatTimeControl,
   resultText,
 } from "@xq/online";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Game, type MoveRecord, Position, toIccs } from "xiangqi-core";
 import { Board } from "../Board.js";
 import { UserAvatar } from "../account/UserAvatar.js";
@@ -21,6 +21,9 @@ import { useAccount } from "../account/session.js";
 import { useNav } from "../nav.js";
 import { announceMove, useOrientation, useSettings, useSound, useT } from "../settings.js";
 import { type GameInfo, type GamePlayer, type GameVerdict, gameInfo, settleGame } from "./api.js";
+
+// The review loads the engine, so it comes in its own chunk once a game is over.
+const GameReviewPanel = lazy(() => import("./GameReviewPanel.js"));
 import { Link, type LinkState, realtimeSignaling, tabSignaling } from "./link.js";
 import { LIVE_GAME_KEY } from "./live.js";
 import { SPEED_NAME } from "./PlayerPage.js";
@@ -78,6 +81,18 @@ function LiveGame({ info }: { info: GameInfo }) {
   /** One queued move for when it's my turn (Lightning and Blitz, if premoves are on). */
   const [premove, setPremove] = useState<string | null>(null);
   const premoves = settings.premoves && info.speed !== "rapid";
+  /** Whether the page lost focus during this turn: sent with the move for the fair-play record (M18). */
+  const lostFocus = useRef(false);
+  useEffect(() => {
+    const lost = () => void (lostFocus.current = true);
+    const hidden = () => document.hidden && lost();
+    window.addEventListener("blur", lost);
+    document.addEventListener("visibilitychange", hidden);
+    return () => {
+      window.removeEventListener("blur", lost);
+      document.removeEventListener("visibilitychange", hidden);
+    };
+  }, []);
 
   const settle = useCallback(async () => {
     const r = ref.current;
@@ -186,9 +201,11 @@ function LiveGame({ info }: { info: GameInfo }) {
       playSound(rec.check ? "check" : rec.captured ? "capture" : "move");
     }
     lastPlies.current = history.length;
+    // A new turn of mine: focus counts from here.
+    if (game && game.turn === info.me) lostFocus.current = !document.hasFocus();
     if (premove && game && game.turn === info.me) {
       setPremove(null);
-      game.move(premove, Date.now());
+      game.move(premove, Date.now(), lostFocus.current);
     }
   }, [history.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -220,7 +237,7 @@ function LiveGame({ info }: { info: GameInfo }) {
           premove={!myTurn && premoves && !result}
           onMove={(m) => {
             if (!myTurn) return setPremove(m);
-            if (game.move(m, Date.now())) setConfirmResign(false);
+            if (game.move(m, Date.now(), lostFocus.current)) setConfirmResign(false);
           }}
           lastMove={last?.iccs ?? null}
           check={checkSquare}
@@ -492,6 +509,12 @@ function ResultPanel({ info, result, verdict, settling, moves }: { info: GameInf
           {tt("Analyse", "分析棋局")}
         </a>
       </div>
+      {/* Once the server has the result, so a rated game's analysis can be sent for the fair-play check. */}
+      {(verdict || !settling) && (
+        <Suspense fallback={null}>
+          <GameReviewPanel id={info.id} me={me} moves={moves} rated={!!verdict?.rated} />
+        </Suspense>
+      )}
     </section>
   );
 }

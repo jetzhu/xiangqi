@@ -2,7 +2,7 @@
 // for M15, 20261012120000_birth_month.sql, 20261013000000_play_a_friend.sql for M16, and
 // 20261016000000_quick_pairing.sql for M17) and to the `game` server function.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { OnlineResult, Report } from "@xq/online";
+import type { AnalysisData, OnlineResult, Report } from "@xq/online";
 
 export type Speed = "lightning" | "blitz" | "rapid";
 export const SPEEDS: Speed[] = ["lightning", "blitz", "rapid"];
@@ -139,6 +139,16 @@ export async function settleGame(sb: SupabaseClient, id: string): Promise<GameVe
   return data!;
 }
 
+/**
+ * Sends this browser's fair-play analysis of a finished rated game (M18). The server compares it
+ * with the other browser's: "one" until both are in, then "checked" or "disagree".
+ */
+export async function submitAnalysis(sb: SupabaseClient, id: string, analysis: AnalysisData): Promise<"one" | "checked" | "disagree"> {
+  const { data, error } = await sb.functions.invoke<{ fairplay: "one" | "checked" | "disagree" }>("game", { body: { game: id, analysis } });
+  if (error) throw new Error(error.message);
+  return data!.fairplay;
+}
+
 // Quick pairing and sportsmanship (M17, migration 20261016000000_quick_pairing.sql) -----------
 
 /** The opponent filters from Settings → Online play, as seek() takes them. */
@@ -147,6 +157,8 @@ export interface SeekFilters {
   established: boolean;
   account_age: number;
   completion: number;
+  /** Only opponents with 10 or more fair-play checked games and no finding. */
+  checked: boolean;
 }
 
 export interface Seeking {

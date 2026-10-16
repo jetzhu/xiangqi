@@ -34,6 +34,8 @@ function world(relay: boolean) {
     far: false,
     sport: { completion: null, last30: { games: 0, abandoned: 0, stalled: 0, aborted: 0, slow_start: 0 }, warning: false, wait_until: null, pool: false },
     calls: [] as string[],
+    /** Fair-play analyses each browser sent after the game (M18). */
+    analyses: [] as { by: "red" | "black"; analysis: { v: number; depth: number; positions: { b: string | null; s: number[] }[] } }[],
   };
 }
 type World = ReturnType<typeof world>;
@@ -125,6 +127,10 @@ async function player(page: Page, w: World, who: { id: string; username: string;
         w.reports.push({ by: who.color, report: body!.p_report as World["reports"][number]["report"] });
         return json(route, null);
       case "/functions/v1/game": {
+        if (body?.analysis) {
+          w.analyses.push({ by: who.color, analysis: body.analysis as World["analyses"][number]["analysis"] });
+          return json(route, { fairplay: w.analyses.length === 2 ? "checked" : "one" });
+        }
         w.settled++;
         const end = w.reports.find((r) => r.report.kind === "end");
         if (!end) return json(route, { status: "playing", pending: "no end report yet" });
@@ -192,7 +198,7 @@ test("quick pairing: two players seeking on a tile are paired and the game opens
   await alice.getByRole("button", { name: /^2\+1/ }).click();
   await expect(alice.getByRole("heading", { name: "Looking for an opponent: 2+1" })).toBeVisible();
   await expect(alice.getByText("Within ±50 of your rating")).toBeVisible();
-  expect(w.calls).toEqual([`seek:red:120+1:${JSON.stringify({ range: 200, established: false, account_age: 0, completion: 0 })}`]);
+  expect(w.calls).toEqual([`seek:red:120+1:${JSON.stringify({ range: 200, established: false, account_age: 0, completion: 0, checked: false })}`]);
 
   await bob.goto(at("/en/online/"));
   await bob.getByRole("button", { name: /^2\+1/ }).click();
@@ -282,6 +288,14 @@ for (const relay of [false, true]) {
       { winner: "black", reason: "resign" },
     ]);
     expect(w.settled).toBeGreaterThan(0);
+
+    // Game Review in both browsers; each sends the same fair-play analysis of the rated game.
+    for (const p of [alice, bob]) await expect(p.getByRole("region", { name: "Game Review" })).toContainText(/Accuracy: \d+ you/, { timeout: 30_000 });
+    await expect.poll(() => w.analyses.length, { timeout: 15_000 }).toBe(2);
+    const [a, b] = w.analyses;
+    expect(a!.analysis).toMatchObject({ v: 1, depth: 8 });
+    expect(a!.analysis.positions).toHaveLength(moves.length + 1);
+    expect(b!.analysis).toEqual(a!.analysis);
   });
 }
 

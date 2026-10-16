@@ -82,7 +82,7 @@ export function OnlineSettings() {
         </label>
         <label className="check">
           <input type="checkbox" checked={settings.opponentChecked} onChange={(e) => set("opponentChecked", e.target.checked)} />
-          {tt("Only players with 10 or more fair-play checked games (from when fair-play checks start)", "只匹配已有 10 盘以上公平性检查的棋手（公平性检查上线后生效）")}
+          {tt("Only players with 10 or more fair-play checked games", "只匹配已有 10 盘以上公平性检查的棋手")}
         </label>
       </div>
 

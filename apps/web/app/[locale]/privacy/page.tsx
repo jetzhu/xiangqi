@@ -50,7 +50,8 @@ function En() {
         </li>
         <li>
           <strong>For online play:</strong> your birth month and year (no day), so that players under 16 get the protections below and lose them by themselves on turning 16; the players you block, the
-          challenge links you make, and your online games: the moves, the clock readings each browser reported, and when each report reached us, used to
+          challenge links you make, and your online games: the moves, the clock readings each browser reported, whether your page lost focus during your turn, when each report reached us, and
+          after a rated game each browser's engine analysis of it, used to
           settle results and for fair play (see the <a href="../fair-play/">fair play policy</a>), and what each game says about sportsmanship
           (left, stalled, aborted, or a very slow start; see the <a href="../sportsmanship/">sportsmanship policy</a>). While you look for a quick-pairing
           game, your rating, filters and the time you started are kept until you're paired or stop.
@@ -127,7 +128,7 @@ function Zh() {
           <strong>下棋记录：</strong>课程进度、设置、星级、连续学习天数、人机对局、题目记录、等级分和保存的分析。
         </li>
         <li>
-          <strong>在线对弈：</strong>你的出生年月（不含日期），用于让 16 岁以下的棋手获得下述保护，并在年满 16 岁时自动解除；你屏蔽的棋手、你生成的挑战链接，以及你的在线对局：着法、双方浏览器报告的时钟读数和每份报告到达服务器的时间，用于判定结果和公平竞技（见<a href="../fair-play/">公平竞技规则</a>），以及每盘对局的棋品记录（离开、拖延、取消或开局过慢，见<a href="../sportsmanship/">棋品规则</a>）。快速匹配时，你的等级分、筛选条件和开始时间会保存到匹配成功或停止寻找为止。
+          <strong>在线对弈：</strong>你的出生年月（不含日期），用于让 16 岁以下的棋手获得下述保护，并在年满 16 岁时自动解除；你屏蔽的棋手、你生成的挑战链接，以及你的在线对局：着法、双方浏览器报告的时钟读数、轮到你走时页面是否失去焦点、每份报告到达服务器的时间，以及计分对局结束后双方浏览器的引擎分析，用于判定结果和公平竞技（见<a href="../fair-play/">公平竞技规则</a>），以及每盘对局的棋品记录（离开、拖延、取消或开局过慢，见<a href="../sportsmanship/">棋品规则</a>）。快速匹配时，你的等级分、筛选条件和开始时间会保存到匹配成功或停止寻找为止。
         </li>
       </ul>
       <p>
