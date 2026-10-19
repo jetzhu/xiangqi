@@ -7,8 +7,10 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { useAccount } from "../account/session.js";
 import { useNav } from "../nav.js";
+import { PHRASES, type Phrase } from "@xq/online";
 import { useT } from "../settings.js";
 import {
+  type CaseGame,
   type ModCase,
   type QueueCase,
   isModerator,
@@ -17,6 +19,7 @@ import {
   modCase,
   modConfirm,
   modDismiss,
+  modInconclusive,
   modLogRecent,
   modQueue,
 } from "./api.js";
@@ -74,6 +77,7 @@ function Queue() {
               <th scope="col">{tt("Standing", "评估")}</th>
               <th scope="col">{tt("Reports (weight)", "举报（权重）")}</th>
               <th scope="col">{tt("Unchecked games", "未检查对局")}</th>
+              <th scope="col">{tt("Last decision", "上次处理")}</th>
             </tr>
           </thead>
           <tbody>
@@ -90,6 +94,9 @@ function Queue() {
                   {c.reports} ({fmt(c.weight)})
                 </td>
                 <td>{c.unchecked}</td>
+                <td className="small">
+                  {c.last_outcome ? `${tt("Returning", "再次进入")}: ${outcomeText(c.last_outcome, tt)} ${c.last_reviewed ? new Date(c.last_reviewed).toLocaleDateString() : ""}${c.last_note ? ` · ${c.last_note}` : ""}` : "–"}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -155,6 +162,13 @@ function Case({ username }: { username: string }) {
         {c.report_barred && ` · ${tt("barred from reporting", "已禁止举报")}`}
       </p>
 
+      {c.review && (
+        <p className="case-review">
+          {tt("Last decision", "上次处理")}: <strong>{outcomeText(c.review.outcome, tt)}</strong> · {new Date(c.review.at).toLocaleDateString()}
+          {c.review.note && ` · ${c.review.note}`}
+        </p>
+      )}
+
       <h2>{tt("Standing", "评估")}</h2>
       <table className="mod-table">
         <thead>
@@ -217,6 +231,7 @@ function Case({ username }: { username: string }) {
                 {g.speed} {g.base / 60}+{g.inc} · {g.color} {tt("vs", "对")} {g.opponent ?? "–"} · {g.result === g.color ? tt("won", "胜") : g.result === "draw" ? tt("draw", "和") : g.result === "none" ? "–" : tt("lost", "负")} ({g.reason}) ·{" "}
                 {g.plies} {tt("plies", "步")} · {tt("rated", "赛前")} {g.rating_before ?? "–"}
                 {g.labels.length > 0 && ` · ${g.labels.join(", ")}`}
+                {g.chat && <GameChat chat={g.chat} me={g.color} />}
               </td>
               <td>
                 {g.status ?? tt("none", "无")}
@@ -295,7 +310,14 @@ function Case({ username }: { username: string }) {
       </label>
       <p className="buttons">
         <button type="button" disabled={!note.trim()} onClick={() => void act(async () => modDismiss(await sb(), c.username, note), tt("Case dismissed.", "案件已驳回。"))}>
-          {tt("Dismiss: no violation", "驳回：无违规")}
+          {tt("No violation", "无违规")}
+        </button>{" "}
+        <button
+          type="button"
+          disabled={!note.trim()}
+          onClick={() => void act(async () => modInconclusive(await sb(), c.username, note), tt("Kept open: back in the queue with new evidence.", "保持未结：有新证据时重新进入队列。"))}
+        >
+          {tt("Not conclusive", "证据不足")}
         </button>{" "}
         {confirming ? (
           <button
@@ -330,5 +352,39 @@ function Case({ username }: { username: string }) {
         ))}
       </ul>
     </>
+  );
+}
+
+function outcomeText(o: "no-violation" | "inconclusive" | "violation", tt: (en: string, zh: string) => string) {
+  return o === "no-violation" ? tt("no violation", "无违规") : o === "violation" ? tt("violation", "违规") : tt("not conclusive", "证据不足");
+}
+
+/**
+ * A game's chat as each browser recorded it. Both records agree unless one browser left
+ * something out or added it, which is itself evidence.
+ */
+function GameChat({ chat, me }: { chat: NonNullable<CaseGame["chat"]>; me: "red" | "black" }) {
+  const { tt, t } = useT();
+  const line = (e: { ply: number; by: "red" | "black"; phrase: string }) =>
+    `${e.ply}: ${e.by === me ? tt("player", "被查棋手") : tt("opponent", "对手")} “${PHRASES[e.phrase as Phrase] ? t(PHRASES[e.phrase as Phrase]) : e.phrase}”`;
+  const red = chat.red ?? [];
+  const black = chat.black ?? [];
+  const same = JSON.stringify(red) === JSON.stringify(black);
+  return (
+    <details className="game-chat">
+      <summary>
+        {tt("Chat", "聊天")} ({Math.max(red.length, black.length)}){!same && ` · ${tt("the two records differ", "双方记录不一致")}`}
+      </summary>
+      {same ? (
+        <ul>{red.map((e, i) => <li key={i}>{line(e)}</li>)}</ul>
+      ) : (
+        (["red", "black"] as const).map((c) => (
+          <div key={c}>
+            <strong>{c === me ? tt("Player's browser", "被查棋手的浏览器") : tt("Opponent's browser", "对手的浏览器")}</strong>
+            <ul>{(chat[c] ?? []).map((e, i) => <li key={i}>{line(e)}</li>)}</ul>
+          </div>
+        ))
+      )}
+    </details>
   );
 }

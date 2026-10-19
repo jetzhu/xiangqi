@@ -5,7 +5,7 @@
 // runs the same in tests. The opponent's browser isn't trusted: its moves are checked, and its
 // clock can't claim more than the lag allowance back.
 import { type Color, Game } from "xiangqi-core";
-import { type Clocks, type LinkMsg, type Phrase, type Report, movesHash } from "./protocol.js";
+import { CHAT_LOG_MAX, type ChatEntry, type Clocks, type LinkMsg, type Phrase, type Report, movesHash } from "./protocol.js";
 import { NO_RESULT, type OnlineResult, material, other, winOrDraw } from "./result.js";
 import {
   AWAY_AFTER_MS,
@@ -95,6 +95,8 @@ export class OnlineGame {
   private begun = false;
   private nextDrawOfferAt = 0;
   private takebackRefusals = 0;
+  /** Chat phrases sent and received, for the end report (M19). */
+  private readonly chatLog: ChatEntry[] = [];
   private takebackWaitUntil = 0;
   private readonly lag: number;
   private readonly firstMoveMs: number;
@@ -248,6 +250,14 @@ export class OnlineGame {
 
   sendChat(phrase: Phrase) {
     this.io.send({ t: "chat", phrase });
+    this.logChat(this.me, phrase);
+  }
+
+  /** Keeps the transcript for the end report; after the game, sends the end report again with it. */
+  private logChat(by: Color, phrase: Phrase) {
+    if (this.chatLog.length >= CHAT_LOG_MAX) return;
+    this.chatLog.push({ ply: this.plies, by, phrase });
+    if (this.result) this.reportEnd();
   }
 
   /** Sent every couple of seconds over a direct link; it measures the round trip too. */
@@ -369,6 +379,10 @@ export class OnlineGame {
         return this.onHello(msg, now);
       case "sync":
         return this.onSync(msg, now);
+      // Chat goes on after the game ("Good game").
+      case "chat":
+        this.logChat(this.opp, msg.phrase);
+        return this.io.chat?.(msg.phrase);
     }
     if (this.result) return;
     switch (msg.t) {
@@ -410,8 +424,6 @@ export class OnlineGame {
           this.io.changed();
         }
         return;
-      case "chat":
-        return this.io.chat?.(msg.phrase);
       case "flag":
         // My own clock decides for me; if it hasn't run out here, the server settles it.
         this.tick(now);
@@ -524,7 +536,11 @@ export class OnlineGame {
     this.drawOffer = null;
     this.takeback = null;
     this.away = null;
-    this.io.report({ kind: "end", result, moves: this.moves, clocks: { ...this.clocks } });
+    this.reportEnd();
     this.io.changed();
+  }
+
+  private reportEnd() {
+    this.io.report({ kind: "end", result: this.result!, moves: this.moves, clocks: { ...this.clocks }, ...(this.chatLog.length ? { chat: [...this.chatLog] } : {}) });
   }
 }

@@ -1104,6 +1104,51 @@ describe("reports and moderation (M19)", () => {
     expect((await db.query<{ j: { weight: number } }>(`select public.reporter_record($1) as j`, [Y])).rows[0]!.j.weight).toBe(0);
   });
 
+  it("leaves a not-conclusive case open: reports kept, reporters' records unchanged, back in the queue with new evidence", async () => {
+    await db.query(`update public.profiles set report_barred = false`);
+    const queue = () => run<{ username: string; reports: number; weight: number; last_outcome: string | null }[]>(MOD, `public.mod_queue()`);
+    const g1 = await game(Y, X, "black");
+    const g2 = await game(Y, X, "black");
+    await run(Y, `public.report_player($1, 'engine')`, [g1]);
+    await run(Y, `public.report_player($1, 'engine')`, [g2]);
+    // One reporter twice counts once.
+    const before = (await queue()).find((c) => c.username === "xia_xq")!;
+    expect(before.reports).toBe(1);
+    const record = async () => (await db.query<{ j: object }>(`select public.reporter_record($1) as j`, [Y])).rows[0]!.j;
+    const r0 = await record();
+    await run(MOD, `public.mod_inconclusive('xia_xq', 'too few games')`);
+    expect((await queue()).find((c) => c.username === "xia_xq")).toBeUndefined();
+    expect((await db.query(`select distinct status from public.reports where game_id in ($1, $2)`, [g1, g2])).rows).toEqual([{ status: "open" }]);
+    expect(await record()).toEqual(r0);
+    expect(await run(MOD, `public.mod_case('xia_xq')->'review'`)).toMatchObject({ outcome: "inconclusive", note: "too few games" });
+    // A second reporter is new evidence: the case returns, with the last decision.
+    const g3 = await game(Z, X, "black");
+    await run(Z, `public.report_player($1, 'chat')`, [g3]);
+    expect((await queue()).find((c) => c.username === "xia_xq")).toMatchObject({ reports: 2, last_outcome: "inconclusive" });
+  });
+
+  it("shows each game's chat as both browsers recorded it", async () => {
+    const g = await game(Y, X, "black");
+    const chat = [{ ply: 3, by: "black", phrase: "oops" }];
+    await db.query(`update public.games set red_end = $2, black_end = $3 where id = $1`, [g, JSON.stringify({ kind: "end", chat }), JSON.stringify({ kind: "end", chat })]);
+    const games = await run<{ id: string; chat: unknown }[]>(MOD, `public.mod_case('xia_xq')->'games'`);
+    expect(games.find((x) => x.id === g)!.chat).toEqual({ red: chat, black: chat });
+  });
+
+  it("keeps game records 12 months, longer while a case is open", async () => {
+    const held = await game(Y, X, "black", "13 months");
+    const free = await game(Y, Z, "draw", "13 months");
+    for (const g of [held, free]) {
+      await db.query(`update public.games set red_end = '{"kind": "end"}' where id = $1`, [g]);
+      await db.query(`insert into public.game_log (game_id, by_color, kind, ply, report, at) values ($1, 'red', 'move', 1, '{}', now())`, [g]);
+    }
+    await db.query(`select public.purge_old_game_records()`);
+    const left = async (g: string) => (await db.query<{ n: number }>(`select count(*)::int as n from public.game_log where game_id = $1`, [g])).rows[0]!.n;
+    expect(await left(free)).toBe(0); // Yan and Zhao have nothing open
+    expect(await left(held)).toBe(1); // Xia has open reports
+    expect((await db.query(`select red_end from public.games where id = $1`, [free])).rows).toEqual([{ red_end: null }]);
+  });
+
   it("lists leaderboard players: 30 games, a settled rating, recent play, 10 checked games, no mark", async () => {
     await db.query(`update public.ratings set games = 35, rd = 70, last_played = now() where user_id in ($1, $2) and kind = 'blitz'`, [Z, X]);
     expect(await as(null, async (tx) => (await tx.query(`select public.leaderboard('blitz') as j`)).rows[0])).toEqual({ j: [] });

@@ -100,4 +100,14 @@ export type Report =
   /** The opponent has gone quiet over the link (since `since`, ms ago when sent). */
   | { kind: "away"; ms: number }
   | { kind: "back" }
-  | { kind: "end"; result: OnlineResult; moves: string[]; clocks: Clocks };
+  /** `chat` (M19): the phrases this browser sent and received, for a moderator checking a report. */
+  | { kind: "end"; result: OnlineResult; moves: string[]; clocks: Clocks; chat?: ChatEntry[] };
+
+/** One chat phrase, as a browser saw it: after how many plies, and who sent it. */
+export interface ChatEntry {
+  ply: number;
+  by: Color;
+  phrase: Phrase;
+}
+/** At most this many phrases are kept per game. */
+export const CHAT_LOG_MAX = 60;

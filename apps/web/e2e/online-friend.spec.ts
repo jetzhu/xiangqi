@@ -80,7 +80,7 @@ async function player(page: Page, w: World, who: { id: string; username: string;
       case "/rest/v1/rpc/is_moderator":
         return json(route, w.moderator);
       case "/rest/v1/rpc/mod_queue":
-        return json(route, [{ username: "bob_xq", rating: 1150, score: 5.4, verdict: "likely", reports: 2, weight: 1.2, unchecked: 1, priority: 20 }]);
+        return json(route, [{ username: "bob_xq", rating: 1150, score: 5.4, verdict: "likely", reports: 2, weight: 1.2, unchecked: 1, priority: 20, last_outcome: "inconclusive", last_note: "too few games", last_reviewed: "2026-10-10T00:00:00Z" }]);
       case "/rest/v1/rpc/mod_log_recent":
         return json(route, [{ at: "2026-10-18T10:00:00Z", action: "dismiss", details: { note: "no evidence" }, moderator: "alice_xq", target: "carol_xq" }]);
       case "/rest/v1/rpc/mod_case":
@@ -89,10 +89,12 @@ async function player(page: Page, w: World, who: { id: string; username: string;
           ratings: { blitz: { rating: 1150, rd: 80, games: 40 } }, standing: { blitz: { games: 12, score: 5.4, far: 4, verdict: "likely" } }, sanctions: [],
           reports: [{ id: 1, game: GAME, reason: "engine", note: "every move instant", at: "2026-10-18T09:00:00Z", status: "open", reporter: "alice_xq", record: { made: 3, upheld: 2, weight: 0.6 } }],
           games: [{ id: GAME, speed: "blitz", base: 300, inc: 3, color: "black", opponent: "alice_xq", result: "black", reason: "resign", plies: 60, ended_at: "2026-10-18T09:00:00Z", rating_before: 1140, status: "checked", labels: [], moves: null,
+            chat: { red: [{ ply: 30, by: "black", phrase: "oops" }], black: [{ ply: 30, by: "black", phrase: "oops" }, { ply: 31, by: "black", phrase: "oops" }] },
             check: { moves: 22, acc: 97.5, match: 0.82, z: 3.9, flags: ["even-times"], timing: { cv: 0.18, fast: 0.05, focus: 0, hard_ratio: 1.02 } } }],
-          log: [],
+          log: [], review: { outcome: "inconclusive", at: "2026-10-10T00:00:00Z", note: "too few games" },
         });
       case "/rest/v1/rpc/mod_dismiss":
+      case "/rest/v1/rpc/mod_inconclusive":
       case "/rest/v1/rpc/mod_confirm":
         w.calls.push(`${url.pathname.split("/").pop()}:${body!.p_username}:${body!.p_note}`);
         return json(route, url.pathname.endsWith("confirm") ? { level: 1, sanction: 1, refunded_games: 3 } : null);
@@ -301,8 +303,17 @@ test("the review page is for moderators: the queue, a case, and a decision", asy
   w.moderator = true;
   await alice.goto(at("/en/moderate/"));
   await expect(alice.getByRole("heading", { name: "Review queue" })).toBeVisible();
+  await expect(alice.getByText("Returning: not conclusive", { exact: false })).toBeVisible();
   await alice.getByRole("link", { name: "bob_xq" }).click();
   await expect(alice.getByText("every move instant")).toBeVisible();
+  await expect(alice.getByText("Last decision: not conclusive", { exact: false })).toBeVisible();
+  // The chat as each browser recorded it: here they differ, which is itself evidence.
+  await alice.getByText("Chat (2) · the two records differ").click();
+  await expect(alice.getByText("Player's browser")).toBeVisible();
+  await alice.getByLabel("Reason and evidence (kept in the log)").fill("still only 12 games");
+  await alice.getByRole("button", { name: "Not conclusive" }).click();
+  await expect(alice.getByText("Kept open: back in the queue with new evidence.")).toBeVisible();
+  expect(w.calls).toContain("mod_inconclusive:bob_xq:still only 12 games");
   await expect(alice.getByRole("cell", { name: "97.5" })).toBeVisible();
   await alice.getByLabel("Reason and evidence (kept in the log)").fill("engine match far above 1150 in 12 games");
   await alice.getByRole("button", { name: "Confirm violation…" }).click();
@@ -364,6 +375,11 @@ for (const relay of [false, true]) {
       { winner: "black", reason: "resign" },
     ]);
     expect(w.settled).toBeGreaterThan(0);
+    // Both end reports carry the chat as each browser saw it.
+    for (const by of ["red", "black"] as const) {
+      const end = w.reports.filter((r) => r.by === by && r.report.kind === "end").at(-1)!.report as { chat?: { by: string; phrase: string }[] };
+      expect(end.chat).toEqual([expect.objectContaining({ by: "black", phrase: "luck" })]);
+    }
 
     // The winner reports the opponent's play.
     await bob.getByRole("button", { name: "Report" }).click();

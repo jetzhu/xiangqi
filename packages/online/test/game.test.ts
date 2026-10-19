@@ -195,6 +195,24 @@ describe("resign, abort, draw", () => {
     expect(q.g.red.canAbort()).toBe(false);
   });
 
+  it("keeps the chat both ways for the end report, and sends it again for chat after the game", () => {
+    const p = pair();
+    p.play(OPENING.slice(0, 2));
+    p.g.red.sendChat("luck");
+    p.advance(100);
+    p.g.black.resign(p.now);
+    p.advance(100);
+    p.g.black.sendChat("gg");
+    p.advance(100);
+    // Each browser's latest end report has the whole conversation, the "gg" after the game included.
+    const lastEnd = (c: "red" | "black") => p.reports[c].filter((r): r is Extract<Report, { kind: "end" }> => r.kind === "end").at(-1)!;
+    expect(lastEnd("black").chat).toEqual(lastEnd("red").chat);
+    expect(lastEnd("red").chat).toEqual([
+      { ply: 2, by: "red", phrase: "luck" },
+      { ply: 2, by: "black", phrase: "gg" },
+    ]);
+  });
+
   it("allows rated draw offers from 10 moves each, and a move declines one", () => {
     const p = pair();
     p.play(OPENING);

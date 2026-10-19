@@ -50,13 +50,15 @@ function En() {
         </li>
         <li>
           <strong>For online play:</strong> your birth month and year (no day), so that players under 16 get the protections below and lose them by themselves on turning 16; the players you block, the
-          challenge links you make, and your online games: the moves, the clock readings each browser reported, whether your page lost focus during your turn, when each report reached us, and
-          after a rated game each browser's engine analysis of it, used to
+          challenge links you make, and your online games: the moves, the clock readings each browser reported, whether your page lost focus during your turn, when each report reached us, the chat
+          phrases each browser sent and received, and after a rated game each browser's engine analysis of it, used to
           settle results and for fair play (see the <a href="../fair-play/">fair play policy</a>), and what each game says about sportsmanship
           (left, stalled, aborted, or a very slow start; see the <a href="../sportsmanship/">sportsmanship policy</a>). While you look for a quick-pairing
           game, your rating, filters and the time you started are kept until you're paired or stop. Reports you make about
           another player, and reports about you, are kept with the moderators' decisions and an unchangeable log of every moderator action, so cases
-          can be reviewed and appealed; reporters never see who else reported, and nobody sees report counts.
+          can be reviewed and appealed; reporters never see who else reported, and nobody sees report counts. A game's detailed record
+          (the per-move reports, analyses and chat) is deleted 12 months after the game, unless a report, an undecided case or an appeal about
+          one of its players is still open; the game itself (players, moves, result and rating change) stays in your history.
         </li>
       </ul>
       <p>
@@ -130,7 +132,7 @@ function Zh() {
           <strong>下棋记录：</strong>课程进度、设置、星级、连续学习天数、人机对局、题目记录、等级分和保存的分析。
         </li>
         <li>
-          <strong>在线对弈：</strong>你的出生年月（不含日期），用于让 16 岁以下的棋手获得下述保护，并在年满 16 岁时自动解除；你屏蔽的棋手、你生成的挑战链接，以及你的在线对局：着法、双方浏览器报告的时钟读数、轮到你走时页面是否失去焦点、每份报告到达服务器的时间，以及计分对局结束后双方浏览器的引擎分析，用于判定结果和公平竞技（见<a href="../fair-play/">公平竞技规则</a>），以及每盘对局的棋品记录（离开、拖延、取消或开局过慢，见<a href="../sportsmanship/">棋品规则</a>）。快速匹配时，你的等级分、筛选条件和开始时间会保存到匹配成功或停止寻找为止。你对其他棋手的举报、别人对你的举报，以及管理员的处理决定，会与一份不可修改的管理操作日志一起保存，以便复核和申诉；举报人看不到其他举报人，任何人都看不到举报次数。
+          <strong>在线对弈：</strong>你的出生年月（不含日期），用于让 16 岁以下的棋手获得下述保护，并在年满 16 岁时自动解除；你屏蔽的棋手、你生成的挑战链接，以及你的在线对局：着法、双方浏览器报告的时钟读数、轮到你走时页面是否失去焦点、每份报告到达服务器的时间、双方浏览器发送和收到的快捷聊天，以及计分对局结束后双方浏览器的引擎分析，用于判定结果和公平竞技（见<a href="../fair-play/">公平竞技规则</a>），以及每盘对局的棋品记录（离开、拖延、取消或开局过慢，见<a href="../sportsmanship/">棋品规则</a>）。快速匹配时，你的等级分、筛选条件和开始时间会保存到匹配成功或停止寻找为止。你对其他棋手的举报、别人对你的举报，以及管理员的处理决定，会与一份不可修改的管理操作日志一起保存，以便复核和申诉；举报人看不到其他举报人，任何人都看不到举报次数。对局的详细记录（每步报告、引擎分析和聊天）在对局 12 个月后删除，除非与其中一方有关的举报、未结案件或申诉仍在进行；对局本身（双方、着法、结果和等级分变化）会保留在你的记录中。
         </li>
       </ul>
       <p>

@@ -249,6 +249,10 @@ export interface QueueCase {
   weight: number;
   unchecked: number;
   priority: number;
+  /** A case decided before and back with new evidence: the last decision and its note. */
+  last_outcome: "no-violation" | "inconclusive" | "violation" | null;
+  last_note: string | null;
+  last_reviewed: string | null;
 }
 
 export interface SideCheck {
@@ -277,6 +281,8 @@ export interface CaseGame {
   labels: string[];
   /** The moves, for games still to check (the moderator's browser can analyse them). */
   moves: string[] | null;
+  /** The chat as each browser recorded it (in its end report), if there was any. */
+  chat: Partial<Record<"red" | "black", { ply: number; by: "red" | "black"; phrase: string }[] | null>> | null;
 }
 
 export interface ModCase {
@@ -292,11 +298,15 @@ export interface ModCase {
   reports: { id: number; game: string; reason: ReportReason; note: string | null; at: string; status: "open" | "upheld" | "dismissed"; reporter: string; record: { made: number; upheld: number; weight: number } }[];
   games: CaseGame[];
   log: { at: string; action: string; details: { note?: string }; moderator: string | null }[];
+  /** The last decision on the case. */
+  review: { outcome: "no-violation" | "inconclusive" | "violation"; at: string; note: string | null } | null;
 }
 
 export const modQueue = (sb: SupabaseClient) => rpc<QueueCase[]>(sb, "mod_queue");
 export const modCase = (sb: SupabaseClient, username: string) => rpc<ModCase | null>(sb, "mod_case", { p_username: username });
 export const modDismiss = (sb: SupabaseClient, username: string, note: string) => rpc<null>(sb, "mod_dismiss", { p_username: username, p_note: note });
+/** Not enough evidence either way: reports stay open, and the case returns with new evidence. */
+export const modInconclusive = (sb: SupabaseClient, username: string, note: string) => rpc<null>(sb, "mod_inconclusive", { p_username: username, p_note: note });
 export const modConfirm = (sb: SupabaseClient, username: string, note: string) =>
   rpc<{ level: number; sanction: number; refunded_games: number }>(sb, "mod_confirm", { p_username: username, p_note: note });
 export const modAppeal = (sb: SupabaseClient, sanction: number, state: "pending" | "upheld" | "overturned", note: string) =>

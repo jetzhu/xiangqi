@@ -317,7 +317,7 @@ function LiveGame({ info }: { info: GameInfo }) {
           </div>
         )}
 
-        {settings.chat && !result && (
+        {settings.chat && (
           <div className="phrases" aria-label={tt("Chat", "快捷聊天")}>
             {(Object.keys(PHRASES) as Phrase[]).map((p) => (
               <button key={p} type="button" className="phrase" onClick={() => game.sendChat(p)}>
