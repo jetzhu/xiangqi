@@ -243,7 +243,8 @@ export function restBackend(url: string, serviceKey: string, fetchFn: typeof fet
       if (!res.ok) throw new Error(`auth: ${res.status}`);
       return ((await res.json()) as { id?: string }).id ?? null;
     },
-    drain: async () => void (await rpc("process_game_reports", {})),
+    // One batch: the scheduled worker does the rest every 5 seconds.
+    drain: async () => void (await rpc("process_game_reports", { p_seconds: 0 })),
     async game(id) {
       const g = (await get<GameDb>(`games?id=eq.${q(id)}&select=*`))[0];
       if (!g) return null;

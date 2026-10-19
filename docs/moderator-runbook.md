@@ -202,6 +202,7 @@ The Supabase access token expires; when a command says "Invalid access token", c
 | `retriage-open-reports` | hourly (:41) | The rules look at open reports again as evidence arrives |
 | `purge-old-game-records` | daily (03:23 UTC) | Deletes detailed game records older than 12 months, except where a report, an undecided case or an appeal involves a player |
 | `purge-deleted-accounts` | daily (03:17 UTC) | Finishes account deletions after their 10-day wait |
+| `pack-game-logs` | daily (03:29 UTC) | Packs the per-move log of games over for more than 8 days into one value per game (a sixth of the size) |
 | Sportsmanship | at the end of each game | Marks, completion rate, warnings and pairing waits: no moderator involved |
 | Keep-alive, weekly backup | GitHub Actions | Keeps the free project awake; encrypted backup |
 

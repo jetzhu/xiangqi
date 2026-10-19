@@ -11,6 +11,8 @@ import { arg, gameFn, rpc, signInAll, sleep, sql, summary } from "./lib.mjs";
 const G = arg("games", 50);
 const PLIES = arg("plies", 60);
 const PER_PLY = arg("seconds-per-ply", 3) * 1000;
+/** Spread the games' endings over this many seconds (0: all at once, the worst case). */
+const SPREAD = arg("spread", 0) * 1000;
 
 // Random legal games from the site's own rules (xiangqi-core), bundled on the fly.
 const build = await rolldown({ input: new URL("../xiangqi-core/src/index.ts", import.meta.url).pathname, resolve: { extensionAlias: { ".js": [".ts", ".js"] } }, logLevel: "silent" });
@@ -75,31 +77,41 @@ async function play(k) {
 }
 
 const played = await Promise.all(games.map((_, k) => play(k)));
-console.log("All games played; everyone resigns at once.");
+console.log(SPREAD ? `All games played; they end over ${SPREAD / 1000} s.` : "All games played; everyone resigns at once.");
 await Promise.all(
-  played.flatMap(({ id, moves, red, black }) =>
-    [red, black].map(async (t) => {
+  played.flatMap(({ id, moves, red, black }) => {
+    const at = Math.random() * SPREAD;
+    return [red, black].map(async (t) => {
+      await sleep(at);
       const end = { kind: "end", result: { winner: "black", reason: "resign" }, moves, clocks: { red: 1000, black: 1000 } };
       let r = await rpc(t, "report_game", { p_game: id, p_report: end });
       if (!r.ok) err("end report", r);
       for (let i = 0; i < 10; i++) {
         r = await gameFn(t, { game: id });
         lat.settle.push(r.ms);
+        if (process.env.VERBOSE) console.log(`  settle ${Math.round(r.ms)} ms`, r.status, JSON.stringify(r.data).slice(0, 90));
         if (!r.ok) err("settle", r);
         if (r.data?.status === "over") break;
         await sleep(3000);
       }
-    }),
-  ),
+    });
+  }),
 );
 console.log("Settled; both browsers send their analysis.");
 await Promise.all(
   played.flatMap(({ id, moves, red, black }) => {
     const analysis = { v: 1, depth: 8, positions: Array.from({ length: moves.length + 1 }, (_, i) => ({ b: moves[i] ?? null, s: [20, 10, -30] })) };
+    const at = Math.random() * SPREAD;
     return [red, black].map(async (t) => {
-      const r = await gameFn(t, { game: id, analysis });
-      lat.analysis.push(r.ms);
-      if (!r.ok) err("analysis", r);
+      await sleep(at);
+      // As the game page does: try again when busy.
+      for (const wait of [0, 3000, 10000, 30000]) {
+        await sleep(wait);
+        const r = await gameFn(t, { game: id, analysis });
+        lat.analysis.push(r.ms);
+        if (r.ok) break;
+        err("analysis", r);
+      }
     });
   }),
 );

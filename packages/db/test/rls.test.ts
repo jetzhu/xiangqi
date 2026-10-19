@@ -30,6 +30,8 @@ const SUPABASE_STANDIN = `
     $$ select msg_id, message from pgmq.q where not archived order by msg_id limit qty $$;
   create function pgmq.archive(name text, id bigint) returns boolean language sql as
     $$ update pgmq.q set archived = true where msg_id = id returning true $$;
+  create function pgmq.delete(name text, ids bigint[]) returns setof bigint language sql as
+    $$ delete from pgmq.q where msg_id = any(ids) returning msg_id $$;
 `;
 
 const migrations = new URL("../supabase/migrations/", import.meta.url);
@@ -738,6 +740,24 @@ describe("play a friend (M16)", () => {
     expect([await games(G), await games(H)]).toEqual([g0 + 1, h0 + 1]);
     expect(await commitAs(H, `public.game_info($1)`, [game])).toMatchObject({ status: "over", result: "red", reason: "resign", moves: ["h2e2", "h9g7"], red_rating_after: 1150, black_rating_after: 770 });
     expect(await failsAs(G, `select public.finish_game('${game}', 'red', 'resign', '{}', null, null, '{}')`)).toMatch(/permission denied/);
+  });
+
+  it("works through a big queue in batches, deletes what it processed, and packs old logs", async () => {
+    const c = await commitAs<string>(G, `public.create_challenge(600, 5, 'red', false, false)`);
+    const g = await commitAs<string>(H, `public.accept_challenge($1, false)`, [c]);
+    for (let ply = 1; ply <= 30; ply++)
+      await db.query(`select pgmq.send('game_reports', jsonb_build_object('game', $1::uuid, 'by', 'red', 'at', now(), 'report', jsonb_build_object('kind', 'move', 'ply', $2::int)))`, [g, ply]);
+    // Batches of 7: the run goes on until the queue is empty.
+    expect((await db.query<{ n: number }>(`select public.process_game_reports(7) as n`)).rows[0]!.n).toBe(30);
+    expect((await db.query(`select count(*)::int as n from pgmq.q`)).rows).toEqual([{ n: 0 }]);
+    expect((await db.query(`select count(*)::int as n from public.game_log where game_id = $1`, [g])).rows).toEqual([{ n: 30 }]);
+    // Over for more than 8 days: the log becomes one value on the game.
+    await db.query(`update public.games set status = 'over', ended_at = now() - interval '9 days' where id = $1`, [g]);
+    await db.query(`select public.pack_game_logs()`);
+    expect((await db.query(`select count(*)::int as n from public.game_log where game_id = $1`, [g])).rows).toEqual([{ n: 0 }]);
+    const packed = (await db.query<{ p: { ply: number; by: string }[] }>(`select log_packed as p from public.games where id = $1`, [g])).rows[0]!.p;
+    expect(packed).toHaveLength(30);
+    expect(packed[29]).toMatchObject({ ply: 30, by: "red" });
   });
 
   it("ends games nobody reports on for 10 minutes", async () => {

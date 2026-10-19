@@ -65,28 +65,32 @@ export async function signIn(i) {
 }
 
 /** Calls a database function as a signed-in player; returns { ms, ok, data, status }. */
-export async function rpc(token, fn, args = {}) {
+export const rpc = (token, fn, args = {}) => call(`${URL_}/rest/v1/rpc/${fn}`, token, args);
+
+/** One request, timed. A network failure is a result ("net" status), never a crash: the test counts it. */
+async function call(url, token, body) {
   const t0 = performance.now();
-  const res = await fetch(`${URL_}/rest/v1/rpc/${fn}`, {
-    method: "POST",
-    headers: { apikey: KEY, authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify(args),
-  });
-  const text = await res.text();
-  return { ms: performance.now() - t0, ok: res.ok, status: res.status, data: text ? JSON.parse(text) : null };
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { apikey: KEY, authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = text;
+    }
+    return { ms: performance.now() - t0, ok: res.ok, status: res.status, data };
+  } catch (e) {
+    return { ms: performance.now() - t0, ok: false, status: `net:${e.cause?.code ?? e.message}`, data: null };
+  }
 }
 
 /** Calls the `game` server function as a player. */
-export async function gameFn(token, body) {
-  const t0 = performance.now();
-  const res = await fetch(`${URL_}/functions/v1/game`, {
-    method: "POST",
-    headers: { apikey: KEY, authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const text = await res.text();
-  return { ms: performance.now() - t0, ok: res.ok, status: res.status, data: text ? JSON.parse(text) : null };
-}
+export const gameFn = (token, body) => call(`${URL_}/functions/v1/game`, token, body);
 
 /** Latency summary: count, p50, p95, p99, max (ms). */
 export function summary(samples) {

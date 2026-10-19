@@ -63,15 +63,26 @@ export default function GameReviewPanel({ id, me, moves, rated }: { id: string; 
     const key = `${id}:${me}`;
     if (!evals || !rated || sent().includes(key)) return;
     const data: AnalysisData = { v: 1, depth: FAIRPLAY_DEPTH, positions: evals.map((p) => ({ b: p.best, s: p.scores.map(encodeScore) })) };
-    void account
-      .client()
-      .then((sb) => submitAnalysis(sb, id, data))
-      .then(() => {
+    let live = true;
+    void (async () => {
+      // The server functions can be busy when many games end together: try again, waiting longer each time.
+      for (const wait of [0, 3_000, 10_000, 30_000]) {
+        await new Promise((r) => setTimeout(r, wait + Math.random() * 1_000));
+        if (!live) return;
         try {
-          localStorage.setItem(SENT, JSON.stringify([...sent().slice(-50), key]));
-        } catch {}
-      })
-      .catch(() => {});
+          await submitAnalysis(await account.client(), id, data);
+          try {
+            localStorage.setItem(SENT, JSON.stringify([...sent().slice(-50), key]));
+          } catch {}
+          return;
+        } catch {
+          // Busy or offline: the next try, or a later visit to this game, sends it.
+        }
+      }
+    })();
+    return () => {
+      live = false;
+    };
   }, [evals, rated, id, me, account]);
 
   if (moves.length === 0) return null;
