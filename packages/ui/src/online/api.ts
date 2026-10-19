@@ -44,6 +44,8 @@ export interface Eligibility {
   target: number;
   clean_win: boolean;
   long_games: number;
+  /** A sanction in force (M19), or null. */
+  sanction: Sanction | null;
   /** Ready for casual friend games: a verified email and the birth month. */
   casual_ok: boolean;
   /** Ready for rated games and quick pairing: also the bot games (D9). */
@@ -112,6 +114,7 @@ export interface GameInfo {
   red_rating_after: number | null;
   black_rating_before: number | null;
   black_rating_after: number | null;
+  ended_at?: string | null;
 }
 
 /** What the `game` server function says about a game. */
@@ -199,3 +202,106 @@ export const cancelSeek = (sb: SupabaseClient) => rpc<null>(sb, "cancel_seek");
 export const seekCounts = (sb: SupabaseClient) => rpc<Record<string, number>>(sb, "seek_counts");
 export const mySportsmanship = (sb: SupabaseClient) => rpc<Sportsmanship>(sb, "my_sportsmanship");
 export const acknowledgeSportsmanship = (sb: SupabaseClient) => rpc<null>(sb, "acknowledge_sportsmanship");
+
+// Reports, notices, leaderboards and moderation (M19, migration 20261019000000_moderation.sql) ---
+
+export type ReportReason = "engine" | "stalling" | "chat" | "username" | "other";
+/** Reports the opponent of one of the player's finished games (within 7 days, once a game). */
+export const reportPlayer = (sb: SupabaseClient, game: string, reason: ReportReason, note: string) =>
+  rpc<null>(sb, "report_player", { p_game: game, p_reason: reason, p_note: note });
+export const reportedGame = (sb: SupabaseClient, game: string) => rpc<boolean>(sb, "reported_game", { p_game: game });
+
+export interface Notice {
+  id: number;
+  kind: "report-upheld" | "refund" | "sanction" | "appeal";
+  data: { points?: number; games?: number; level?: number; outcome?: "upheld" | "overturned" };
+  at: string;
+}
+export const myNotices = (sb: SupabaseClient) => rpc<Notice[]>(sb, "my_notices");
+export const dismissNotice = (sb: SupabaseClient, id: number) => rpc<null>(sb, "dismiss_notice", { p_id: id });
+
+/** A sanction in force (in the online-play check): level 1 stops rated play, level 2 all online play. */
+export interface Sanction {
+  id: number;
+  level: 1 | 2;
+  suspended_until: string | null;
+  closed: boolean;
+  appeal: "none" | "pending" | "upheld" | "overturned";
+  appeal_deadline: string;
+}
+
+export interface LeaderboardRow {
+  rank: number;
+  username: string;
+  rating: number;
+  games: number;
+}
+export const leaderboard = (sb: SupabaseClient, speed: Speed) => rpc<LeaderboardRow[]>(sb, "leaderboard", { p_speed: speed });
+
+export const isModerator = (sb: SupabaseClient) => rpc<boolean>(sb, "is_moderator");
+
+export interface QueueCase {
+  username: string;
+  rating: number | null;
+  score: number | null;
+  verdict: "normal" | "watch" | "likely" | null;
+  reports: number;
+  weight: number;
+  unchecked: number;
+  priority: number;
+}
+
+export interface SideCheck {
+  moves: number;
+  acc: number | null;
+  match: number | null;
+  z: number | null;
+  flags: string[];
+  timing: { cv: number | null; fast: number | null; focus: number | null; hard_ratio: number | null };
+}
+
+export interface CaseGame {
+  id: string;
+  speed: Speed;
+  base: number;
+  inc: number;
+  color: "red" | "black";
+  opponent: string | null;
+  result: "red" | "black" | "draw" | "none" | null;
+  reason: string | null;
+  plies: number;
+  ended_at: string;
+  rating_before: number | null;
+  status: "one" | "disagree" | "checked" | "missing" | null;
+  check: SideCheck | null;
+  labels: string[];
+  /** The moves, for games still to check (the moderator's browser can analyse them). */
+  moves: string[] | null;
+}
+
+export interface ModCase {
+  username: string;
+  created_at: string;
+  report_barred: boolean;
+  reporter: { made: number; upheld: number; weight: number };
+  completion: number | null;
+  checked_games: number;
+  ratings: Partial<Record<Speed, { rating: number; rd: number; games: number }>>;
+  standing: Partial<Record<Speed, { games: number; score: number; far: number; verdict: "normal" | "watch" | "likely" }>>;
+  sanctions: (Omit<Sanction, "closed"> & { created_at: string; reason: string; public_until: string; overturned_at: string | null })[];
+  reports: { id: number; game: string; reason: ReportReason; note: string | null; at: string; status: "open" | "upheld" | "dismissed"; reporter: string; record: { made: number; upheld: number; weight: number } }[];
+  games: CaseGame[];
+  log: { at: string; action: string; details: { note?: string }; moderator: string | null }[];
+}
+
+export const modQueue = (sb: SupabaseClient) => rpc<QueueCase[]>(sb, "mod_queue");
+export const modCase = (sb: SupabaseClient, username: string) => rpc<ModCase | null>(sb, "mod_case", { p_username: username });
+export const modDismiss = (sb: SupabaseClient, username: string, note: string) => rpc<null>(sb, "mod_dismiss", { p_username: username, p_note: note });
+export const modConfirm = (sb: SupabaseClient, username: string, note: string) =>
+  rpc<{ level: number; sanction: number; refunded_games: number }>(sb, "mod_confirm", { p_username: username, p_note: note });
+export const modAppeal = (sb: SupabaseClient, sanction: number, state: "pending" | "upheld" | "overturned", note: string) =>
+  rpc<null>(sb, "mod_appeal", { p_sanction: sanction, p_state: state, p_note: note });
+export const modBarReporter = (sb: SupabaseClient, username: string, barred: boolean, note: string) =>
+  rpc<null>(sb, "mod_bar_reporter", { p_username: username, p_barred: barred, p_note: note });
+export const modLogRecent = (sb: SupabaseClient) =>
+  rpc<{ at: string; action: string; details: { note?: string }; moderator: string | null; target: string | null }[]>(sb, "mod_log_recent", { p_limit: 50 });

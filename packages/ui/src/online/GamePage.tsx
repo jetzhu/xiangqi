@@ -21,6 +21,7 @@ import { useAccount } from "../account/session.js";
 import { useNav } from "../nav.js";
 import { announceMove, useOrientation, useSettings, useSound, useT } from "../settings.js";
 import { type GameInfo, type GamePlayer, type GameVerdict, gameInfo, settleGame } from "./api.js";
+import { ReportGame } from "./ReportGame.js";
 
 // The review loads the engine, so it comes in its own chunk once a game is over.
 const GameReviewPanel = lazy(() => import("./GameReviewPanel.js"));
@@ -509,6 +510,7 @@ function ResultPanel({ info, result, verdict, settling, moves }: { info: GameInf
           {tt("Analyse", "分析棋局")}
         </a>
       </div>
+      {verdict && <ReportGame game={info.id} endedAt={info.ended_at} />}
       {/* Once the server has the result, so a rated game's analysis can be sent for the fair-play check. */}
       {(verdict || !settling) && (
         <Suspense fallback={null}>

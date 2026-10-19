@@ -28,7 +28,7 @@ export const ACCOUNTS =
     : null;
 export const SITE_NAME = { zh: "象棋学堂", en: "Xiangqi School" } as const;
 
-type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "profile" | "signup" | "login" | "resetPassword" | "authCallback" | "privacy" | "terms" | "player" | "online" | "fairPlay" | "sportsmanship" | "friend" | "challenge" | "game";
+type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "profile" | "signup" | "login" | "resetPassword" | "authCallback" | "privacy" | "terms" | "player" | "online" | "fairPlay" | "sportsmanship" | "friend" | "challenge" | "game" | "leaderboard" | "moderate";
 const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; description: Record<Locale, string> }> = {
   home: {
     path: "/",
@@ -84,7 +84,7 @@ const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; desc
   online: {
     path: "/online",
     title: { zh: "在线对弈", en: "Play online" },
-    description: { zh: "与好友在线对弈；与水平相近的棋手快速匹配将在 v0.3 推出。", en: "Play a friend online; quick pairing with people of your level comes with v0.3." },
+    description: { zh: "与水平相近的棋手快速匹配，或与好友在线对弈。", en: "Get paired with a player of your level, or play a friend online." },
   },
   friend: {
     path: "/friend",
@@ -100,6 +100,16 @@ const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; desc
     path: "/game",
     title: { zh: "在线对局", en: "Online game" },
     description: { zh: "一盘在线象棋对局。", en: "An online game of Xiangqi." },
+  },
+  leaderboard: {
+    path: "/leaderboard",
+    title: { zh: "排行榜", en: "Leaderboards" },
+    description: { zh: "闪电、超快棋和快棋的在线等级分排行榜。", en: "The top online players at Lightning, Blitz and Rapid." },
+  },
+  moderate: {
+    path: "/moderate",
+    title: { zh: "审核", en: "Review" },
+    description: { zh: "管理员审核页面。", en: "The moderators' review page." },
   },
   fairPlay: {
     path: "/fair-play",

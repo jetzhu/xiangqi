@@ -6,7 +6,19 @@ import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useAccount } from "../account/session.js";
 import { useNav } from "../nav.js";
 import { useT } from "../settings.js";
-import { type Eligibility, LONG_GAMES_NEEDED, LONG_GAME_MOVES, type Sportsmanship, acknowledgeSportsmanship, mySportsmanship, onlineEligibility } from "./api.js";
+import {
+  type Eligibility,
+  LONG_GAMES_NEEDED,
+  LONG_GAME_MOVES,
+  type Notice,
+  type Sanction,
+  type Sportsmanship,
+  acknowledgeSportsmanship,
+  dismissNotice,
+  myNotices,
+  mySportsmanship,
+  onlineEligibility,
+} from "./api.js";
 import { BirthMonthForm, useMonthName } from "./BirthMonth.js";
 import { useLiveGame } from "./live.js";
 import { QuickPair } from "./QuickPair.js";
@@ -104,6 +116,8 @@ export function OnlinePage() {
   return (
     <div className="online-page">
       {intro}
+      <Notices />
+      {check.sanction && <SanctionNotice sanction={check.sanction} />}
       {live !== null && (
         <p className="live-notice" role="status">
           {tt("You have a game in progress.", "你有一盘对局正在进行。")} {live && <a href={nav.href(`/game?id=${live}`)}>{tt("Back to the game", "回到对局")}</a>}
@@ -138,7 +152,8 @@ export function OnlinePage() {
       <p className="muted small">
         {tt("Bot games count once they're saved to your account.", "人机对局保存到账号后才计入。")}{" "}
         <a href={nav.href("/fair-play")}>{tt("Fair play", "公平竞技")}</a> · <a href={nav.href("/sportsmanship")}>{tt("Sportsmanship", "棋品规则")}</a> ·{" "}
-        <a href={nav.href("/settings?tab=online")}>{tt("Online settings", "在线对弈设置")}</a>
+        <a href={nav.href("/settings?tab=online")}>{tt("Online settings", "在线对弈设置")}</a> ·{" "}
+        <a href={nav.href("/leaderboard")}>{tt("Leaderboards", "排行榜")}</a>
       </p>
     </div>
   );
@@ -200,5 +215,81 @@ function SportsmanshipRecord({ sport, onAcknowledged }: { sport: Sportsmanship; 
       )}
       {sport.pool && <p className="muted small">{tt("For the next few days you'll be paired with other players who have also left games.", "接下来几天，你将与同样离开过对局的棋手匹配。")}</p>}
     </section>
+  );
+}
+
+/** Unread notices: action taken on a report, a rating refund, a sanction or an appeal's outcome. */
+function Notices() {
+  const { tt } = useT();
+  const account = useAccount();
+  const [notices, setNotices] = useState<Notice[]>([]);
+  useEffect(() => {
+    void account
+      .client()
+      .then(myNotices)
+      .then(setNotices, () => {});
+  }, [account]);
+  const text = (n: Notice) => {
+    switch (n.kind) {
+      case "report-upheld":
+        return tt("Action was taken on a player you reported. Thank you for reporting.", "你举报的棋手已被处理。感谢你的举报。");
+      case "refund":
+        return tt(
+          `A player you lost to broke the fair-play rules. ${n.data.points} rating points from ${n.data.games} game(s) have been given back to you.`,
+          `与你对局的一名棋手违反了公平竞技规则。你在 ${n.data.games} 盘对局中失去的 ${n.data.points} 等级分已退还。`,
+        );
+      case "sanction":
+        return tt("A fair-play violation was confirmed on your account. See below.", "你的账号被确认违反公平竞技规则，详见下文。");
+      case "appeal":
+        return n.data.outcome === "overturned"
+          ? tt("Your appeal succeeded: the sanction has been lifted.", "你的申诉成功，处罚已撤销。")
+          : tt("Your appeal was reviewed, and the decision stands.", "你的申诉已复核，原决定维持不变。");
+    }
+  };
+  const dismiss = async (id: number) => {
+    setNotices((ns) => ns.filter((n) => n.id !== id));
+    await dismissNotice(await account.client(), id).catch(() => {});
+  };
+  if (notices.length === 0) return null;
+  return (
+    <ul className="notices">
+      {notices.map((n) => (
+        <li key={n.id} role="status">
+          {text(n)}{" "}
+          <button type="button" className="link" onClick={() => void dismiss(n.id)}>
+            {tt("Dismiss", "知道了")}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** A sanction in force: what it stops, until when, and how to appeal. */
+function SanctionNotice({ sanction }: { sanction: Sanction }) {
+  const { tt, lang } = useT();
+  const nav = useNav();
+  const date = (d: string) => new Date(d).toLocaleDateString(lang === "zh" ? "zh-CN" : "en", { year: "numeric", month: "long", day: "numeric" });
+  return (
+    <div className="sanction" role="alert">
+      <p>
+        {sanction.closed
+          ? tt("Your account is closed for online play after a second confirmed fair-play violation.", "因第二次被确认违反公平竞技规则，你的账号已被关闭在线对弈。")
+          : sanction.level === 2
+            ? tt("Online play is suspended after a second confirmed fair-play violation.", "因第二次被确认违反公平竞技规则，你的在线对弈已暂停。")
+            : tt(
+                `Rated online play is suspended until ${date(sanction.suspended_until!)} after a confirmed fair-play violation. Games with friends can be casual.`,
+                `因被确认违反公平竞技规则，计分在线对弈暂停至 ${date(sanction.suspended_until!)}。与好友仍可下休闲对局。`,
+              )}
+      </p>
+      {!sanction.closed && (
+        <p className="small">
+          {sanction.appeal === "pending"
+            ? tt("Your appeal is being reviewed.", "你的申诉正在复核中。")
+            : tt(`You can appeal by email until ${date(sanction.appeal_deadline)}.`, `你可以在 ${date(sanction.appeal_deadline)} 前通过邮件申诉。`)}{" "}
+          <a href={nav.href("/fair-play")}>{tt("Fair play policy", "公平竞技规则")}</a>
+        </p>
+      )}
+    </div>
   );
 }

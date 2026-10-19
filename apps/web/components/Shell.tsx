@@ -8,7 +8,7 @@ import { UpdateBanner } from "./UpdateBanner";
 type Section = "home" | "learn" | "puzzles" | "bots" | "online" | "analysis" | "play" | "settings" | "help" | "stats" | "account" | "privacy" | "terms";
 const ACCOUNT_PAGES = ["signup", "login", "reset-password", "auth", "profile"];
 /** The online-play pages all sit under "Play online" in the menu. */
-const ONLINE_PAGES = ["online", "friend", "challenge", "game", "player"];
+const ONLINE_PAGES = ["online", "friend", "challenge", "game", "player", "leaderboard", "moderate"];
 
 /** Providers and header for a locale; the language link points to the same page in the other locale. */
 export function Shell({ locale, children }: { locale: "zh" | "en"; children: ReactNode }) {

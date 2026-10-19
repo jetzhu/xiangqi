@@ -490,3 +490,17 @@ a.button.big { display: inline-block; }
 .game-review { margin-top: 12px; }
 .game-review h3 { margin: 0 0 4px; font-size: 15px; }
 .grade-counts { list-style: none; padding: 0; margin: 4px 0; display: grid; grid-template-columns: repeat(3, auto); gap: 2px 12px; font-size: 14px; }
+/* Reports, notices and sanctions (M19) */
+.report-form fieldset { border: 0; padding: 0; margin: 8px 0; display: flex; flex-direction: column; gap: 4px; }
+.report-form legend { font-weight: 600; margin-bottom: 4px; }
+.report-form textarea { width: 100%; }
+.notices { list-style: none; padding: 0; margin: 12px 0; display: flex; flex-direction: column; gap: 8px; }
+.notices li, .sanction { padding: 10px 12px; border: 1px solid var(--accent); border-radius: 8px; }
+/* Leaderboards and the review page (M19) */
+.leaderboard, .mod-table { border-collapse: collapse; margin: 12px 0; width: 100%; font-variant-numeric: tabular-nums; }
+.leaderboard th, .leaderboard td, .mod-table th, .mod-table td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.moderate-page { max-width: 1100px; }
+.moderate-page .mod-table { font-size: 14px; display: block; overflow-x: auto; }
+.mod-note { display: flex; flex-direction: column; gap: 4px; max-width: 640px; }
+.mod-log, .mod-reports, .mod-sanctions { padding-left: 18px; font-size: 14px; line-height: 1.7; }
+button.danger { background: #b3261e; color: #fff; border-color: #b3261e; }

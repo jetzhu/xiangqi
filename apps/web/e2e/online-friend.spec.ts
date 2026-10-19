@@ -34,6 +34,11 @@ function world(relay: boolean) {
     far: false,
     sport: { completion: null, last30: { games: 0, abandoned: 0, stalled: 0, aborted: 0, slow_start: 0 }, warning: false, wait_until: null, pool: false },
     calls: [] as string[],
+    /** M19: notices, a sanction, the leaderboard, and whether the player is a moderator. */
+    notices: [] as { id: number; kind: string; data: object; at: string }[],
+    sanction: null as null | object,
+    board: [] as { rank: number; username: string; rating: number; games: number }[],
+    moderator: false,
     /** Fair-play analyses each browser sent after the game (M18). */
     analyses: [] as { by: "red" | "black"; analysis: { v: number; depth: number; positions: { b: string | null; s: number[] }[] } }[],
   };
@@ -58,7 +63,39 @@ async function player(page: Page, w: World, who: { id: string; username: string;
       case "/rest/v1/profiles":
         return json(route, [{ username: who.username, username_chosen: true, avatar: null, country: null }]);
       case "/rest/v1/rpc/online_eligibility":
-        return json(route, { verified: true, age_answered: true, under16: false, level: 1200, target: 1200, clean_win: true, long_games: 3, casual_ok: true, eligible: true });
+        return json(route, { verified: true, age_answered: true, under16: false, level: 1200, target: 1200, clean_win: true, long_games: 3, casual_ok: true, eligible: !w.sanction, sanction: w.sanction });
+      case "/rest/v1/rpc/report_player":
+        w.calls.push(`report:${body!.p_reason}:${body!.p_note}`);
+        return json(route, null);
+      case "/rest/v1/rpc/reported_game":
+        return json(route, w.calls.some((c) => c.startsWith("report:")));
+      case "/rest/v1/rpc/my_notices":
+        return json(route, w.notices);
+      case "/rest/v1/rpc/dismiss_notice":
+        w.calls.push(`dismiss:${body!.p_id}`);
+        w.notices = w.notices.filter((n) => n.id !== body!.p_id);
+        return json(route, null);
+      case "/rest/v1/rpc/leaderboard":
+        return json(route, body!.p_speed === "blitz" ? w.board : []);
+      case "/rest/v1/rpc/is_moderator":
+        return json(route, w.moderator);
+      case "/rest/v1/rpc/mod_queue":
+        return json(route, [{ username: "bob_xq", rating: 1150, score: 5.4, verdict: "likely", reports: 2, weight: 1.2, unchecked: 1, priority: 20 }]);
+      case "/rest/v1/rpc/mod_log_recent":
+        return json(route, [{ at: "2026-10-18T10:00:00Z", action: "dismiss", details: { note: "no evidence" }, moderator: "alice_xq", target: "carol_xq" }]);
+      case "/rest/v1/rpc/mod_case":
+        return json(route, {
+          username: "bob_xq", created_at: "2026-10-01T00:00:00Z", report_barred: false, reporter: { made: 0, upheld: 0, weight: 0.5 }, completion: 100, checked_games: 12,
+          ratings: { blitz: { rating: 1150, rd: 80, games: 40 } }, standing: { blitz: { games: 12, score: 5.4, far: 4, verdict: "likely" } }, sanctions: [],
+          reports: [{ id: 1, game: GAME, reason: "engine", note: "every move instant", at: "2026-10-18T09:00:00Z", status: "open", reporter: "alice_xq", record: { made: 3, upheld: 2, weight: 0.6 } }],
+          games: [{ id: GAME, speed: "blitz", base: 300, inc: 3, color: "black", opponent: "alice_xq", result: "black", reason: "resign", plies: 60, ended_at: "2026-10-18T09:00:00Z", rating_before: 1140, status: "checked", labels: [], moves: null,
+            check: { moves: 22, acc: 97.5, match: 0.82, z: 3.9, flags: ["even-times"], timing: { cv: 0.18, fast: 0.05, focus: 0, hard_ratio: 1.02 } } }],
+          log: [],
+        });
+      case "/rest/v1/rpc/mod_dismiss":
+      case "/rest/v1/rpc/mod_confirm":
+        w.calls.push(`${url.pathname.split("/").pop()}:${body!.p_username}:${body!.p_note}`);
+        return json(route, url.pathname.endsWith("confirm") ? { level: 1, sanction: 1, refunded_games: 3 } : null);
       case "/rest/v1/rpc/create_challenge":
         w.challenge = { base: body!.p_base as number, inc: body!.p_inc as number, color: body!.p_color as string, rated: body!.p_rated as boolean, game: null };
         return json(route, CODE);
@@ -235,6 +272,45 @@ test("a sportsmanship warning must be acknowledged before quick pairing", async 
   expect(w.calls).toEqual(["acknowledge"]);
 });
 
+test("notices and a suspension show on the Play online page", async ({ context }) => {
+  const { w, alice } = await twoPlayers(context, false);
+  w.notices = [{ id: 4, kind: "refund", data: { points: 18, games: 2 }, at: "2026-10-18T10:00:00Z" }];
+  w.sanction = { id: 1, level: 1, suspended_until: "2026-11-17T10:00:00Z", closed: false, appeal: "none", appeal_deadline: "2026-11-17T10:00:00Z" };
+  await alice.goto(at("/en/online/"));
+  await expect(alice.getByText("18 rating points from 2 game(s) have been given back to you.", { exact: false })).toBeVisible();
+  await expect(alice.getByText("Rated online play is suspended until November 17, 2026", { exact: false })).toBeVisible();
+  await expect(alice.getByRole("heading", { name: "Quick pairing" })).toHaveCount(0);
+  await alice.getByRole("button", { name: "Dismiss" }).click();
+  await expect(alice.getByText("have been given back to you", { exact: false })).toHaveCount(0);
+  expect(w.calls).toContain("dismiss:4");
+});
+
+test("leaderboards list the top players by speed", async ({ context }) => {
+  const { w, alice } = await twoPlayers(context, false);
+  w.board = [{ rank: 1, username: "bob_xq", rating: 1650, games: 41 }];
+  await alice.goto(at("/en/leaderboard/"));
+  await expect(alice.getByRole("row", { name: "1 bob_xq 1650 41" })).toBeVisible();
+  await alice.getByRole("tab", { name: "Rapid" }).click();
+  await expect(alice.getByText("Nobody qualifies yet.")).toBeVisible();
+});
+
+test("the review page is for moderators: the queue, a case, and a decision", async ({ context }) => {
+  const { w, alice, bob } = await twoPlayers(context, false);
+  await bob.goto(at("/en/moderate/"));
+  await expect(bob.getByText("This page is for moderators.")).toBeVisible();
+  w.moderator = true;
+  await alice.goto(at("/en/moderate/"));
+  await expect(alice.getByRole("heading", { name: "Review queue" })).toBeVisible();
+  await alice.getByRole("link", { name: "bob_xq" }).click();
+  await expect(alice.getByText("every move instant")).toBeVisible();
+  await expect(alice.getByRole("cell", { name: "97.5" })).toBeVisible();
+  await alice.getByLabel("Reason and evidence (kept in the log)").fill("engine match far above 1150 in 12 games");
+  await alice.getByRole("button", { name: "Confirm violation…" }).click();
+  await alice.getByRole("button", { name: "Confirm violation: sanction, refunds, public mark" }).click();
+  await expect(alice.getByText("Violation confirmed.")).toBeVisible();
+  expect(w.calls).toContain("mod_confirm:bob_xq:engine match far above 1150 in 12 games");
+});
+
 for (const relay of [false, true]) {
   test(`play a friend over ${relay ? "the relay" : "a direct link"}: moves, clocks, chat, resign, rated result`, async ({ context }) => {
     const { w, alice, bob } = await twoPlayers(context, relay);
@@ -288,6 +364,14 @@ for (const relay of [false, true]) {
       { winner: "black", reason: "resign" },
     ]);
     expect(w.settled).toBeGreaterThan(0);
+
+    // The winner reports the opponent's play.
+    await bob.getByRole("button", { name: "Report" }).click();
+    await bob.getByLabel("Engine or outside help").check();
+    await bob.getByLabel("Anything we should know (optional)").fill("instant moves");
+    await bob.getByRole("button", { name: "Send report" }).click();
+    await expect(bob.getByText("Thank you. Every report is reviewed; you'll be told if action is taken.")).toBeVisible();
+    expect(w.calls).toContain("report:engine:instant moves");
 
     // As served by Pages the engine needs the service worker, which these tests turn off: the
     // review says so, and nothing is sent.
