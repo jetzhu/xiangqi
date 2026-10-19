@@ -253,6 +253,28 @@ export interface QueueCase {
   last_outcome: "no-violation" | "inconclusive" | "violation" | null;
   last_note: string | null;
   last_reviewed: string | null;
+  /** How the rules triaged the open reports. */
+  triage?: { valid: number; invalid: number; inconclusive: number };
+}
+
+/** A verdict on a report from the rules or an adviser (an AI, under "ai:<name>"). */
+export interface TriageVerdict {
+  source: string;
+  verdict: "valid" | "invalid" | "inconclusive";
+  confidence: number;
+  rule: string;
+  reason: string;
+  at: string;
+}
+
+/** How often a source's verdicts matched moderators' decisions, per report reason, over 90 days. */
+export interface TriageAgreement {
+  source: string;
+  category: ReportReason;
+  decisions: number;
+  agreed: number;
+  confident: number;
+  confident_agreed: number;
 }
 
 export interface SideCheck {
@@ -295,7 +317,17 @@ export interface ModCase {
   ratings: Partial<Record<Speed, { rating: number; rd: number; games: number }>>;
   standing: Partial<Record<Speed, { games: number; score: number; far: number; verdict: "normal" | "watch" | "likely" }>>;
   sanctions: (Omit<Sanction, "closed"> & { created_at: string; reason: string; public_until: string; overturned_at: string | null })[];
-  reports: { id: number; game: string; reason: ReportReason; note: string | null; at: string; status: "open" | "upheld" | "dismissed"; reporter: string; record: { made: number; upheld: number; weight: number } }[];
+  reports: {
+    id: number;
+    game: string;
+    reason: ReportReason;
+    note: string | null;
+    at: string;
+    status: "open" | "upheld" | "dismissed";
+    reporter: string;
+    record: { made: number; upheld: number; weight: number };
+    triage?: TriageVerdict[];
+  }[];
   games: CaseGame[];
   log: { at: string; action: string; details: { note?: string }; moderator: string | null }[];
   /** The last decision on the case. */
@@ -313,5 +345,6 @@ export const modAppeal = (sb: SupabaseClient, sanction: number, state: "pending"
   rpc<null>(sb, "mod_appeal", { p_sanction: sanction, p_state: state, p_note: note });
 export const modBarReporter = (sb: SupabaseClient, username: string, barred: boolean, note: string) =>
   rpc<null>(sb, "mod_bar_reporter", { p_username: username, p_barred: barred, p_note: note });
+export const triageAgreement = (sb: SupabaseClient) => rpc<TriageAgreement[]>(sb, "triage_agreement");
 export const modLogRecent = (sb: SupabaseClient) =>
   rpc<{ at: string; action: string; details: { note?: string }; moderator: string | null; target: string | null }[]>(sb, "mod_log_recent", { p_limit: 50 });

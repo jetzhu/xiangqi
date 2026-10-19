@@ -22,6 +22,9 @@ import {
   modInconclusive,
   modLogRecent,
   modQueue,
+  type TriageAgreement,
+  type TriageVerdict,
+  triageAgreement,
 } from "./api.js";
 
 // Analysing a game loads the engine, so it comes in its own chunk.
@@ -55,10 +58,12 @@ function Queue() {
   const account = useAccount();
   const [cases, setCases] = useState<QueueCase[] | null>(null);
   const [log, setLog] = useState<Awaited<ReturnType<typeof modLogRecent>>>([]);
+  const [agreement, setAgreement] = useState<TriageAgreement[]>([]);
   useEffect(() => {
     void account.client().then(async (sb) => {
       setCases(await modQueue(sb));
       setLog(await modLogRecent(sb));
+      setAgreement(await triageAgreement(sb).catch(() => []));
     });
   }, [account]);
   return (
@@ -77,6 +82,7 @@ function Queue() {
               <th scope="col">{tt("Standing", "评估")}</th>
               <th scope="col">{tt("Reports (weight)", "举报（权重）")}</th>
               <th scope="col">{tt("Unchecked games", "未检查对局")}</th>
+              <th scope="col">{tt("Triage (rules)", "初筛（规则）")}</th>
               <th scope="col">{tt("Last decision", "上次处理")}</th>
             </tr>
           </thead>
@@ -95,6 +101,11 @@ function Queue() {
                 </td>
                 <td>{c.unchecked}</td>
                 <td className="small">
+                  {c.triage && (c.triage.valid || c.triage.invalid || c.triage.inconclusive)
+                    ? tt(`${c.triage.valid} likely valid · ${c.triage.invalid} likely invalid · ${c.triage.inconclusive} inconclusive`, `${c.triage.valid} 可能成立 · ${c.triage.invalid} 可能不成立 · ${c.triage.inconclusive} 不确定`)
+                    : "–"}
+                </td>
+                <td className="small">
                   {c.last_outcome ? `${tt("Returning", "再次进入")}: ${outcomeText(c.last_outcome, tt)} ${c.last_reviewed ? new Date(c.last_reviewed).toLocaleDateString() : ""}${c.last_note ? ` · ${c.last_note}` : ""}` : "–"}
                 </td>
               </tr>
@@ -102,6 +113,40 @@ function Queue() {
           </tbody>
         </table>
       )}
+      <h2>{tt("Triage agreement, last 90 days", "初筛一致率（最近 90 天）")}</h2>
+      <p className="muted small">
+        {tt(
+          "How often each source's verdict matched your decision. Shadow mode: verdicts are shown, never acted on. A category could act on its own once its confident verdicts agree about 95 % of the time over 20 or more decisions.",
+          "各来源的初筛结论与你的处理一致的比例。影子模式：只显示结论，不自动处理。当某类别的高置信度结论在 20 次以上的处理中约 95% 一致时，可考虑让其自动处理。",
+        )}
+      </p>
+      {agreement.length === 0 ? (
+        <p className="muted">{tt("No decisions yet.", "暂无处理记录。")}</p>
+      ) : (
+        <table className="mod-table">
+          <thead>
+            <tr>
+              <th scope="col">{tt("Source", "来源")}</th>
+              <th scope="col">{tt("Reason", "举报原因")}</th>
+              <th scope="col">{tt("Agreed", "一致")}</th>
+              <th scope="col">{tt("Confident (0.8+) agreed", "高置信度一致")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {agreement.map((a) => (
+              <tr key={`${a.source}/${a.category}`}>
+                <td>{a.source}</td>
+                <td>{a.category}</td>
+                <td>
+                  {a.agreed}/{a.decisions} ({Math.round((100 * a.agreed) / Math.max(1, a.decisions))} %)
+                </td>
+                <td>{a.confident ? `${a.confident_agreed}/${a.confident} (${Math.round((100 * a.confident_agreed) / a.confident)} %)` : "–"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
       <h2>{tt("Recent actions", "最近操作")}</h2>
       <ul className="mod-log">
         {log.map((l, i) => (
@@ -205,6 +250,13 @@ function Case({ username }: { username: string }) {
               {new Date(r.at).toLocaleDateString()} · <strong>{r.reason}</strong> · {r.reporter} ({tt("record", "记录")} {r.record.upheld}/{r.record.made}, {tt("weight", "权重")}{" "}
               {fmt(r.record.weight)}) · {r.status}
               {r.note && <q> {r.note}</q>}
+              {r.triage && r.triage.length > 0 && (
+                <ul className="triage">
+                  {r.triage.map((t) => (
+                    <TriageLine key={t.source} t={t} />
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
         </ul>
@@ -386,5 +438,17 @@ function GameChat({ chat, me }: { chat: NonNullable<CaseGame["chat"]>; me: "red"
         ))
       )}
     </details>
+  );
+}
+
+/** One verdict on a report: who gave it (the rules, or an adviser such as "ai:claude-code"), how sure, and why. */
+function TriageLine({ t }: { t: TriageVerdict }) {
+  const { tt } = useT();
+  const verdict = t.verdict === "valid" ? tt("likely valid", "可能成立") : t.verdict === "invalid" ? tt("likely invalid", "可能不成立") : tt("inconclusive", "不确定");
+  const who = t.source === "rules" ? tt("Rules", "规则") : t.source.replace(/^ai:/, "AI: ");
+  return (
+    <li className={`triage-${t.verdict}`}>
+      <strong>{who}</strong>: {verdict} ({Number(t.confidence).toFixed(2)}) · <span className="muted">{t.rule}</span> · {t.reason}
+    </li>
   );
 }

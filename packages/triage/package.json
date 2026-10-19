@@ -1,0 +1,21 @@
+{
+  "name": "@xq/triage",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Report triage advisers: an AI (Claude Code, the Anthropic API, any OpenAI-compatible API or any command) gives open reports a second-line verdict for the review page",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "triage": "node scripts/triage.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.4",
+    "rolldown": "1.2.12",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  }
+}

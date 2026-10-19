@@ -504,3 +504,6 @@ a.button.big { display: inline-block; }
 .mod-note { display: flex; flex-direction: column; gap: 4px; max-width: 640px; }
 .mod-log, .mod-reports, .mod-sanctions { padding-left: 18px; font-size: 14px; line-height: 1.7; }
 button.danger { background: #b3261e; color: #fff; border-color: #b3261e; }
+.triage { list-style: none; padding-left: 12px; margin: 2px 0 6px; font-size: 13px; }
+.triage-valid strong { color: #b3261e; }
+.triage-invalid strong { color: #2e8b57; }

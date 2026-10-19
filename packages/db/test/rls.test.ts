@@ -1162,6 +1162,88 @@ describe("reports and moderation (M19)", () => {
   });
 });
 
+describe("report triage, phase 1", () => {
+  const [TMOD, R1, S1, S2] = ["c3", "c4", "c5", "c6"].map((x) => `00000000-0000-4000-8000-0000000000${x}`) as [string, string, string, string];
+  const run = <T>(user: string, sql: string, params: unknown[] = []) =>
+    db.transaction(async (tx) => {
+      await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [user]);
+      await tx.exec(`set local role authenticated`);
+      return (await tx.query<{ j: T }>(`select ${sql} as j`, params)).rows[0]!.j;
+    });
+  /** A finished game R1 (red) lost to the suspect (black), then R1's report on it; returns the rules' verdict. */
+  const reportOn = async (suspect: string, reason: string, game: { labels?: object; redEnd?: object | null; blackEnd?: object | null; speed?: string } = {}) => {
+    const g = (
+      await db.query<{ id: string }>(
+        `insert into public.games (red, black, base, inc, speed, rated, relay, status, result, reason, moves, labels, red_end, black_end, started_at, ended_at)
+         values ($1, $2, 300, 3, $3, true, false, 'over', 'black', 'timeout', array_fill('h2e2'::text, array[40]), $4, $5, $6, now(), now()) returning id`,
+        [R1, suspect, game.speed ?? "blitz", JSON.stringify(game.labels ?? {}), game.redEnd === undefined ? null : JSON.stringify(game.redEnd), game.blackEnd === undefined ? null : JSON.stringify(game.blackEnd)],
+      )
+    ).rows[0]!.id;
+    // Straight into the table: the 5-a-day limit is tested with report_player above.
+    await db.query(`insert into public.reports (game_id, reporter, suspect, reason) values ($1, $2, $3, $4)`, [g, R1, suspect, reason]);
+    return (await db.query<{ verdict: string; rule: string; confidence: string; id: number }>(
+      `select t.verdict, t.rule, t.confidence, r.id from public.report_triage t join public.reports r on r.id = t.report_id where r.game_id = $1 and t.source = 'rules'`, [g])).rows[0]!;
+  };
+  const chatOf = (phrases: string[]) => ({ kind: "end", chat: phrases.map((phrase, i) => ({ ply: 20 + i, by: "black", phrase })) });
+
+  beforeAll(async () => {
+    for (const [u, name] of [[TMOD, "tmod_xq"], [R1, "rep_xq"], [S1, "sus_xq"], [S2, "badwordy_xq"]] as const) await signUp(u, { username: name });
+    await db.query(`insert into public.moderators (user_id) values ($1)`, [TMOD]);
+  });
+
+  it("judges stalling by the game's marks", async () => {
+    expect(await reportOn(S1, "stalling", { labels: { black: ["stalled"] } })).toMatchObject({ verdict: "valid", rule: "stall-mark" });
+    expect(await reportOn(S1, "stalling")).toMatchObject({ verdict: "invalid", rule: "no-stall-mark" });
+  });
+
+  it("judges chat by what the suspect sent, from both browsers' records", async () => {
+    expect(await reportOn(S1, "chat", { redEnd: chatOf(["wow", "wow", "wow"]), blackEnd: chatOf(["wow"]) })).toMatchObject({ verdict: "valid", rule: "chat-spam" });
+    expect(await reportOn(S1, "chat", { redEnd: chatOf(["gg"]), blackEnd: chatOf(["gg"]) })).toMatchObject({ verdict: "invalid", rule: "chat-little" });
+    expect(await reportOn(S1, "chat", { redEnd: chatOf(["luck", "oops", "wow"]) })).toMatchObject({ verdict: "inconclusive", rule: "chat-borderline" });
+    expect(await reportOn(S1, "chat")).toMatchObject({ verdict: "inconclusive", rule: "no-chat-record" });
+  });
+
+  it("judges engine reports by the suspect's standing at that speed", async () => {
+    expect(await reportOn(S1, "engine", { speed: "rapid" })).toMatchObject({ verdict: "inconclusive", rule: "few-checked" });
+    await db.query(`insert into public.fairplay (user_id, speed, games, score, far, verdict) values ($1, 'blitz', 14, 0.4, 0, 'normal'), ($1, 'lightning', 15, 7.2, 5, 'likely')`, [S1]);
+    expect(await reportOn(S1, "engine")).toMatchObject({ verdict: "invalid", rule: "standing-normal" });
+    expect(await reportOn(S1, "engine", { speed: "lightning" })).toMatchObject({ verdict: "valid", rule: "standing-likely" });
+  });
+
+  it("judges usernames by the private word list, and leaves the rest to an adviser or a person", async () => {
+    expect(await reportOn(S2, "username")).toMatchObject({ verdict: "inconclusive", rule: "username-judgement" });
+    await db.query(`insert into public.username_blocklist (word) values ('badword')`);
+    expect(await reportOn(S2, "username")).toMatchObject({ verdict: "valid", rule: "username-word" });
+    expect(await reportOn(S2, "other")).toMatchObject({ verdict: "inconclusive", rule: "free-text" });
+    expect(await failsAs(R1, `select * from public.username_blocklist`)).toMatch(/permission denied/);
+  });
+
+  it("hands open reports to an adviser and shows its verdict beside the rules'", async () => {
+    const pending = await q2<{ report: number; reason: string; suspect: string; rules: { verdict: string } }[]>(`public.triage_pending('ai:test', 100)`);
+    const other = pending.find((p) => p.reason === "other")!;
+    expect(other).toMatchObject({ suspect: "badwordy_xq", rules: { verdict: "inconclusive" } });
+    expect(JSON.stringify(pending)).not.toMatch(/@example\.com/);
+    await db.query(`select public.save_triage_advice($1, 'ai:test', 'invalid', 1.4, 'model-x', 'The note describes a normal loss.')`, [other.report]);
+    expect((await q2<{ report: number }[]>(`public.triage_pending('ai:test', 100)`)).map((p) => p.report)).not.toContain(other.report);
+    const c = await run<{ reports: { id: number; triage: { source: string; confidence: number }[] }[] }>(TMOD, `public.mod_case('badwordy_xq')`);
+    expect(c.reports.find((r) => r.id === other.report)!.triage.map((t) => [t.source, Number(t.confidence)])).toEqual([["rules", 0.2], ["ai:test", 1]]);
+    expect(await failsAs(TMOD, `select public.save_triage_advice(1, 'x', 'valid', 1, 'x', 'x')`)).toMatch(/permission denied/);
+  });
+
+  it("compares each decision with the verdicts, and reports how often they agreed", async () => {
+    const queue = await run<{ username: string; triage: { valid: number; invalid: number; inconclusive: number } }[]>(TMOD, `public.mod_queue()`);
+    expect(queue.find((c) => c.username === "sus_xq")!.triage).toMatchObject({ valid: 3, invalid: 3 });
+    await run(TMOD, `public.mod_dismiss('sus_xq', 'checked each')`);
+    const agreement = await run<{ source: string; category: string; decisions: number; agreed: number }[]>(TMOD, `public.triage_agreement()`);
+    expect(agreement.find((a) => a.source === "rules" && a.category === "stalling")).toMatchObject({ decisions: 2, agreed: 1 });
+    expect(agreement.find((a) => a.source === "rules" && a.category === "chat")).toMatchObject({ decisions: 4, agreed: 1 });
+    expect(await failsAs(R1, `select public.triage_agreement()`)).toMatch(/moderators only/);
+  });
+});
+
+/** Runs a query as the database owner and returns its one value. */
+const q2 = <T>(sql: string, params: unknown[] = []) => db.query<{ j: T }>(`select ${sql} as j`, params).then((r) => r.rows[0]!.j);
+
 async function errorOfQuery(sql: string): Promise<string> {
   return db.query(sql).then(() => "no error", (e: Error) => e.message);
 }

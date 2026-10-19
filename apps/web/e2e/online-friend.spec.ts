@@ -80,14 +80,20 @@ async function player(page: Page, w: World, who: { id: string; username: string;
       case "/rest/v1/rpc/is_moderator":
         return json(route, w.moderator);
       case "/rest/v1/rpc/mod_queue":
-        return json(route, [{ username: "bob_xq", rating: 1150, score: 5.4, verdict: "likely", reports: 2, weight: 1.2, unchecked: 1, priority: 20, last_outcome: "inconclusive", last_note: "too few games", last_reviewed: "2026-10-10T00:00:00Z" }]);
+        return json(route, [{ username: "bob_xq", rating: 1150, score: 5.4, verdict: "likely", reports: 2, weight: 1.2, unchecked: 1, priority: 20, last_outcome: "inconclusive", last_note: "too few games", last_reviewed: "2026-10-10T00:00:00Z", triage: { valid: 1, invalid: 0, inconclusive: 1 } }]);
+      case "/rest/v1/rpc/triage_agreement":
+        return json(route, [{ source: "rules", category: "stalling", decisions: 20, agreed: 19, confident: 18, confident_agreed: 18 }]);
       case "/rest/v1/rpc/mod_log_recent":
         return json(route, [{ at: "2026-10-18T10:00:00Z", action: "dismiss", details: { note: "no evidence" }, moderator: "alice_xq", target: "carol_xq" }]);
       case "/rest/v1/rpc/mod_case":
         return json(route, {
           username: "bob_xq", created_at: "2026-10-01T00:00:00Z", report_barred: false, reporter: { made: 0, upheld: 0, weight: 0.5 }, completion: 100, checked_games: 12,
           ratings: { blitz: { rating: 1150, rd: 80, games: 40 } }, standing: { blitz: { games: 12, score: 5.4, far: 4, verdict: "likely" } }, sanctions: [],
-          reports: [{ id: 1, game: GAME, reason: "engine", note: "every move instant", at: "2026-10-18T09:00:00Z", status: "open", reporter: "alice_xq", record: { made: 3, upheld: 2, weight: 0.6 } }],
+          reports: [{ id: 1, game: GAME, reason: "engine", note: "every move instant", at: "2026-10-18T09:00:00Z", status: "open", reporter: "alice_xq", record: { made: 3, upheld: 2, weight: 0.6 },
+            triage: [
+              { source: "rules", verdict: "valid", confidence: 0.9, rule: "standing-likely", reason: "Fair-play standing at this speed is \"likely\".", at: "2026-10-18T09:00:00Z" },
+              { source: "ai:claude-code", verdict: "valid", confidence: 0.75, rule: "sonnet", reason: "Accuracy far above the rating band in 12 games.", at: "2026-10-18T10:00:00Z" },
+            ] }],
           games: [{ id: GAME, speed: "blitz", base: 300, inc: 3, color: "black", opponent: "alice_xq", result: "black", reason: "resign", plies: 60, ended_at: "2026-10-18T09:00:00Z", rating_before: 1140, status: "checked", labels: [], moves: null,
             chat: { red: [{ ply: 30, by: "black", phrase: "oops" }], black: [{ ply: 30, by: "black", phrase: "oops" }, { ply: 31, by: "black", phrase: "oops" }] },
             check: { moves: 22, acc: 97.5, match: 0.82, z: 3.9, flags: ["even-times"], timing: { cv: 0.18, fast: 0.05, focus: 0, hard_ratio: 1.02 } } }],
@@ -304,9 +310,14 @@ test("the review page is for moderators: the queue, a case, and a decision", asy
   await alice.goto(at("/en/moderate/"));
   await expect(alice.getByRole("heading", { name: "Review queue" })).toBeVisible();
   await expect(alice.getByText("Returning: not conclusive", { exact: false })).toBeVisible();
+  await expect(alice.getByText("1 likely valid · 0 likely invalid · 1 inconclusive")).toBeVisible();
+  await expect(alice.getByRole("row", { name: "rules stalling 19/20 (95 %) 18/18 (100 %)" })).toBeVisible();
   await alice.getByRole("link", { name: "bob_xq" }).click();
   await expect(alice.getByText("every move instant")).toBeVisible();
   await expect(alice.getByText("Last decision: not conclusive", { exact: false })).toBeVisible();
+  // Each report with the rules' verdict and the AI adviser's beside it.
+  await expect(alice.getByText("Rules: likely valid (0.90)", { exact: false })).toBeVisible();
+  await expect(alice.getByText("AI: claude-code: likely valid (0.75)", { exact: false })).toBeVisible();
   // The chat as each browser recorded it: here they differ, which is itself evidence.
   await alice.getByText("Chat (2) · the two records differ").click();
   await expect(alice.getByText("Player's browser")).toBeVisible();

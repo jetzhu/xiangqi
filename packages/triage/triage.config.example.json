@@ -1,0 +1,9 @@
+{
+  "//": "Copy to ~/.config/xiangqi-triage.json (or point TRIAGE_CONFIG at it). Secrets go in the environment, named by apiKeyEnv, never in this file.",
+  "adviser": "claude-code",
+  "limit": 20,
+  "claude-code": { "command": "claude", "model": "sonnet", "timeoutMs": 120000 },
+  "anthropic": { "model": "claude-sonnet-5-5", "apiKeyEnv": "ANTHROPIC_API_KEY" },
+  "openai-compatible": { "baseUrl": "https://api.openai.com/v1", "model": "gpt-4.1-mini", "apiKeyEnv": "OPENAI_API_KEY" },
+  "command": { "command": "my-llm", "args": ["--json"], "timeoutMs": 120000 }
+}
