@@ -33,7 +33,7 @@ export interface GameRecord extends GameRow {
 export type FairplayRecord =
   | { status: "one" }
   | { status: "disagree" }
-  | { status: "checked"; red: SideScore; black: SideScore };
+  | { status: "checked"; red: SideScore; black: SideScore; by_moderator?: true };
 
 export interface RatingRow {
   rating: number;
@@ -59,6 +59,8 @@ export interface Backend {
   /** Honest players of that speed and rating (fairplay_baseline). */
   baseline(speed: string, rating: number): Promise<Baseline>;
   config(): Promise<Partial<FairplayConfig>>;
+  /** Whether the user is a moderator (M19): their own analysis settles a game. */
+  isModerator(user: string): Promise<boolean>;
   /** Saves the check on the game and updates both players' fair-play standing. */
   saveFairplay(game: string, record: FairplayRecord): Promise<void>;
   finish(args: {
@@ -146,11 +148,19 @@ export async function handle(req: Request, db: Backend, now = Date.now()): Promi
  */
 async function fairplay(db: Backend, user: string, id: string, raw: unknown, now: number): Promise<Response> {
   const g = await db.game(id);
-  if (!g || (g.red !== user && g.black !== user)) return json(404, { error: "no such game" });
+  const player = !!g && (g.red === user || g.black === user);
+  // A moderator's own analysis, from the review page, settles a game whose check is missing or disputed.
+  const moderator = !!g && !player && (await db.isModerator(user));
+  if (!g || (!player && !moderator)) return json(404, { error: "no such game" });
   if (g.status !== "over" || !g.rated || !g.moves) return json(409, { error: "not a finished rated game" });
-  if (g.endedAt && now - g.endedAt > ANALYSIS_DAYS * 86_400_000) return json(409, { error: "too late" });
+  if (player && g.endedAt && now - g.endedAt > ANALYSIS_DAYS * 86_400_000) return json(409, { error: "too late" });
   const data = parseAnalysis(raw, g.moves.length);
   if (!data) return json(400, { error: "bad analysis" });
+  if (moderator) {
+    const scores = await score(db, g, data);
+    await db.saveFairplay(id, { status: "checked", ...scores, by_moderator: true });
+    return json(200, { fairplay: "checked" });
+  }
   const by: Color = g.red === user ? "red" : "black";
   const both = await db.saveAnalysis(id, by, data);
   if (!both.red || !both.black) {
@@ -161,14 +171,18 @@ async function fairplay(db: Backend, user: string, id: string, raw: unknown, now
     await db.saveFairplay(id, { status: "disagree" });
     return json(200, { fairplay: "disagree" });
   }
+  await db.saveFairplay(id, { status: "checked", ...(await score(db, g, both.red)) });
+  return json(200, { fairplay: "checked" });
+}
+
+/** Both sides' scores from an analysis, against baselines for their ratings at the start. */
+async function score(db: Backend, g: GameRecord, analysis: AnalysisData) {
   const [config, redBase, blackBase] = await Promise.all([
     db.config(),
     db.baseline(g.speed, g.redRatingBefore ?? 1200),
     db.baseline(g.speed, g.blackRatingBefore ?? 1200),
   ]);
-  const scores = scoreGame({ moves: g.moves, analysis: both.red, log: await db.log(id), tc: g.tc, baselines: { red: redBase, black: blackBase }, config });
-  await db.saveFairplay(id, { status: "checked", ...scores });
-  return json(200, { fairplay: "checked" });
+  return scoreGame({ moves: g.moves!, analysis, log: await db.log(g.id), tc: g.tc, baselines: { red: redBase, black: blackBase }, config });
 }
 
 async function save(db: Backend, g: GameRecord, d: Extract<Decision, { kind: "over" }>): Promise<GameOut> {
@@ -252,6 +266,7 @@ export function restBackend(url: string, serviceKey: string, fetchFn: typeof fet
       const rows = await get<{ key: string; value: number }>("fairplay_config?select=key,value");
       return Object.fromEntries(rows.map((r) => [r.key, Number(r.value)])) as Partial<FairplayConfig>;
     },
+    isModerator: async (user) => (await rpc("is_moderator_user", { p_user: user })) === true,
     saveFairplay: async (game, record) => void (await rpc("save_fairplay", { p_game: game, p_record: record })),
     rating: async (user, speed) => (await get<RatingRow>(`ratings?user_id=eq.${q(user)}&kind=eq.${q(speed)}&select=rating,rd,games,last_played`))[0] ?? null,
     finish: async (a) =>

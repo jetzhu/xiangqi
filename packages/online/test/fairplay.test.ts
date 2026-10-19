@@ -102,7 +102,7 @@ describe("the game function, with analyses", () => {
     const records: FairplayRecord[] = [];
     const ratings: number[] = [];
     const db = {
-      user: async (a: string | null) => (a === "Bearer one" ? "u1" : a === "Bearer two" ? "u2" : "u3"),
+      user: async (a: string | null) => (a === "Bearer one" ? "u1" : a === "Bearer two" ? "u2" : a === "Bearer three" ? "u3" : "u4"),
       game: async () => game,
       log: async () => s.log,
       saveAnalysis: async (_g: string, by: "red" | "black", data: AnalysisData) => {
@@ -114,6 +114,7 @@ describe("the game function, with analyses", () => {
         return { acc: { mean: 60, sd: 10 }, match: { mean: 0.3, sd: 0.12 } };
       },
       config: async () => ({}),
+      isModerator: async (u: string) => u === "u3",
       saveFairplay: async (_g: string, r: FairplayRecord) => void records.push(r),
     } as unknown as Backend;
     return { s, db, records, ratings };
@@ -136,10 +137,17 @@ describe("the game function, with analyses", () => {
     await handle(post("one", { game: ID, analysis: s.analysis }), db, 1_000_500);
     await handle(post("two", { game: ID, analysis: other }), db, 1_000_500);
     expect(records.at(-1)).toEqual({ status: "disagree" });
-    expect((await handle(post("three", { game: ID, analysis: s.analysis }), db, 1_000_500)).status).toBe(404);
+    expect((await handle(post("four", { game: ID, analysis: s.analysis }), db, 1_000_500)).status).toBe(404);
     expect((await handle(post("one", { game: ID, analysis: { v: 1 } }), db, 1_000_500)).status).toBe(400);
     expect((await handle(post("one", { game: ID, analysis: s.analysis }), db, 1_000_000 + 8 * 86_400_000)).status).toBe(409);
     const casual = setup({ rated: false });
     expect((await handle(post("one", { game: ID, analysis: casual.s.analysis }), casual.db, 1_000_500)).status).toBe(409);
+  });
+
+  it("lets a moderator's own analysis settle a disputed game, even after a week", async () => {
+    const { s, db, records } = setup();
+    const res = await handle(post("three", { game: ID, analysis: s.analysis }), db, 1_000_000 + 30 * 86_400_000);
+    expect(await res.json()).toEqual({ fairplay: "checked" });
+    expect(records.at(-1)).toMatchObject({ status: "checked", by_moderator: true, red: { match: 1 } });
   });
 });

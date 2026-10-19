@@ -201,6 +201,7 @@ describe("the game server function", () => {
       saveAnalysis: async () => ({}),
       baseline: async () => ({ acc: { mean: 60, sd: 10 }, match: { mean: 0.3, sd: 0.12 } }),
       config: async () => ({}),
+      isModerator: async () => false,
       saveFairplay: async () => {},
       finish: async (a) => {
         if (staleOnce) {

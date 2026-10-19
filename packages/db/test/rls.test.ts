@@ -1001,6 +1001,122 @@ describe("fair play (M18)", () => {
   });
 });
 
+describe("reports and moderation (M19)", () => {
+  const [MOD, X, Y, Z] = ["b1", "b2", "b3", "b4"].map((x) => `00000000-0000-4000-8000-0000000000${x}`) as [string, string, string, string];
+  const run = <R>(user: string, sql: string, params: unknown[] = []) =>
+    db.transaction(async (tx) => {
+      await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [user]);
+      await tx.exec(`set local role authenticated`);
+      return (await tx.query<{ j: R }>(`select ${sql} as j`, params)).rows[0]!.j;
+    });
+  const errorOf = (user: string, sql: string) => failsAs(user, `select ${sql}`);
+  /** A finished rated blitz game; the winner gains 10, the loser loses 10. */
+  const game = async (red: string, black: string, result: "red" | "black" | "draw", ago = "1 hour") =>
+    (
+      await db.query<{ id: string }>(
+        `insert into public.games (red, black, base, inc, speed, rated, relay, status, result, reason, moves, red_rating_before, red_rating_after, black_rating_before, black_rating_after, started_at, ended_at)
+         values ($1, $2, 300, 3, 'blitz', true, false, 'over', $3, 'resign', array_fill('h2e2'::text, array[40]), 1200, $4, 1200, $5, now() - $6::interval, now() - $6::interval) returning id`,
+        [red, black, result, result === "red" ? 1210 : result === "black" ? 1190 : 1200, result === "black" ? 1210 : result === "red" ? 1190 : 1200, ago],
+      )
+    ).rows[0]!.id;
+
+  beforeAll(async () => {
+    for (const [u, name] of [[MOD, "mod_xq"], [X, "xia_xq"], [Y, "yan_xq"], [Z, "zhao_xq"]] as const) {
+      await signUp(u, { username: name });
+      await db.query(`update public.profiles set birth_month = '1990-01-01' where user_id = $1`, [u]);
+      await db.query(
+        `insert into public.bot_games (user_id, bot_id, bot_rating, player_color, moves, result, helps, rated, started_at)
+         select $1, 'laochen', 800, 'red', array_fill('h2e2'::text, array[30]), 'loss', 0, true, now() from generate_series(1, 3)`,
+        [u],
+      );
+      await db.query(`insert into public.ratings (user_id, kind, rating, rd, games) values ($1, 'blitz', 1200, 80, 40)`, [u]);
+    }
+    await db.query(`insert into public.moderators (user_id) values ($1)`, [MOD]);
+  });
+
+  it("lets a player report the opponent of their own finished game, once, within 7 days", async () => {
+    const g = await game(X, Y, "red");
+    expect(await errorOf(Z, `public.report_player('${g}', 'engine')`)).toMatch(/not your game/);
+    await run(Y, `public.report_player($1, 'engine', '  ')`, [g]);
+    expect(await run(Y, `public.reported_game($1)`, [g])).toBe(true);
+    expect(await errorOf(Y, `public.report_player('${g}', 'engine')`)).toMatch(/already reported/);
+    expect(await errorOf(Y, `public.report_player('${g}', 'cheating')`)).toMatch(/check constraint|already/);
+    const old = await game(X, Y, "red", "8 days");
+    expect(await errorOf(Y, `public.report_player('${old}', 'engine')`)).toMatch(/too late/);
+    expect((await db.query(`select suspect, note from public.reports where game_id = $1`, [g])).rows).toEqual([{ suspect: X, note: null }]);
+    expect(await failsAs(Y, `select * from public.reports`)).toMatch(/permission denied/);
+  });
+
+  it("keeps the review queue and case to moderators", async () => {
+    expect(await errorOf(Y, `public.mod_queue()`)).toMatch(/moderators only/);
+    expect(await errorOf(Y, `public.mod_case('xia_xq')`)).toMatch(/moderators only/);
+    const queue = await run<{ username: string; reports: number; weight: number }[]>(MOD, `public.mod_queue()`);
+    expect(queue.find((c) => c.username === "xia_xq")).toMatchObject({ reports: 1, weight: 0.5 });
+    const c = await run<{ reports: { reporter: string; record: { weight: number } }[]; games: unknown[] }>(MOD, `public.mod_case('XIA_XQ')`);
+    expect(c.reports).toMatchObject([{ reporter: "yan_xq", reason: "engine", record: { made: 0, upheld: 0, weight: 0.5 } }]);
+    expect(c.games.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("confirms a first violation: rated play suspended, ratings reset, victims refunded, reporters told, a public mark", async () => {
+    await game(X, Z, "red"); // Zhao lost 10 to Xia
+    const out = await run<{ level: number; refunded_games: number }>(MOD, `public.mod_confirm('xia_xq', 'engine moves in 12 games')`);
+    expect(out.level).toBe(1);
+    expect(out.refunded_games).toBeGreaterThanOrEqual(2);
+    const zhao = (await db.query<{ rating: number }>(`select rating from public.ratings where user_id = $1 and kind = 'blitz'`, [Z])).rows[0]!;
+    expect(Number(zhao.rating)).toBe(1210);
+    expect(await run(Z, `public.my_notices()`)).toMatchObject([{ kind: "refund", data: { points: 10, games: 1 } }]);
+    expect(await run(Y, `public.my_notices()`)).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "report-upheld" })]));
+    const xia = await run<{ eligible: boolean; casual_ok: boolean; sanction: { level: number } }>(X, `public.online_eligibility()`);
+    expect(xia).toMatchObject({ eligible: false, casual_ok: true, sanction: { level: 1, closed: false } });
+    expect(await errorOf(X, `public.seek(300, 3, '{"range": 200}', false)`)).toMatch(/not ready/);
+    expect((await db.query(`select rating, games from public.ratings where user_id = $1 and kind = 'blitz'`, [X])).rows[0]).toMatchObject({ games: 0 });
+    expect(await as(null, async (tx) => (await tx.query<{ j: { violation: unknown } }>(`select public.public_profile('xia_xq') as j`)).rows[0]!.j.violation)).toMatchObject({ at: expect.any(String) });
+    expect(await run(Y, `public.reporter_record($1)`, [Y]).catch((e: Error) => e.message)).toMatch(/permission denied/);
+    expect((await db.query<{ j: { weight: number } }>(`select public.reporter_record($1) as j`, [Y])).rows[0]!.j).toMatchObject({ made: 1, upheld: 1, weight: 0.67 });
+    // The log has it, and can't be changed.
+    expect(await run(MOD, `public.mod_log_recent()`)).toMatchObject([{ action: "confirm", target: "xia_xq", moderator: "mod_xq" }]);
+    expect(await errorOfQuery(`update public.mod_log set action = 'dismiss'`)).toMatch(/append-only/);
+    expect(await errorOfQuery(`delete from public.mod_log`)).toMatch(/append-only/);
+  });
+
+  it("makes a second violation stop all online play, closed unless an appeal succeeds", async () => {
+    const out = await run<{ level: number; sanction: number }>(MOD, `public.mod_confirm('xia_xq', 'again')`);
+    expect(out.level).toBe(2);
+    expect(await run(X, `public.online_eligibility()`)).toMatchObject({ casual_ok: false, sanction: { level: 2, closed: false } });
+    await db.query(`update public.sanctions set appeal_deadline = now() - interval '1 day' where id = $1`, [out.sanction]);
+    expect(await run(X, `public.online_eligibility()->'sanction'->'closed'`)).toBe(true);
+    // An appeal received holds the closure; overturned lifts the sanction.
+    await run(MOD, `public.mod_appeal($1, 'pending', 'email received')`, [out.sanction]);
+    expect(await run(X, `public.online_eligibility()->'sanction'->'closed'`)).toBe(false);
+    await run(MOD, `public.mod_appeal($1, 'overturned', 'new evidence')`, [out.sanction]);
+    expect(await run(X, `public.online_eligibility()->'sanction'`)).toMatchObject({ level: 1 });
+    expect(await errorOf(Y, `public.mod_appeal(${out.sanction}, 'overturned', 'x')`)).toMatch(/moderators only/);
+  });
+
+  it("dismisses a case, and bars a persistent false reporter", async () => {
+    const g = await game(Y, Z, "black");
+    await run(Y, `public.report_player($1, 'engine')`, [g]);
+    await run(MOD, `public.mod_dismiss('zhao_xq', 'no evidence')`);
+    expect((await db.query(`select status from public.reports where game_id = $1`, [g])).rows).toEqual([{ status: "dismissed" }]);
+    await run(MOD, `public.mod_bar_reporter('yan_xq', true, 'reports every loss')`);
+    const g2 = await game(Y, Z, "black");
+    expect(await errorOf(Y, `public.report_player('${g2}', 'engine')`)).toMatch(/not allowed/);
+    expect((await db.query<{ j: { weight: number } }>(`select public.reporter_record($1) as j`, [Y])).rows[0]!.j.weight).toBe(0);
+  });
+
+  it("lists leaderboard players: 30 games, a settled rating, recent play, 10 checked games, no mark", async () => {
+    await db.query(`update public.ratings set games = 35, rd = 70, last_played = now() where user_id in ($1, $2) and kind = 'blitz'`, [Z, X]);
+    expect(await as(null, async (tx) => (await tx.query(`select public.leaderboard('blitz') as j`)).rows[0])).toEqual({ j: [] });
+    for (let i = 0; i < 10; i++)
+      await db.query(
+        `update public.games set fairplay = '{"status": "checked", "red": {"z": 0, "flags": []}, "black": {"z": 0, "flags": []}}' where id = $1`,
+        [await game(Z, MOD, "draw")],
+      );
+    const board = (await as(null, async (tx) => (await tx.query<{ j: { username: string }[] }>(`select public.leaderboard('blitz') as j`)).rows[0]!.j));
+    expect(board.map((r) => r.username)).toEqual(["zhao_xq"]);
+  });
+});
+
 async function errorOfQuery(sql: string): Promise<string> {
   return db.query(sql).then(() => "no error", (e: Error) => e.message);
 }
