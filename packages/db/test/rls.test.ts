@@ -802,6 +802,19 @@ describe("quick pairing (M17)", () => {
     expect(await run(P, `public.game_info($1)`, [q.game])).toMatchObject({ rated: true, speed: "blitz", base: 300, inc: 3, status: "playing" });
   });
 
+  it("doesn't let a new search wipe out a match just made", async () => {
+    await reset();
+    await rate(P, 1200);
+    await rate(Q, 1210);
+    await seek(P);
+    await seek(Q);
+    const game = (await find(Q)).game;
+    expect(game).toBeTruthy();
+    // P clicks a tile again before their page has heard about the match.
+    await seek(P);
+    expect(await find(P)).toEqual({ status: "matched", game });
+  });
+
   it("widens the window with waiting, and lists the nearest players outside it", async () => {
     await reset();
     await rate(P, 1200);

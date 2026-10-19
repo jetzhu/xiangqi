@@ -404,6 +404,16 @@ importers:
         specifier: 5.0.3
         version: 5.0.3(@types/node@26.6.4)(jsdom@30.1.1)(vite@8.3.2(@types/node@26.6.4))
 
+  packages/loadtest:
+    dependencies:
+      xiangqi-core:
+        specifier: workspace:*
+        version: link:../xiangqi-core
+    devDependencies:
+      rolldown:
+        specifier: 1.2.12
+        version: 1.2.12
+
   packages/online:
     dependencies:
       '@xq/puzzles':

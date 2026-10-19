@@ -1,0 +1,13 @@
+{
+  "name": "@xq/loadtest",
+  "version": "0.1.0",
+  "private": true,
+  "description": "M20 load test against a staging Supabase project: synthetic players, quick pairing, move reports, the game function, storage",
+  "type": "module",
+  "dependencies": {
+    "xiangqi-core": "workspace:*"
+  },
+  "devDependencies": {
+    "rolldown": "1.2.12"
+  }
+}
