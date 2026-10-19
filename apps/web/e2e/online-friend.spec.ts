@@ -289,6 +289,13 @@ for (const relay of [false, true]) {
     ]);
     expect(w.settled).toBeGreaterThan(0);
 
+    // As served by Pages the engine needs the service worker, which these tests turn off: the
+    // review says so, and nothing is sent.
+    if (process.env.E2E_PAGES) {
+      for (const p of [alice, bob]) await expect(p.getByText("Game Review needs a browser that can run the engine.")).toBeVisible();
+      expect(w.analyses).toEqual([]);
+      return;
+    }
     // Game Review in both browsers; each sends the same fair-play analysis of the rated game.
     for (const p of [alice, bob]) await expect(p.getByRole("region", { name: "Game Review" })).toContainText(/Accuracy: \d+ you/, { timeout: 30_000 });
     await expect.poll(() => w.analyses.length, { timeout: 15_000 }).toBe(2);
