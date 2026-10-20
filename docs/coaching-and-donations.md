@@ -71,16 +71,19 @@ A coach seeing an under-16 player's games is a new disclosure of a child's data 
 
 Students cost almost nothing to keep; the real limit is **classes playing at the same time** (realtime connections), so caps are about separating family and volunteer use from commercial teaching, not about cost.
 
-### Questions for you
+### Decisions (2026-10-20)
 
-1. Guardian confirmation under 16 (matching the site's existing under-16 rule), or only under 13 (COPPA's line)?
-2. Should a coach see the **name of the student's opponent** when that opponent is also under 16 (whose games aren't public)? Proposal: show "an opponent under 16" instead.
-3. A cap on under-16 students per coach before a moderator review (proposal: 15), as a protection against misuse.
-4. 3 free family links, or your 2?
+1. **Guardian confirmation:** required for players under 16 by default. A parent may lower the line to 13 for their own child, after which a player aged 13–15 can link a coach without a confirmation each time (the parent's choice is logged and can be changed back).
+2. **Opponents under 16:** a coach sees "an opponent under 16" in place of that opponent's name.
+3. **Family links:** up to **3** children free.
+4. **Audience:** worldwide, mainly China and the USA — so donations and payments need both card/PayPal and Alipay/WeChat Pay.
+5. Still open: a cap on under-16 students per coach before a moderator review (proposal: 15).
 
 ## 2. Donations
 
-### Platforms (fees checked 2026-10-20; the owner's country decides which are available)
+Players are worldwide, mainly in **China and the USA** (decided 2026-10-20). Which platforms can pay out depends on the country where the owner receives the money, which is still to be confirmed.
+
+### Platforms (fees checked 2026-10-20)
 
 | Platform | Fee | One-off / monthly | For a static site | Notes |
 | --- | --- | --- | --- | --- |
