@@ -9,7 +9,7 @@ import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
 import { PRESETS } from "../bots/BotPicker.js";
 import { useAccount } from "../account/session.js";
 import { useNav } from "../nav.js";
-import { useSettings, useT } from "../settings.js";
+import { type Settings, useSettings, useT } from "../settings.js";
 import { type Seeking, type Sportsmanship, answerInvite, cancelSeek, findMatch, inviteSeeker, seek, seekCounts, widenSeek } from "./api.js";
 import { SPEED_NAME } from "./PlayerPage.js";
 
@@ -233,6 +233,16 @@ export function QuickPair({ level, sport, onSport, busy }: { level: number; spor
               </ul>
             </div>
           )}
+          {state?.excluded && Object.keys(state.excluded).length > 0 && (
+            <p className="excluded small" role="status">
+              {tt("Your filters leave out players searching here:", "你的筛选条件排除了正在这里寻找对手的棋手：")}{" "}
+              {(Object.entries(state.excluded) as [keyof NonNullable<Seeking["excluded"]>, number][])
+                .map(([k, n]) => `${filterName(k, settings, tt)}: ${n}`)
+                .join(tt(", ", "，"))}
+              .{" "}
+              <a href={nav.href("/settings?tab=online")}>{tt("Change filters", "修改筛选")}</a>
+            </p>
+          )}
           {note && <p className="muted">{note}</p>}
           <p className="buttons">
             <button type="button" onClick={() => void cancel()}>
@@ -278,4 +288,18 @@ export function QuickPair({ level, sport, onSport, busy }: { level: number; spor
 function botFor(level: number) {
   const ladder = [...BOTS].sort((a, b) => a.ratingLabel - b.ratingLabel);
   return ladder.filter((b) => b.ratingLabel <= level).pop() ?? ladder[0]!;
+}
+
+/** A filter's name with the player's setting, for the "your filters leave out…" line. */
+function filterName(k: "completion" | "account_age" | "established" | "checked", s: Settings, tt: (en: string, zh: string) => string) {
+  switch (k) {
+    case "completion":
+      return tt(`completion rate ${s.opponentCompletion} %+`, `完成率 ${s.opponentCompletion}% 以上`);
+    case "account_age":
+      return tt(`accounts ${s.opponentAccountAge}+ days old`, `注册 ${s.opponentAccountAge} 天以上`);
+    case "established":
+      return tt("established players only", "只匹配等级分已稳定的棋手");
+    case "checked":
+      return tt("10+ fair-play checked games", "10 盘以上公平性检查");
+  }
 }

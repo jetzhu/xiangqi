@@ -173,6 +173,8 @@ export interface Seeking {
   waited: number;
   /** The nearest players seeking on the same tile but outside the window, for "Play anyway". */
   nearest: { username: string; rating: number; diff: number; waited: number; invited: boolean }[];
+  /** Players on this tile that only the searcher's own filters leave out, per filter. */
+  excluded?: Partial<Record<"completion" | "account_age" | "established" | "checked", number>>;
   /** Someone outside the window wants to play: their rating and the gap, open for `expires_in` s. */
   invite: { id: number; rating: number; diff: number; expires_in: number } | null;
   /** Players seeking on each tile, keyed "base+inc" in seconds. */

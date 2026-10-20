@@ -32,6 +32,8 @@ function world(relay: boolean) {
     seeks: {} as Partial<Record<"red" | "black", { base: number; inc: number; matched: boolean }>>,
     invite: false,
     far: false,
+    /** What find_match says the searcher's own filters leave out. */
+    excluded: null as null | Record<string, number>,
     sport: { completion: null, last30: { games: 0, abandoned: 0, stalled: 0, aborted: 0, slow_start: 0 }, warning: false, wait_until: null, pool: false },
     calls: [] as string[],
     /** M19: notices, a sanction, the leaderboard, and whether the player is a moderator. */
@@ -165,6 +167,7 @@ async function player(page: Page, w: World, who: { id: string; username: string;
         return json(route, {
           status: "searching", window: 50, anyone: false, waited: 3, counts: { "120+1": Object.keys(w.seeks).length },
           nearest: theirs ? [{ ...other, waited: 3, invited: w.invite && who.color === "red" }] : [],
+          ...(w.excluded ? { excluded: w.excluded } : {}),
           invite: w.invite && who.color === "black" ? { id: 7, rating: 1200, diff: -300, expires_in: 12 } : null,
         });
       }
@@ -267,6 +270,18 @@ test("quick pairing: play anyway with the nearest player outside the window", as
   await bob.getByRole("button", { name: "Accept" }).click();
   await expect(bob).toHaveURL(new RegExp(`/en/game/\\?id=${GAME}`));
   await expect(alice).toHaveURL(new RegExp(`/en/game/\\?id=${GAME}`), { timeout: 10_000 });
+});
+
+test("quick pairing says when the player's own filters leave others out", async ({ context }) => {
+  const { w, alice } = await twoPlayers(context, false);
+  w.excluded = { completion: 1 };
+  await alice.goto(at("/en/settings/?tab=online"));
+  await alice.getByLabel("Completion rate (棋品)").selectOption("95");
+  await alice.goto(at("/en/online/"));
+  await alice.getByRole("button", { name: /^2\+1/ }).click();
+  await expect(alice.getByText("Your filters leave out players searching here: completion rate 95 %+: 1.")).toBeVisible();
+  await alice.getByRole("link", { name: "Change filters" }).click();
+  await expect(alice).toHaveURL(/\/en\/settings\/\?tab=online/);
 });
 
 test("a sportsmanship warning must be acknowledged before quick pairing", async ({ context }) => {

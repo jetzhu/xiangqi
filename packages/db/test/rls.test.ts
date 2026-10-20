@@ -779,7 +779,15 @@ describe("quick pairing (M17)", () => {
     });
   const errorOf = (user: string, sql: string) => failsAs(user, `select ${sql}`);
   const seek = (user: string, filters: object = {}, tile = "300, 3") => run(user, `public.seek(${tile}, $1, false)`, [JSON.stringify({ range: 200, established: false, account_age: 0, completion: 0, ...filters })]);
-  type Found = { status: string; game?: string; window?: number; nearest?: { username: string; diff: number }[]; invite?: { id: number; diff: number } | null; counts?: Record<string, number> };
+  type Found = {
+    status: string;
+    game?: string;
+    window?: number;
+    nearest?: { username: string; diff: number }[];
+    invite?: { id: number; diff: number } | null;
+    counts?: Record<string, number>;
+    excluded?: Record<string, number>;
+  };
   const find = (user: string) => run<Found>(user, `public.find_match()`);
   const rate = (user: string, rating: number, games = 20) =>
     db.query(`insert into public.ratings (user_id, kind, rating, rd, games) values ($1, 'blitz', $2, 80, $3)
@@ -881,7 +889,9 @@ describe("quick pairing (M17)", () => {
     await rate(Q, 1210, 3);
     await seek(P, { established: true });
     await seek(Q);
-    expect(await find(P)).toMatchObject({ status: "searching", nearest: [] });
+    // P is told their own filter is why: one player left out as not yet established. Q isn't told about P's filter.
+    expect(await find(P)).toMatchObject({ status: "searching", nearest: [], excluded: { established: 1 } });
+    expect(await find(Q)).toMatchObject({ status: "searching", excluded: {} });
     await seek(P);
     await db.query(`insert into public.blocks (user_id, blocked_id) values ($1, $2)`, [Q, P]);
     expect(await find(P)).toMatchObject({ status: "searching", nearest: [] });
