@@ -1,0 +1,154 @@
+# Coaching, donations and paid plans — research and proposal
+
+> This file is the master copy of this proposal. Update it here, in the same commit as any change it leads to.
+
+Oct 20, 2026 · Jet Zhu · **Draft for discussion** — nothing here is built yet
+
+Three questions, researched on 2026-10-20: what coach features to support (an under-16 player especially should be able to link a coach who can see their games), how to accept donations so the site can keep running, and whether anything should be paid for — in particular by coaches teaching groups with the site. Prices and rules change; each figure below has its source and the date it was checked, and anything that couldn't be verified says so.
+
+The guiding principle, from the rest of the site: **learning, play, ratings, fair play and analysis stay free for everyone, with no ads.** Money may only pay for running costs and for tools coaches use for their teaching — never for an advantage in play.
+
+## 1. Coaching
+
+### What comparable sites do
+
+| Site | Coach and teacher features | Safeguards for children |
+| --- | --- | --- |
+| **lichess** | **Classes** (free): teachers (2FA required) add existing players or create student accounts with generated names and no email, track their games and puzzles, and post news and homework on a class board ([lichess.org/class](https://lichess.org/class)). A coach directory of titled players with rates; lessons are arranged off the site ([lichess.org/coach](https://lichess.org/coach)). Studies shared publicly, unlisted or by invitation ([blog](https://lichess.org/blog/V0KrLSkAAMo3hsi4/study-chess-the-lichess-way)). A reported cap of 100 students per class (forum, unverified). | Student accounts have kid mode (restricted chat) on by default. Teachers reported that they can't message a kid-mode student one to one. |
+| **chess.com** | **Classroom**: a shared board with optional voice and video; the coach controls who moves and can load a student's games ([news](https://www.chess.com/news/view/chesscom-releases-new-classroom-feature)). Coach listing requires identity, a federation rating and age 18+; lessons and payment are "solely between the user and the coach" ([support](https://support.chess.com/en/articles/8648287-how-do-i-find-or-become-a-chess-coach)). | — |
+| **ChessKid** | Groups, assigned lessons and videos, report cards, class matches ([support](https://support.chesskid.com/en/articles/8864339-coach-school-what-are-the-special-features-available-to-schools-groups)). | "Adult accounts cannot talk to kids. Ever." — except a guardian, who links by creating the child's account or by the child entering their email, and can read the child's messages ([safety](https://www.chesskid.com/article/view/how-to-understand-chesskids-safety-features2), [guardianship](https://support.chesskid.com/en/articles/8863569-how-to-connect-to-my-kid-through-guardianship)). |
+| **天天象棋 Tiantian Xiangqi** | Clubs (棋社) with their own tournaments, smart review, courses by contracted masters ([App Store](https://apps.apple.com/cn/app/id403941510)). A "private coaching" release note couldn't be verified; no master–student (师徒) feature found. | Rated 9+. |
+| **xiangqi.com** | Lessons from a teaching team; a coach can challenge a student from a handicap position ([help](https://www.xiangqi.com/help/handicap-mode)). | — |
+
+The pattern: adults reach children only through a link the platform controls (a guardian or a class teacher), linking never opens a private chat, and coaching marketplaces with money stay off-site.
+
+### Rules for children, at the depth a hobby site needs
+
+- **COPPA (US, under 13):** collecting personal information needs verifiable parental consent; the 2025 amendments add a written security programme, a written retention policy and naming third parties ([Federal Register](https://www.federalregister.gov/documents/2025/04/22/2025-05904/childrens-online-privacy-protection-rule)). A school can consent only for an educational, non-commercial purpose, and the site stays responsible ([analysis](https://perkinscoie.com/insights/update/ftcs-coppa-enforcement-action-provides-lessons-edtech-providers)).
+- **GDPR Article 8:** the age of digital consent is 16 by default, 13–16 by country (13 in the UK); below it, parental consent with "reasonable efforts" to verify ([overview](https://childreninthedigitalworld.twobirds.com/home/eu)).
+- **UK Age Appropriate Design Code:** best interests of the child, high-privacy defaults, data minimisation, child-friendly explanations ([summary](https://tiga.org/?p=9917)).
+- Not researched: mainland China's rules on minors online (real-name and play-time rules), which may matter if the site targets players there.
+
+A coach seeing an under-16 player's games is a new disclosure of a child's data to another adult, so it must be off by default, minimal, and under the child's (and, young enough, a parent's) control.
+
+### Proposed features
+
+**First coaching milestone**
+
+1. **The player starts the link.** The player (or their parent) sends a request by the coach's username, or enters a one-time code from the coach; the coach accepts; **either side can end it at any time**. Adults never reach out to children first.
+2. **A parent or guardian confirms for under-16s**: the player gives a guardian's email, and the link starts only when the guardian clicks a confirmation. (An emailed confirmation is a common "reasonable effort", not proof.) A parent coaching their own child does both steps themselves.
+3. **What a coach sees:** the player's finished online games, their replays and Game Reviews, and their ratings. Not chat, not games in progress, not anything else. Lesson and puzzle progress could be added later, with the player's agreement.
+4. **Coaches are adults:** 18 or over by their birth month, verified email, account at least some days old.
+5. **No messaging.** Linking opens no private chat; coaches talk to students' families outside the site, as on lichess and chess.com.
+6. **A log of coach visits**, visible to the player, their guardian and moderators.
+7. **Moderation:** report a coach, moderators can end links and bar an account from coaching.
+8. **A coach page** listing their students, each student's recent games, and links to the reviews.
+
+**Later**
+
+- **Homework:** assign lessons, puzzle sets or positions, marked done or not done (needs the progress opt-in).
+- **Classes with a join code:** a coach shares a code; players (with guardians, for under-16s) ask to join.
+- **Shared annotated positions and games** (studies), visible to the class.
+- **Coach challenges from a set position or with a handicap** — cheap, and suits Xiangqi teaching.
+- **A teaching board** (coach moves, students watch), over the existing realtime channel; mind the free plan's 200 connections.
+
+**Not for us**
+
+- A paid coach marketplace or payments between users (disputes, liability, adults soliciting children).
+- A public coach directory with rates.
+- Voice or video.
+- Formal verification of coaches' titles or identity (impractical; the site just says "coach", never "vetted").
+- Coaches creating accounts for children without email (lichess's model makes the site the manager of child accounts).
+
+### How many students
+
+| Who | Free | Why |
+| --- | --- | --- |
+| A parent or guardian coaching their own children | **Up to 3** (your suggestion was 2) | Families of three children are common; chess.com's family plan covers 6 accounts. Two would leave a third child out for no saving: a student costs about 100–200 KB of storage a year. |
+| A volunteer or club coach | **Up to 15 students**, one class | Covers a typical club evening. Free class tools elsewhere are generous (lichess classes are free; Google Classroom allows 250 per class); Kahoot's free plan allows 10. |
+| Schools, non-profit clubs, Xiangqi associations | **Free on request**, approved by hand each year | As lichess and the UK's Chess in Schools arrangement with ChessKid do. |
+| A coach teaching more | Paid plan (section 3), once there's demand | Coaches earning from teaching get clear value from bigger classes and reports. |
+
+Students cost almost nothing to keep; the real limit is **classes playing at the same time** (realtime connections), so caps are about separating family and volunteer use from commercial teaching, not about cost.
+
+### Questions for you
+
+1. Guardian confirmation under 16 (matching the site's existing under-16 rule), or only under 13 (COPPA's line)?
+2. Should a coach see the **name of the student's opponent** when that opponent is also under 16 (whose games aren't public)? Proposal: show "an opponent under 16" instead.
+3. A cap on under-16 students per coach before a moderator review (proposal: 15), as a protection against misuse.
+4. 3 free family links, or your 2?
+
+## 2. Donations
+
+### Platforms (fees checked 2026-10-20; the owner's country decides which are available)
+
+| Platform | Fee | One-off / monthly | For a static site | Notes |
+| --- | --- | --- | --- | --- |
+| **GitHub Sponsors** | **0%** for personal accounts ([docs](https://docs.github.com/en/sponsors/getting-started-with-github-sponsors/about-github-sponsors)) | Both | A link, plus a Sponsor button on the repository (`.github/FUNDING.yml`) | Donors need a GitHub account; cards and PayPal; ages 13–17 need a guardian ([terms](https://docs.github.com/en/site-policy/github-terms/github-sponsors-additional-terms)). |
+| **Ko-fi** | **0% on one-off donations**; 5% on memberships unless Ko-fi Gold (fee figures from third parties, [Ruzuku](https://www.ruzuku.com/learn/articles/ko-fi-pricing)) | Both | A button or link | No account needed to give; cards and PayPal. |
+| **Stripe Payment Link** | Stripe's card fees (2.9% + $0.30, +1.5% international, +1% conversion) ([pricing](https://stripe.com/pricing)) | One-off with Alipay/WeChat Pay | A URL | **The only option found with Alipay and WeChat Pay** ([Alipay](https://docs.stripe.com/payments/alipay), [WeChat Pay](https://docs.stripe.com/payments/wechat-pay)), if the owner's country is supported. Stripe restricts donations "for a reward" ([restricted list](https://stripe.com/legal/restricted-businesses)). |
+| Liberapay | 0% + processing | Monthly only | A link | Receivers can't be in China ([global](https://liberapay.com/about/global)). |
+| Open Collective (Open Source Collective) | 10% + processing ([fees](https://docs.oscollective.org/how-it-works/fees)) | Both | A link | The best public ledger, but needs an open-source licence and a GitHub organisation ([criteria](https://docs.oscollective.org/getting-started/acceptance-criteria)); the repository has neither today. |
+| Buy Me a Coffee | 5% + processing | Both | A link | — |
+| Patreon | 10% + processing ([Patreon](https://support.patreon.com/hc/en-us/articles/36426991446797)) | Mostly monthly | A link | Built around perks; 18+ or parental permission. Poor fit. |
+| 爱发电 afdian | about 6% (2022 report, unverified) | Both | A link | WeChat Pay and Alipay only; withdrawals appear to need a mainland identity and bank (unverified). |
+
+### How others do it
+
+**lichess** (a French non-profit): monthly "Patron" support whose only perk is cosmetic wings — "no features are reserved for Patrons" — and a public cost spreadsheet ([patron](https://lichess.org/patron)). **Wikipedia**: many small donations (about 18 million averaging $10 in 2024–25) and yearly public reports ([report](https://meta.wikimedia.org/wiki/Fundraising/2024-25_Report)). No funding model was found for other Xiangqi sites.
+
+### Recommendation
+
+- **Start with Ko-fi** (0% on one-off gifts, no account needed) **or GitHub Sponsors** (0%, a Sponsor button on the repository), plus **a Stripe Payment Link with Alipay and WeChat Pay** for players in China — each only if available in your country.
+- **A "Support us / 支持我们" page**, linked from the footer, Help and the repository, saying: free with no ads, forever; run by one volunteer; gifts are personal and **not tax-deductible** (never say "charity"); what it costs now ($0 a month) and what money would pay for; that **donations never unlock anything in play**; "under 18? please ask a parent first"; refunds on request within 30 days; a link to the spending report.
+- **A spending report** (`docs/costs.md`, updated each quarter, as lichess does): income after fees, each cost, the balance, and what a surplus is kept for.
+- **Perks:** at most an optional, cosmetic supporter badge and an opt-in thanks list — never on children's accounts, never showing amounts.
+- **Never:** pop-ups or prompts in games, lessons or puzzles; anything aimed at children; storing payment details on the site (the platforms hold donor data; the privacy policy names them).
+- **What it would pay for:** today the site costs **$0 a month**. Outgrowing the free plan means Supabase Pro from **$25 a month** ([pricing](https://supabase.com/pricing)) and perhaps a domain (about $11 a year, third-party figure): **about $310–430 a year**.
+
+**Tax (not legal advice):** gifts to an individual are generally taxable income; keep records and check your local rules.
+
+## 3. Paid plans
+
+### What others charge for
+
+- **chess.com:** the free plan limits Game Review (1 a day), puzzles (3 a day) and lessons (1 a day) and shows ads; paid tiers lift those limits ([help](https://support.chess.com/en/articles/8562418-what-does-each-level-of-membership-get-me)); list prices around €50–125 a year (May 2026 deal page, unverified).
+- **ChessKid:** free basic accounts; Gold (about $40–49 a child a year, unverified) unlocks the teaching content; coaches and schools get discounts or licences ([ChessKid](https://www.chesskid.com/learn/articles/how-to-buy-upgrade-and-manage-gold-memberships2)).
+- **lichess:** everything free, including classes ([class](https://lichess.org/class)).
+- **天天象棋:** a ¥24–30 a month privilege subscription; deeper AI analysis with paid "analysis cards" (older guide, [toutiao](https://www.toutiao.com/zixun/7546074533329979418/)).
+- **xiangqi.com:** no paid tier found.
+
+### What we could charge for
+
+| Feature | Charge? | Why |
+| --- | --- | --- |
+| Game Review, engine analysis | **No** | It runs in the player's own browser and costs nothing; free analysis is what earns trust (lichess, xiangqi.com). |
+| Lessons, puzzles, bots, ratings, matchmaking, fair play | **Never** | Learning basics and fairness; any link to payment would be, or look like, pay-to-win. |
+| Ad-free | **No** | There are no ads. Promise "no ads, ever" instead. |
+| "Priority" or "more reliable" service | **No** | Everyone shares one database; there's no faster lane to sell. Better reliability for everyone (Supabase Pro, backups) is what donations pay for. |
+| Coach and club tools beyond the free caps: more students, several classes, homework, progress reports, exports, private club tournaments | **Yes — the one paid product** | Value for people who teach, often for pay, without taking anything from learners (ChessKid's model). |
+| Saved analyses and studies beyond a generous free quota | Maybe, later | A small real storage cost. |
+| Certificates, worksheets | Free for players; club-branded versions in the coach plan | Children are motivated by them. |
+| A supporter badge | Optional thank-you for donors | Cosmetic, as lichess does. |
+
+**Indicative coach plan**, once there's demand: about **$3–5 a month ($30–40 a year)** for up to 50 students with unlimited classes, homework, reports and exports; a **club** level around **$8–10 a month** for up to 200. This sits well under ChessKid's per-child price and near teacher tools at $10–12 a month.
+
+### How payment would work
+
+- **Selling is different from receiving gifts.** Selling digital services to people abroad brings sales taxes (VAT applies from the first sale to EU consumers for sellers outside the EU, [Fonoa](https://www.fonoa.com/resources/blog/the-eu-vat-reform-oss-ioss-and-moss)). A **merchant of record** — Paddle, Lemon Squeezy, or Stripe's Managed Payments (since April 2026, [changelog](https://docs.stripe.com/changelog/dahlia/2026-04-22/managed-payments.md)) — is legally the seller and handles those taxes and refunds, for about 5% + $0.50 a sale (figures partly unverified). It doesn't handle income tax: selling is trading, which may mean declaring business income or registering — check with a local accountant before launching.
+- **Players in China:** Paddle supports Alipay subscriptions; WeChat Pay one-off only ([Paddle](https://developer.paddle.com/changelog/2024/recurring-alipay-subscriptions)); yearly one-off passes suit them best.
+- **On the site:** checkout carries the account's id; the payment provider calls a Supabase server function, which checks the signature and records the plan (plan, seats, valid until) in a table only the server writes; the database enforces seat caps; the page only displays the plan. Cancellations and refunds set the end date; going over a cap after a downgrade makes the coach read-only, never deletes anything.
+- **Children never see prices or buy:** only adult accounts see checkout.
+
+### Recommendation: in stages
+
+1. **Now:** donations only (section 2), with a public pledge: learning, play, ratings, fair play and analysis free forever, no ads.
+2. **Coaching v1, free:** guardian links for up to 3 children and one class of up to 15, with the seat caps checked by the database from the start (set to the free defaults).
+3. **When coaches need more** (for example, ten coaches at their cap, or hosting moves to the paid plan): a coach and club plan through a merchant of record, with yearly passes for Alipay and WeChat Pay.
+4. **Always:** free access for schools and non-profit clubs on request.
+
+**Avoid:** paywalling Game Review or analysis; anything touching ratings, pairing or fair play; selling "priority"; prices shown to children; selling without a merchant of record.
+
+## Not verified
+
+chess.com's and ChessKid's current prices; Ko-fi Gold's price; Buy Me a Coffee's countries and age rule; afdian's fees and rules for recipients outside China; whether mainland China residents can receive GitHub Sponsors payouts or donors there can use PayPal; Tiantian Xiangqi's VIP contents and private-coaching feature; lichess's class cap and coach-listing criteria; Stripe Managed Payments' fee; the domain price.
