@@ -233,6 +233,35 @@ A research memo written from an experienced privacy lawyer's point of view, from
 
 **For a licensed lawyer to confirm:** US — whether a free individual site is "commercial", and whether donations change that; a PO box and virtual phone for the notice; the Supabase and Google terms as written assurances; a link click as email plus. Korea — a one-click link as an "equivalent method". China — whether a foreign individual can appoint a representative; direct collection versus data export; whether bots, puzzles and saved progress make it an online game; the final September 2026 rules; whether the yearly compliance audit applies at this scale. EU/UK — the exemption from appointing an EU representative; combining the two impact assessments. Vietnam — the exact articles and whether a foreign site is in scope. Hong Kong — that nothing requires 18.
 
+### A site hosted in mainland China, run with an agent there (research memo, 2026-10-20)
+
+Asked after the memo above: the owner plans a separate instance of the site hosted in mainland China and operated by an agent there, which would provide the local presence PIPL asks for. A research memo from a PRC internet and data lawyer's point of view, from public sources — **not legal advice**; many points rest on provincial practice and secondary reports, marked for a licensed PRC lawyer.
+
+**What hosting in China brings**
+
+| Area | What applies | Confidence |
+| --- | --- | --- |
+| **Website filing** | A mainland-hosted site must be filed (ICP 备案) through the hosting provider before going live, and with the public security bureau (公安联网备案) within 30 days. An **individual can file a non-commercial site**, but provincial practice limits personal filings to display-type sites: no forums or communities, no social features, **no games**; some provinces also object to registration and login. Online play, public profiles and preset chat would very likely be refused on a personal filing. | Medium |
+| **Who files** | The filer must really be the site's owner and legally responsible person, with face-verified real names; a nominee filing for someone abroad is a known compliance problem. Put the agent's operator role, data control and moderation duties in a written agreement that matches reality. Whether a foreign passport holder can file personally depends on the provider. | Medium |
+| **Money** | A paid plan is a commercial service: a company and a commercial ICP licence. Donations are grey; collecting them on a website needs a WeChat Pay/Alipay merchant account, which needs a business licence (a company or 个体工商户). Only registered charities may fundraise publicly. | Medium–high |
+| **Online play** | Online Xiangqi with matchmaking and ratings is very likely a chess-and-card online game, which needs NPPA publishing approval (版号) through a licensed publisher — **no exemption for free games**, foreign investment in online publishing is prohibited, and approvals are rationed. Then real-name checks through the national anti-addiction system and minors limited to 20:00–21:00 on Fridays, weekends and holidays. **Not feasible for a hobby project.** | Medium–high |
+| **Bots, puzzles, lessons** | Lessons and the analysis board are an information service, not a game. Puzzles are close to exercises (lower risk). Bots are the grey area: playing against the computer may be read as a game. | Low–medium |
+| **Accounts** | Real-name verification by mobile number (SMS, which itself needs a company sender), screening of usernames and avatars, logs kept at least 6 months, a reporting channel. Expect a company filing once there are accounts. | Medium–high |
+| **Personal data** | Full PIPL duties as a domestic processor. **The children's line is under 14**, not 13: a 13-year-old's account needs a guardian's consent too. Children's rules, a named responsible person, separate consent, an impact assessment, a yearly audit. | High |
+| **Data crossing borders** | Not critical infrastructure, so no blanket localisation duty — but **any child's data sent to the US needs a standard contract** (sensitive data has no small-volume exemption), and the owner looking at the China database from abroad counts as a transfer. **Keep China accounts separate, with no sync, and no routine access from abroad.** | High that this is simpler |
+
+**Child profiles in the China instance:** lessons, puzzles and analysis can be offered without being an online game; leave bots out (or limit them) to stay clear of the game rules. The parent's account verified by mobile number; a separate consent screen for the child's data; nickname and birth year only (drop the country); no social features or public profile, which the plan already has; children's rules, a responsible person, an impact assessment and a yearly audit.
+
+**Recommended phases for China**
+
+1. **A learning site** — lessons, puzzles, the analysis board (bots as a stated risk); **no accounts** (progress stays in the browser), no money, nothing identifying sent to the server; filed personally by the agent as the real owner, plus the public security filing. A few hundred yuan a year; 1–4 weeks.
+2. **Accounts** (and child profiles) — mobile-number real names, name screening, a privacy policy and children's rules, an impact assessment, log retention; most likely a company filing (a company owned by the agent, or a 个体工商户): roughly ¥5,000–20,000 a year (estimate).
+3. **Online play** — only through a licensed publisher with an approval, a domestic company and the anti-addiction system: six figures in yuan and 6–24 months with no assurance. **Not for this project**; mainland players who want online play can use licensed Xiangqi platforms, or the worldwide site where it's reachable.
+
+**The agent carries the legal responsibility:** penalties under the Cybersecurity Law (raised from 2026) and PIPL (including personal fines for responsible people), cancellation of the filing, and in extreme cases criminal liability for refusing network-security duties or unlicensed game publishing. This should be clear to them, in writing.
+
+**For a licensed PRC lawyer:** the chosen province's stance on personal filings with registration or bots; whether bots and puzzles need a 版号; a domestic company versus the foreign-investment pilot; the exact article numbers and the final September 2026 minors rules; an acceptable guardian-consent method and audit format; tax on donations; whether a paid coach plan falls under the off-campus training rules; and whether the worldwide (US) site's mainland users still need a PIPL representative.
+
 ## 5. Receiving money: the US, mainland China, or Hong Kong (researched 2026-10-20)
 
 Players are mainly in Asia (mainland China first), with fewer in the USA and elsewhere. What decides the options is **where the owner receives the money**. General information, not tax or legal advice.
