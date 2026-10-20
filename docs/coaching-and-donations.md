@@ -77,7 +77,7 @@ Students cost almost nothing to keep; the real limit is **classes playing at the
 2. **Opponents under 16:** a coach sees "an opponent under 16" in place of that opponent's name.
 3. **Family links:** up to **3** children free.
 4. **Audience:** worldwide, mainly China and the USA — so donations and payments need both card/PayPal and Alipay/WeChat Pay.
-5. Still open: a cap on under-16 students per coach before a moderator review (proposal: 15).
+5. **Under-16 students per coach:** 15; above that, a moderator reviews the coach first.
 
 ## 2. Donations
 
