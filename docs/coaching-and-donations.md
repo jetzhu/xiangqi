@@ -198,6 +198,41 @@ A parent creating the child's account from their own signed-in account is the pa
 
 This makes "a parent coaching their own child" possible at any age, while children under 13 still can't be reached by other adults or play strangers.
 
+### Legal questions (research memo, 2026-10-20)
+
+A research memo written from an experienced privacy lawyer's point of view, from public sources — **not legal advice**. It checked the US rule text (16 CFR 312.2, 312.4, 312.5, 312.8, 312.10 on [LII](https://www.law.cornell.edu/cfr/text/16/312.5)), Korea's Enforcement Decree Art. 17-2, and the September 2026 Chinese draft ([Junhe](https://junhe.com/legal-updates/3159)); other points are from secondary sources and marked for a lawyer.
+
+**Bottom line:** the plan fits US law well; most of the gap is paperwork. Korea is workable with a small change to the consent email. Mainland China is the hard one: the law reaches a foreign site serving mainland users, and one requirement (a representative in China) a foreign individual can't realistically meet — the realistic outcome is blocking, not fines. EU and UK email consent is acceptable for data this low-risk. Hong Kong doesn't require 18 by law.
+
+| Question | Conclusion | Confidence |
+| --- | --- | --- |
+| **US:** is "email plus" enough when only the parent sees the profile? | Yes. Email plus is still a listed method when nothing is disclosed (312.5(b)(2)); a parent viewing their own child's data is the parent's right of review, not a disclosure (312.2); Supabase and Gmail are service providers for internal operations, not third parties. A second coach **would** be a disclosure: then a stronger consent method and separate consent to disclosure (312.5(a)(2)). | High |
+| **US:** what else does the 2025 rule require? | A written security programme with a named coordinator and a yearly review (312.8), with written assurances from processors; a written, published retention policy with deletion timeframes (312.10); a direct notice to the parent with the listed items, including the right to revoke (312.4(c)); a children's section in the privacy policy with **the operator's name, address, phone and email** (312.4(d)). | High |
+| **US:** does COPPA even apply to a free hobby site? | Arguably not ("operated for commercial purposes"), but the FTC reads that broadly and donations or paid plans weaken the argument: comply as if it applies. Realistic enforcement risk for a small, ad-free, non-disclosing site that does the above: very low. | Low–medium |
+| **Korea** (under 14) | The decree's email method is the parent **replying by email** with their consent; a one-click link is most defensibly "an equivalent method". Ask Korean parents to reply "동의" (or record an explicit statement of consent), and keep the record. No local representative needed at this scale. | Medium |
+| **Mainland China** | The law applies (PIPL Art. 3(2)). It requires a representative in China (Art. 53, no small-site exemption), standalone children's rules with a named responsible person (2019 CAC Art. 8), separate consent for sensitive data, and a written impact assessment kept 3 years (Arts. 29, 55–56). Lessons, puzzles and bots might be seen as a single-player online game; **online play would clearly be one**, bringing real-name checks and time limits a foreign individual can't meet. The September 2026 draft (minor mode for under-16s) isn't in force; watch for the final text. | Medium on the law, low on the game question |
+| **EU/UK** | Email consent is "reasonable efforts" for low-risk data (EDPB consent guidelines). The UK Children's Code needs a data protection impact assessment, private defaults and a child-friendly explanation that the parent can see their progress. | High |
+| **Hong Kong** | No minimum age in law: the 18 copied from chess.com is a policy choice; 13, as elsewhere, is defensible. | Medium–high |
+| **Vietnam** | The 2025 data law (in force 2026-01-01) generally needs a parent's consent, and for some data the child's own consent from age 7 too. | Medium |
+
+**Changes to the plan before building:**
+
+1. A short written **security programme** (coordinator: the owner; yearly risk review; safeguards such as row-level security, two-factor sign-in on admin accounts, encrypted backups; a yearly test).
+2. A published **retention policy**: child profiles deleted after a set time without use; consent records kept a set number of years as proof; unconfirmed profiles deleted after 7–14 days.
+3. File the **Supabase and Google terms** as the processors' written assurances.
+4. A **notice-to-parent email** covering every item in 312.4(c)(1), including the right to revoke.
+5. A **children's section in the privacy policy** with an operator contact block — **a postal address and phone number become public**, so decide on a PO box or virtual address and a virtual phone number (a lawyer should confirm these are acceptable).
+6. The parent **re-enters their password** to create a profile and to confirm consent, so a child can't do it.
+7. A child profile never appears publicly or on leaderboards.
+8. A stronger consent method before any second coach or online play for children.
+9. **Korea:** the Korean consent email asks for a reply or an explicit recorded statement of consent.
+10. **China:** standalone Chinese children's rules naming the owner as the responsible person; a separate tick-box consent for children's (sensitive) data explaining why it's needed; a written impact assessment, updated yearly; no game-like elements in child profiles (no rankings, no time rewards); no online play or chat for under-18 mainland users. Either accept the gap on the representative in China, or **don't offer child profiles to mainland users** until a Chinese lawyer has advised.
+11. **EU/UK:** one short impact assessment (it can double as China's); a child-friendly line in the profile saying the parent can see their progress; private defaults.
+12. **Vietnam:** a simple "do you agree?" screen for the child aged 7 or over, alongside the parent's consent.
+13. Optionally, lower Hong Kong's minimum age from 18 to the general 13.
+
+**For a licensed lawyer to confirm:** US — whether a free individual site is "commercial", and whether donations change that; a PO box and virtual phone for the notice; the Supabase and Google terms as written assurances; a link click as email plus. Korea — a one-click link as an "equivalent method". China — whether a foreign individual can appoint a representative; direct collection versus data export; whether bots, puzzles and saved progress make it an online game; the final September 2026 rules; whether the yearly compliance audit applies at this scale. EU/UK — the exemption from appointing an EU representative; combining the two impact assessments. Vietnam — the exact articles and whether a foreign site is in scope. Hong Kong — that nothing requires 18.
+
 ## 5. Receiving money: the US, mainland China, or Hong Kong (researched 2026-10-20)
 
 Players are mainly in Asia (mainland China first), with fewer in the USA and elsewhere. What decides the options is **where the owner receives the money**. General information, not tax or legal advice.
