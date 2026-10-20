@@ -152,6 +152,75 @@ Players are worldwide, mainly in **China and the USA** (decided 2026-10-20). Whi
 
 **Avoid:** paywalling Game Review or analysis; anything touching ratings, pairing or fair play; selling "priority"; prices shown to children; selling without a merchant of record.
 
+## 4. Younger children (researched 2026-10-20)
+
+The question: could a parent lower the age line further, for example so a parent can coach their 7-year-old? Today **accounts start at 13** (higher in some countries: 14 Italy and Korea, 15 France and Japan, 16 Germany, Spain, the Netherlands and Poland, 18 Hong Kong and India), and younger visitors use the site as guests, with their progress only in their own browser. Letting a parent lower the coach line below 13 therefore means letting children under 13 have accounts, which is where the strictest rules apply. General information, not legal advice.
+
+### What the rules require for under-13s
+
+- **USA (COPPA, amended rule in force 2025-06-23, compliance by 2026-04-22):** asking for a birth month and admitting a child under 13 is "actual knowledge", so COPPA applies to that account even on a foreign site ([FTC FAQ](https://www.ftc.gov/business-guidance/resources/complying-coppa-frequently-asked-questions)). Game records and an account id are personal information. **Verifiable parental consent** must come first, by a signed form, a card transaction, a call, an ID check, knowledge-based questions or a face match ([16 CFR 312.5](https://www.law.cornell.edu/cfr/text/16/312.5)); the cheap **"email plus"** method is allowed only if the child's data is never disclosed to anyone — and a coach seeing the games is arguably a disclosure. Also required: a direct notice to parents naming who gets the data, parents' rights to review and delete, a published retention policy and a written security programme ([Federal Register](https://www.federalregister.gov/documents/2025/04/22/2025-05904/childrens-online-privacy-protection-rule)). The FTC does fine small operators (for example $60,000 for LAI Systems, [FTC](https://www.ftc.gov/node/44784)).
+- **Mainland China:** a child's personal information is "sensitive" under 14 and needs a guardian's consent and its own processing rules ([PIPL Art. 28 and 31](https://digichina.stanford.edu/work/translation-personal-information-protection-law-of-the-peoples-republic-of-china-effective-nov-1-2021/); [CAC 2019 provisions](https://www.cac.gov.cn/2019-08/23/c_1124913903.htm)), and PIPL reaches operators abroad who serve people in China. The 2024 Regulations on the Protection of Minors Online require minor mode and real-identity checks for online games ([State Council](https://www.gov.cn/zhengce/content/202310/content_6911288.htm)); a 2026 draft would extend minor mode to under-16s ([Xinhua](https://www.news.cn/politics/20260918/3e78d1511b7649eba6f2f6d20c9e1219/c.html), not yet in force). Online Xiangqi with ratings looks like a chess-and-card online game, which in China needs a licence a foreign hobby site can't get; the realistic risk is being blocked rather than pursued (judgement, not verified). China's real-name systems aren't available to a foreign operator.
+- **Elsewhere:** EU GDPR, parental consent below 13–16 by country with "reasonable efforts" to verify ([GDPR](https://eur-lex.europa.eu/eli/reg/2016/679/oj)); UK 13, plus the Children's Code for anyone under 18 ([ICO](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/childrens-information/childrens-code-guidance-and-resources/)); South Korea, a legal representative's confirmed consent below 14 ([PIPA Art. 22-2](https://prighter.com/resources/laws/korean-pipa/main/articles/article-22-2)); Singapore, a parent's consent below 13 (2024 guidelines, [CMS](https://cms.law/en/sgp/legal-updates/singapore-personal-data-regulator-issues-guidelines-for-processing-children-s-personal-data)); Japan, a guardian's consent expected for younger children; Hong Kong and Taiwan, no fixed age (unverified); Vietnam, both parent and child consent from age 7 (unverified).
+- **Sign-in services:** GitHub requires 13+, and Google accounts follow the country minimum, so children under the minimum couldn't use those sign-ins anyway.
+
+### How others do it
+
+chess.com sends under-age children to ChessKid ([support](https://support.chess.com/en/articles/16208488-how-does-chess-com-help-keep-children-safe)); ChessKid and Khan Academy let a parent create the child's account from their own adult account, with no child email ([ChessKid](https://support.chesskid.com/en/articles/8871815-how-to-add-a-kid-to-my-adult-account), [Khan](https://support.khanacademy.org/hc/en-us/articles/202262974)); lichess requires 15 (or the local age), or a parent's authorisation, with kid mode ([terms](https://lichess.org/terms-of-service)); Tiantian Xiangqi uses Tencent's real-name and anti-addiction system (an hour a day and no play at night for 12 and under, [ithome](https://www.ithome.com/0/408/044.htm)).
+
+### The risks of a parent-lowered line
+
+- **Consent can be faked:** a child can type a parent's email and click the link. Email confirmation isn't valid consent for under-13s when a coach sees the games.
+- **Safeguarding:** a "coach" who isn't the parent gets an ongoing view of a young child's activity, and contact can move off the site. We can't vet coaches.
+- **Liability:** the site is run by an individual, with no company in between, and COPPA penalties are per violation.
+
+### Options
+
+| | Option | Legal risk | Effort |
+| --- | --- | --- | --- |
+| 1 | Parents may lower the coach-confirmation line **only within 13–15** (players who can already have accounts) | Low | Low |
+| 2 | Under-13s stay guests; a parent follows their progress **on the child's own device** (nothing uploaded) | Low | Low–medium |
+| 3 | **Child profiles managed under the parent's account** (ChessKid/Khan style): a nickname only, no email or birth date, no online play, visible to the parent alone; a stronger consent method, a notice to parents, review and delete, a retention policy, China's children's rules | Medium | High |
+| 4 | Full under-13 accounts with online play | High | Very high |
+
+**Recommendation:** option 1 now, which is the decision already taken (guardian confirmation under 16, a parent may lower it to 13), plus option 2 for younger children. That covers a parent coaching their own 13–15 year old without new under-13 data. If families with 7–12 year olds ask for more, build option 3 limited to **the parent as the only coach**, and only after a lawyer has looked at it. Questions for a lawyer: whether a parent-chosen coach is a COPPA "disclosure"; whether a parent creating a child profile counts as consent under COPPA, PIPL and Korea's PIPA; whether a free Xiangqi site is an "online game" in China and an offshore operator's exposure under PIPL; whether the 18 line for Hong Kong is needed.
+
+## 5. Receiving money: the US, mainland China, or Hong Kong (researched 2026-10-20)
+
+Players are mainly in Asia (mainland China first), with fewer in the USA and elsewhere. What decides the options is **where the owner receives the money**. General information, not tax or legal advice.
+
+### As a US resident
+
+- **Stripe** opens for an individual as a sole proprietor with a Social Security number, no company needed ([Stripe](https://support.stripe.com/questions/signing-up-for-stripe-as-a-sole-proprietor-without-employer-id-number)); tips and donations on your own site are allowed (it restricts charity fundraising and bans donations to individuals only in Japan, [restricted list](https://stripe.com/legal/restricted-businesses)).
+- **Chinese donors can pay a US Stripe account with Alipay and WeChat Pay** (one-off; Payment Links supported), priced in yuan and settled in US dollars, for 2.9% + 30¢ plus 1% for conversion ([Alipay](https://docs.stripe.com/payments/alipay), [WeChat Pay](https://docs.stripe.com/payments/wechat-pay), [fees](https://stripe.com/pricing/local-payment-methods)). No chargebacks; refunds within 90 and 180 days.
+- **GitHub Sponsors** pays out in the US (0% fee), and **Ko-fi** pays into your own Stripe or PayPal.
+- **Paddle bans donations** (it needs a real product, [AUP](https://paddle.com/support/aup)), so it's only for a later subscription; there it handles sales tax and VAT and supports Alipay subscriptions in yuan.
+- **Tax:** the 1099-K reporting line is back to over $20,000 and over 200 payments (2025 law), but every dollar is still income; donations from a site's own users are generally income rather than gifts (confirm with an accountant); selling means Schedule C. US state sales tax on a $3–5 subscription is very unlikely outside the owner's home state; a merchant of record removes the question.
+
+### As a mainland China resident
+
+- **Personal WeChat/Alipay payment codes** on a website are risky: since 2022 the central bank requires business-like collection to use merchant codes ([36kr](https://www.36kr.com/p/1501333111470979)); a full merchant account needs a business licence (个体工商户 or a company).
+- **爱发电 (afdian)** is a compliant route for mainland donors: creators keep 94% ([FAQ](https://guide.afdian.com/faq/faq-for-creators)); its real-name withdrawal rules weren't confirmed.
+- **No Stripe, GitHub Sponsors or Ko-fi payouts** to the mainland. **PayPal** works for international donors: withdraw in US dollars to a mainland bank for $35 each time ([PayPal](https://www.paypal.com/c2/webapps/mpp/paypal-fees)). Whether Paddle pays mainland banks is undocumented.
+- Personal foreign-exchange conversion is capped at US$50,000 a year (not a concern at this scale); income is taxed as 劳务报酬 (3–45%) and foreign income must be declared in the annual return. Charging users could look like a commercial internet service, which nominally needs a commercial licence; enforcement against foreign-hosted hobby sites is unclear.
+
+### Through Hong Kong
+
+**Stripe Hong Kong** supports Alipay, WeChat Pay and cards, reportedly with cheaper wallet fees (about 2.2% + HK$2, unconfirmed), and GitHub Sponsors pays out there — but it needs a Hong Kong identity card and a business registration certificate for a sole proprietor, or a Hong Kong company (yearly costs of a few thousand US dollars, unverified). Hong Kong taxes only Hong Kong-sourced profits.
+
+### Both yuan and dollars
+
+Yes. **Stripe's Adaptive Pricing** is on for Payment Links: it shows prices in the visitor's currency (including mainland China, Hong Kong, Taiwan, Singapore and Malaysia) by location, which also unlocks Alipay and WeChat Pay; the customer pays a 2–4% conversion fee and the account settles in its own currency ([Stripe](https://docs.stripe.com/payments/currencies/localize-prices/adaptive-pricing.md?payment-ui=stripe-hosted)). So **one Stripe account shows ¥ to players in China and $ to others**. For donations, the Support page can offer amounts in both (¥10 / ¥30 / ¥68 and $2 / $5 / $10). For subscriptions, Alipay and WeChat Pay recurring payments are still limited on Stripe, so yearly one-off passes are the simple answer; Paddle supports Alipay renewals.
+
+### Recommendation by where the owner receives money
+
+| | Donations now | A coach plan later | Avoid |
+| --- | --- | --- | --- |
+| **US resident** (simplest) | A Stripe Payment Link (pay what you want) with Alipay, WeChat Pay and cards, showing ¥ or $ automatically; plus GitHub Sponsors or Ko-fi | Paddle (handles taxes, Alipay renewals), or Stripe with yearly passes for wallet payers | Paddle for donations |
+| **Mainland China resident** | 爱发电 for mainland donors; PayPal for international donors (withdraw in batches) | A 个体工商户 licence with a WeChat Pay/Alipay merchant account, or Paddle if it pays mainland banks | Personal payment codes on the site; Stripe, GitHub Sponsors and Ko-fi (no payouts) |
+| **Hong Kong** (identity card or company) | Stripe Hong Kong with wallets and cards; GitHub Sponsors | Stripe Hong Kong, or Paddle | A Hong Kong company just for donations |
+
+Questions for an accountant: whether donations are income or gifts and how to report them; sales tax for a subscription (or simply use Paddle); for a mainland resident, declaring foreign income and whether charging triggers business registration or a commercial internet licence; for Hong Kong, the business registration and where profits are sourced.
+
 ## Not verified
 
-chess.com's and ChessKid's current prices; Ko-fi Gold's price; Buy Me a Coffee's countries and age rule; afdian's fees and rules for recipients outside China; whether mainland China residents can receive GitHub Sponsors payouts or donors there can use PayPal; Tiantian Xiangqi's VIP contents and private-coaching feature; lichess's class cap and coach-listing criteria; Stripe Managed Payments' fee; the domain price.
+Sections 4 and 5 mark their own unverified points. From sections 1–3: chess.com's and ChessKid's current prices; Ko-fi Gold's price; Buy Me a Coffee's countries and age rule; afdian's fees and rules for recipients outside China; whether mainland China residents can receive GitHub Sponsors payouts or donors there can use PayPal; Tiantian Xiangqi's VIP contents and private-coaching feature; lichess's class cap and coach-listing criteria; Stripe Managed Payments' fee; the domain price.
