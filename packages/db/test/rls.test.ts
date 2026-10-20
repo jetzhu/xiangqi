@@ -914,11 +914,12 @@ describe("quick pairing (M17)", () => {
         [user, opp, JSON.stringify(labels), endedAgo],
       );
     for (let i = 0; i < 4; i++) await game(S, R, {}, "2 days");
-    expect(await run(S, `public.my_sportsmanship()`)).toMatchObject({ completion: null, warning: false, wait_until: null, pool: false });
+    // Counted from the first game, from a clean record worth 5 finished games.
+    expect(await run(S, `public.my_sportsmanship()`)).toMatchObject({ completion: 100, warning: false, wait_until: null, pool: false });
     await game(S, R, { red: ["abandoned"] });
-    expect(await run(S, `public.my_sportsmanship()`)).toMatchObject({ completion: 80, warning: true, last30: { games: 5, abandoned: 1 } });
+    expect(await run(S, `public.my_sportsmanship()`)).toMatchObject({ completion: 90, warning: true, last30: { games: 5, abandoned: 1 } });
     expect(await errorOf(S, `public.seek(300, 3, '{}', false)`)).toMatch(/sportsmanship/);
-    expect(await as(null, async (tx) => (await tx.query<{ j: unknown }>(`select public.public_profile('shi_xq') as j`)).rows[0]!.j)).toMatchObject({ completion: 80 });
+    expect(await as(null, async (tx) => (await tx.query<{ j: unknown }>(`select public.public_profile('shi_xq') as j`)).rows[0]!.j)).toMatchObject({ completion: 90 });
     await run(S, `public.acknowledge_sportsmanship()`);
     expect(await run(S, `public.my_sportsmanship()`)).toMatchObject({ warning: false, wait_until: null, pool: false });
     await seek(S);
@@ -932,6 +933,38 @@ describe("quick pairing (M17)", () => {
     await db.query(`update public.profiles set sport_warned_at = sport_warned_at - interval '20 minutes' where user_id = $1`, [S]);
     await db.query(`update public.games set ended_at = ended_at - interval '20 minutes' where red = $1 and labels ? 'red'`, [S]);
     expect(await run(S, `public.my_sportsmanship()`)).toMatchObject({ wait_until: null, pool: true });
+  });
+
+  it("catches a throwaway account's aborts from its first games, and lets moderators excuse a mark or reset the record", async () => {
+    const T = "00000000-0000-4000-8000-0000000000d9";
+    await signUp(T, { username: "throw_xq" });
+    const MODU = "00000000-0000-4000-8000-0000000000da";
+    await signUp(MODU, { username: "sportmod_xq" });
+    await db.query(`insert into public.moderators (user_id) values ($1)`, [MODU]);
+    const aborted = async () =>
+      (
+        await db.query<{ id: string }>(
+          `insert into public.games (red, black, base, inc, speed, rated, relay, status, result, reason, labels, started_at, ended_at)
+           values ($1, $2, 300, 3, 'blitz', true, false, 'over', 'none', 'aborted', '{"red": ["aborted"]}', now() - interval '1 hour', now() - interval '1 hour') returning id`,
+          [T, R],
+        )
+      ).rows[0]!.id;
+    const completion = async () => (await db.query<{ c: number }>(`select public.completion_of($1) as c`, [T])).rows[0]!.c;
+    expect(await completion()).toBeNull();
+    const first = await aborted();
+    await aborted();
+    await aborted();
+    expect(await completion()).toBe(63); // (0 + 5) / (3 + 5): a 90 % filter leaves it out at once
+    // Excusing one mark (logged), then resetting the record.
+    expect(await failsAs(T, `select public.mod_excuse_label('${first}', 'throw_xq', 'aborted', 'x')`)).toMatch(/moderators only/);
+    await run(MODU, `public.mod_excuse_label($1, 'throw_xq', 'aborted', 'site fault in that game')`, [first]);
+    expect(await completion()).toBe(75); // (1 + 5) / (3 + 5)
+    expect(await failsAs(MODU, `select public.mod_excuse_label('${first}', 'throw_xq', 'aborted', 'again')`)).toMatch(/no such mark/);
+    await run(MODU, `public.mod_reset_sportsmanship('throw_xq', 'test games')`);
+    expect(await completion()).toBeNull();
+    expect(await run(MODU, `public.mod_log_recent()`)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ action: "excuse-mark", target: "throw_xq" }), expect.objectContaining({ action: "reset-sportsmanship", target: "throw_xq" })]),
+    );
   });
 
   it("gives Red to whoever had Black more often", async () => {
@@ -1117,7 +1150,7 @@ describe("reports and moderation (M19)", () => {
     expect(await run(Y, `public.reporter_record($1)`, [Y]).catch((e: Error) => e.message)).toMatch(/permission denied/);
     expect((await db.query<{ j: { weight: number } }>(`select public.reporter_record($1) as j`, [Y])).rows[0]!.j).toMatchObject({ made: 1, upheld: 1, weight: 0.67 });
     // The log has it, and can't be changed.
-    expect(await run(MOD, `public.mod_log_recent()`)).toMatchObject([{ action: "confirm", target: "xia_xq", moderator: "mod_xq" }]);
+    expect((await run<{ action: string }[]>(MOD, `public.mod_log_recent()`))[0]).toMatchObject({ action: "confirm", target: "xia_xq", moderator: "mod_xq" });
     expect(await errorOfQuery(`update public.mod_log set action = 'dismiss'`)).toMatch(/append-only/);
     expect(await errorOfQuery(`delete from public.mod_log`)).toMatch(/append-only/);
   });

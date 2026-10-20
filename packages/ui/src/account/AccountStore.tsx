@@ -10,7 +10,7 @@ import { StoreProvider, browserKV, createStore, defaultStore } from "../store/in
 import type { ImportSummary } from "../store/import.js";
 import { idbKV } from "../store/kv.js";
 import { type AccountSync, type SyncedSettings, accountSync } from "../store/sync.js";
-import { type Account, useAccount } from "./session.js";
+import { type Account, DELETING, useAccount } from "./session.js";
 
 /** The account whose data this browser caches, so it can be cleared after signing out. */
 const CACHE_USER = "xq:account-cache:v1";
@@ -147,8 +147,13 @@ export function AccountStoreProvider({ children }: { children: ReactNode }) {
       const before = changes();
       const pulled = await sync.pull();
       if (!live || !pulled) return;
-      // Signed in during the 10 days: the deletion is off (as on chess.com).
-      if (pulled.deletionPending) {
+      // Signed in during the 10 days: the deletion is off (as on chess.com). Not while this tab is
+      // asking for the deletion: its password check signs in too.
+      let deleting = false;
+      try {
+        deleting = sessionStorage.getItem(DELETING) === "1";
+      } catch {}
+      if (pulled.deletionPending && !deleting) {
         const { data } = await (await account.client()).rpc("cancel_account_deletion");
         if (live && data === true) {
           setDeletionCancelled(true);

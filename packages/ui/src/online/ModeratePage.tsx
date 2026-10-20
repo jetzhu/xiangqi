@@ -4,7 +4,7 @@
 // against same-rating baselines, each checked game's accuracy, engine match, timing and focus,
 // the reports with their reporters' records, sanctions and appeals, and the log. Games still
 // unchecked can be analysed in the moderator's own browser, which settles them.
-import { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import { type FormEvent, Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { useAccount } from "../account/session.js";
 import { useNav } from "../nav.js";
 import { PHRASES, type Phrase } from "@xq/online";
@@ -19,7 +19,9 @@ import {
   modCase,
   modConfirm,
   modDismiss,
+  modExcuseLabel,
   modInconclusive,
+  modResetSportsmanship,
   modLogRecent,
   modQueue,
   type TriageAgreement,
@@ -69,6 +71,7 @@ function Queue() {
   return (
     <>
       <h1>{tt("Review queue", "审核队列")}</h1>
+      <FindPlayer />
       {cases === null ? (
         <p className="muted">…</p>
       ) : cases.length === 0 ? (
@@ -282,7 +285,26 @@ function Case({ username }: { username: string }) {
               <td>
                 {g.speed} {g.base / 60}+{g.inc} · {g.color} {tt("vs", "对")} {g.opponent ?? "–"} · {g.result === g.color ? tt("won", "胜") : g.result === "draw" ? tt("draw", "和") : g.result === "none" ? "–" : tt("lost", "负")} ({g.reason}) ·{" "}
                 {g.plies} {tt("plies", "步")} · {tt("rated", "赛前")} {g.rating_before ?? "–"}
-                {g.labels.length > 0 && ` · ${g.labels.join(", ")}`}
+                {g.labels.map((l) => (
+                  <span key={l} className="mod-label">
+                    {" · "}
+                    {l}
+                    {l !== "slow-start" && (
+                      <>
+                        {" "}
+                        <button
+                          type="button"
+                          className="link small"
+                          disabled={!note.trim()}
+                          title={note.trim() ? "" : tt("Write the reason in the note box first", "请先在下方填写理由")}
+                          onClick={() => void act(async () => modExcuseLabel(await sb(), g.id, c.username, l, note), tt("Mark excused.", "已撤销该标记。"))}
+                        >
+                          {tt("Excuse", "撤销")}
+                        </button>
+                      </>
+                    )}
+                  </span>
+                ))}
                 {g.chat && <GameChat chat={g.chat} me={g.color} />}
               </td>
               <td>
@@ -391,6 +413,13 @@ function Case({ username }: { username: string }) {
           onClick={() => void act(async () => modBarReporter(await sb(), c.username, !c.report_barred, note), tt("Saved.", "已保存。"))}
         >
           {c.report_barred ? tt("Allow reporting again", "恢复举报权限") : tt("Bar from reporting", "禁止举报")}
+        </button>{" "}
+        <button
+          type="button"
+          disabled={!note.trim()}
+          onClick={() => void act(async () => modResetSportsmanship(await sb(), c.username, note), tt("Sportsmanship record reset: only games from now count.", "棋品记录已重置：只计算此后的对局。"))}
+        >
+          {tt("Reset sportsmanship record", "重置棋品记录")}
         </button>
       </p>
       {message && <p role="status">{message}</p>}
@@ -450,5 +479,24 @@ function TriageLine({ t }: { t: TriageVerdict }) {
     <li className={`triage-${t.verdict}`}>
       <strong>{who}</strong>: {verdict} ({Number(t.confidence).toFixed(2)}) · <span className="muted">{t.rule}</span> · {t.reason}
     </li>
+  );
+}
+
+/** Opens any player's case by username, not only those in the queue. */
+function FindPlayer() {
+  const { tt } = useT();
+  const nav = useNav();
+  const [name, setName] = useState("");
+  const go = (e: FormEvent) => {
+    e.preventDefault();
+    if (name.trim()) location.assign(nav.href(`/moderate?u=${encodeURIComponent(name.trim())}`));
+  };
+  return (
+    <form className="find-player" onSubmit={go}>
+      <label>
+        {tt("Open a player's case", "查看棋手案件")} <input value={name} onChange={(e) => setName(e.target.value)} placeholder={tt("username", "用户名")} />
+      </label>{" "}
+      <button type="submit">{tt("Open", "打开")}</button>
+    </form>
   );
 }

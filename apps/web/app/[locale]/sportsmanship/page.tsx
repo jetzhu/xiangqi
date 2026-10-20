@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { type Locale, pageMetadata } from "../../../lib/site";
 
 // The sportsmanship policy for online games (v0.3; docs/v0.3-online-design.md, "Sportsmanship").
-const UPDATED = "2026-10-16";
+const UPDATED = "2026-10-19";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   return pageMetadata("sportsmanship", (await params).locale as Locale);
@@ -19,8 +19,9 @@ function En() {
       <p className="muted">Last updated {UPDATED}</p>
       <p>
         A game is two people's time. Finishing it, win or lose, is part of playing fair. Your <strong>completion rate</strong> (棋品) is the share of your
-        online games in the last 90 days that you played to a result. It's on your profile, and other players may choose to play only people above a
-        certain rate. Only your own actions change it.
+        online games in the last 90 days that you played to a result. It counts from your first game, and everyone starts with a clean record worth 5
+        finished games, so a single mishap early on doesn't count for much. It's on your profile, and other players may choose to play only people
+        above a certain rate. Only your own actions change it. If a mark came from a fault on our side, write to us and a moderator will remove it.
       </p>
 
       <h2>What lowers it</h2>
@@ -56,7 +57,7 @@ function Zh() {
       <h1>棋品规则</h1>
       <p className="muted">更新于 {UPDATED}</p>
       <p>
-        一盘棋占用的是两个人的时间。无论输赢都下完，是公平对弈的一部分。你的<strong>棋品（完成率）</strong>是最近 90 天内你下到出结果的在线对局所占的比例。它显示在资料页上，其他棋手可以选择只与达到一定比例的棋手对局。只有你自己的行为会影响它。
+        一盘棋占用的是两个人的时间。无论输赢都下完，是公平对弈的一部分。你的<strong>棋品（完成率）</strong>是最近 90 天内你下到出结果的在线对局所占的比例。它从你的第一盘棋开始计算，每个人起步时都相当于已经完整下完 5 盘，因此早期的一次意外影响不大。它显示在资料页上，其他棋手可以选择只与达到一定比例的棋手对局。只有你自己的行为会影响它。如果某个标记是我们这边的故障造成的，请联系我们，管理员会将其删除。
       </p>
 
       <h2>哪些行为会降低棋品</h2>

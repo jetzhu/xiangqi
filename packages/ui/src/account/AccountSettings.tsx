@@ -9,10 +9,11 @@ import { useT } from "../settings.js";
 import { Field, FormError, MIN_PASSWORD, authErrorText, callbackUrl, rememberNext } from "./AuthPages.js";
 import { LinkedSignIns } from "./LinkedSignIns.js";
 import { download, exportAccount } from "./exportData.js";
-import { PROVIDERS, type Provider, useAccount } from "./session.js";
+import { DELETING, PROVIDERS, type Provider, useAccount } from "./session.js";
 
 /** Where the deletion date waits for the signed-out page to show it. */
 export const DELETION_NOTICE = "xq:deletion-scheduled";
+
 
 export function AccountSettings() {
   const account = useAccount();
@@ -202,6 +203,9 @@ function DeleteSection({ hasPassword, provider }: { hasPassword: boolean; provid
     setBusy(true);
     setError(null);
     try {
+      sessionStorage.setItem(DELETING, "1");
+    } catch {}
+    try {
       const sb = await account.client();
       if (hasPassword) {
         // Proves who it is, and makes the sign-in fresh, as the database asks.
@@ -220,6 +224,10 @@ function DeleteSection({ hasPassword, provider }: { hasPassword: boolean; provid
       // Signed out everywhere: signing in again within the 10 days cancels the deletion.
       await account.signOut("global");
     } finally {
+      // Signed out now (or the request failed): a later sign-in cancels the deletion as it should.
+      try {
+        sessionStorage.removeItem(DELETING);
+      } catch {}
       setBusy(false);
     }
   };

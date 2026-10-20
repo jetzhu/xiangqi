@@ -96,11 +96,17 @@ async function player(page: Page, w: World, who: { id: string; username: string;
               { source: "rules", verdict: "valid", confidence: 0.9, rule: "standing-likely", reason: "Fair-play standing at this speed is \"likely\".", at: "2026-10-18T09:00:00Z" },
               { source: "ai:claude-code", verdict: "valid", confidence: 0.75, rule: "sonnet", reason: "Accuracy far above the rating band in 12 games.", at: "2026-10-18T10:00:00Z" },
             ] }],
-          games: [{ id: GAME, speed: "blitz", base: 300, inc: 3, color: "black", opponent: "alice_xq", result: "black", reason: "resign", plies: 60, ended_at: "2026-10-18T09:00:00Z", rating_before: 1140, status: "checked", labels: [], moves: null,
+          games: [{ id: GAME, speed: "blitz", base: 300, inc: 3, color: "black", opponent: "alice_xq", result: "black", reason: "resign", plies: 60, ended_at: "2026-10-18T09:00:00Z", rating_before: 1140, status: "checked", labels: ["aborted"], moves: null,
             chat: { red: [{ ply: 30, by: "black", phrase: "oops" }], black: [{ ply: 30, by: "black", phrase: "oops" }, { ply: 31, by: "black", phrase: "oops" }] },
             check: { moves: 22, acc: 97.5, match: 0.82, z: 3.9, flags: ["even-times"], timing: { cv: 0.18, fast: 0.05, focus: 0, hard_ratio: 1.02 } } }],
           log: [], review: { outcome: "inconclusive", at: "2026-10-10T00:00:00Z", note: "too few games" },
         });
+      case "/rest/v1/rpc/mod_excuse_label":
+        w.calls.push(`excuse:${body!.p_username}:${body!.p_label}:${body!.p_note}`);
+        return json(route, null);
+      case "/rest/v1/rpc/mod_reset_sportsmanship":
+        w.calls.push(`reset:${body!.p_username}:${body!.p_note}`);
+        return json(route, null);
       case "/rest/v1/rpc/mod_dismiss":
       case "/rest/v1/rpc/mod_inconclusive":
       case "/rest/v1/rpc/mod_confirm":
@@ -325,6 +331,11 @@ test("the review page is for moderators: the queue, a case, and a decision", asy
   await alice.goto(at("/en/moderate/"));
   await expect(alice.getByRole("heading", { name: "Review queue" })).toBeVisible();
   await expect(alice.getByText("Returning: not conclusive", { exact: false })).toBeVisible();
+  // Any player's case can be opened by name.
+  await alice.getByLabel("Open a player's case").fill("bob_xq");
+  await alice.getByRole("button", { name: "Open", exact: true }).click();
+  await expect(alice).toHaveURL(/\/en\/moderate\/\?u=bob_xq/);
+  await alice.goto(at("/en/moderate/"));
   await expect(alice.getByText("1 likely valid · 0 likely invalid · 1 inconclusive")).toBeVisible();
   await expect(alice.getByRole("row", { name: "rules stalling 19/20 (95 %) 18/18 (100 %)" })).toBeVisible();
   await alice.getByRole("link", { name: "bob_xq" }).click();
@@ -336,6 +347,15 @@ test("the review page is for moderators: the queue, a case, and a decision", asy
   // The chat as each browser recorded it: here they differ, which is itself evidence.
   await alice.getByText("Chat (2) · the two records differ").click();
   await expect(alice.getByText("Player's browser")).toBeVisible();
+  // A sportsmanship mark can be excused, and the record reset, each with a reason.
+  await expect(alice.getByRole("button", { name: "Excuse" })).toBeDisabled();
+  await alice.getByLabel("Reason and evidence (kept in the log)").fill("test game");
+  await alice.getByRole("button", { name: "Excuse" }).click();
+  await expect(alice.getByText("Mark excused.")).toBeVisible();
+  await alice.getByLabel("Reason and evidence (kept in the log)").fill("test games");
+  await alice.getByRole("button", { name: "Reset sportsmanship record" }).click();
+  await expect(alice.getByText("Sportsmanship record reset: only games from now count.")).toBeVisible();
+  expect(w.calls).toEqual(expect.arrayContaining(["excuse:bob_xq:aborted:test game", "reset:bob_xq:test games"]));
   await alice.getByLabel("Reason and evidence (kept in the log)").fill("still only 12 games");
   await alice.getByRole("button", { name: "Not conclusive" }).click();
   await expect(alice.getByText("Kept open: back in the queue with new evidence.")).toBeVisible();

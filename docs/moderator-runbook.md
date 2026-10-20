@@ -136,6 +136,20 @@ For persistent false reporting, open the reporter's own case (`/en/moderate/?u=<
 
 Limits players can't exceed: a report only by a player of that game, within 7 days, once per game, 5 a day.
 
+## Sportsmanship corrections
+
+Sportsmanship (棋品) is automatic: each game's marks (left, stalled, aborted, slow start) come from the server's clock, and the completion rate, warnings and pairing waits follow. The completion rate counts from a player's first game, from a clean record worth 5 finished games: (finished + 5) ÷ (games + 5) over the last 90 days. Two corrections, both on the case page and both logged with your note:
+
+- **Excuse** next to a mark on one of the player's games removes that mark (a fault on our side, a test game). The rate and any penalty follow at once.
+- **Reset sportsmanship record** makes only games from now count, and clears any pending warning (test accounts, or after a run of site problems).
+
+Open any player's case with **Open a player's case** on the queue page. For developers, the same functions from the command line, acting as a moderator account so the action is logged under that moderator:
+
+```
+node packages/db/scripts/sql.mjs --write "begin; select set_config('request.jwt.claim.sub', (select user_id::text from public.profiles where username = 'jetzhu'), true); select public.mod_reset_sportsmanship('name', 'why'); commit;"
+node packages/db/scripts/sql.mjs --write "begin; select set_config('request.jwt.claim.sub', (select user_id::text from public.profiles where username = 'jetzhu'), true); select public.mod_excuse_label('<game id>', 'name', 'aborted', 'why'); commit;"
+```
+
 ## The AI adviser
 
 The adviser reads open reports the rules couldn't settle and gives its own verdict beside the rules'. It never acts. Setup is in `packages/triage` ([triage.config.example.json](../packages/triage/triage.config.example.json)); the default is Claude Code on the operator's own subscription, with all tools off.

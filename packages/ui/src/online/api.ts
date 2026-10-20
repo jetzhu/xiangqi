@@ -347,6 +347,12 @@ export const modAppeal = (sb: SupabaseClient, sanction: number, state: "pending"
   rpc<null>(sb, "mod_appeal", { p_sanction: sanction, p_state: state, p_note: note });
 export const modBarReporter = (sb: SupabaseClient, username: string, barred: boolean, note: string) =>
   rpc<null>(sb, "mod_bar_reporter", { p_username: username, p_barred: barred, p_note: note });
+/** Removes one sportsmanship mark from a player's side of a game (logged). */
+export const modExcuseLabel = (sb: SupabaseClient, game: string, username: string, label: string, note: string) =>
+  rpc<null>(sb, "mod_excuse_label", { p_game: game, p_username: username, p_label: label, p_note: note });
+/** Starts a player's sportsmanship record afresh (logged). */
+export const modResetSportsmanship = (sb: SupabaseClient, username: string, note: string) =>
+  rpc<null>(sb, "mod_reset_sportsmanship", { p_username: username, p_note: note });
 export const triageAgreement = (sb: SupabaseClient) => rpc<TriageAgreement[]>(sb, "triage_agreement");
 export const modLogRecent = (sb: SupabaseClient) =>
   rpc<{ at: string; action: string; details: { note?: string }; moderator: string | null; target: string | null }[]>(sb, "mod_log_recent", { p_limit: 50 });

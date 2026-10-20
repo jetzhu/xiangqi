@@ -111,8 +111,16 @@ export function AccountProvider({ config, children }: { config: AccountConfig | 
     return clientRef.current;
   }, [config]);
 
+  /**
+   * Counts state changes. A load reads the session and then the profile over the network; if a
+   * sign-out (or a newer load) happened meanwhile, its result is stale and isn't applied, or a
+   * sign-in event that was still loading could make a signed-out tab look signed in again.
+   */
+  const generation = useRef(0);
+
   const load = useCallback(async (): Promise<AccountState> => {
     if (!config) return { status: "off" };
+    const mine = ++generation.current;
     const sb = await client();
     const { data } = await sb.auth.getSession();
     const user = data.session?.user;
@@ -136,7 +144,7 @@ export function AccountProvider({ config, children }: { config: AccountConfig | 
         },
       };
     }
-    setState(next);
+    if (mine === generation.current) setState(next);
     return next;
   }, [config, client]);
 
@@ -167,7 +175,10 @@ export function AccountProvider({ config, children }: { config: AccountConfig | 
       if (!live) return;
       // Sign-in or sign-out in another tab, or a session that could not be refreshed.
       const { data } = sb.auth.onAuthStateChange((event) => {
-        if (event === "SIGNED_OUT") setState({ status: "guest" });
+        if (event === "SIGNED_OUT") {
+          generation.current++;
+          setState({ status: "guest" });
+        }
         else if (event === "SIGNED_IN" || event === "USER_UPDATED") void load();
       });
       unsubscribe = () => data.subscription.unsubscribe();
@@ -192,6 +203,7 @@ export function AccountProvider({ config, children }: { config: AccountConfig | 
     const { error } = await sb.auth.signOut({ scope });
     // Ending the other sessions failed (offline): this device is still signed out.
     if (error && scope === "global") await sb.auth.signOut({ scope: "local" });
+    generation.current++;
     setState({ status: "guest" });
   }, [client]);
 
@@ -202,3 +214,10 @@ export function AccountProvider({ config, children }: { config: AccountConfig | 
 }
 
 export const useAccount = () => useContext(AccountContext);
+
+/**
+ * Set (in sessionStorage) while this tab asks for its account's deletion. The password check
+ * signs in afresh, and a sign-in normally cancels a pending deletion (AccountStore): without
+ * this mark, that could cancel the very deletion being asked for.
+ */
+export const DELETING = "xq:deleting";
