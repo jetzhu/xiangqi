@@ -184,6 +184,20 @@ chess.com sends under-age children to ChessKid ([support](https://support.chess.
 
 **Recommendation:** option 1 now, which is the decision already taken (guardian confirmation under 16, a parent may lower it to 13), plus option 2 for younger children. That covers a parent coaching their own 13–15 year old without new under-13 data. If families with 7–12 year olds ask for more, build option 3 limited to **the parent as the only coach**, and only after a lawyer has looked at it. Questions for a lawyer: whether a parent-chosen coach is a COPPA "disclosure"; whether a parent creating a child profile counts as consent under COPPA, PIPL and Korea's PIPA; whether a free Xiangqi site is an "online game" in China and an offshore operator's exposure under PIPL; whether the 18 line for Hong Kong is needed.
 
+### Plan for children under 13: profiles under a parent's account (agreed 2026-10-20)
+
+A parent creating the child's account from their own signed-in account is the pattern ChessKid and Khan Academy use. The parent being signed in doesn't by itself count as the consent the rules ask for, and the rules still apply to the child's data once it exists; this plan keeps that data small and visible only to the parent, so the lighter consent methods stay available. A legal review is under way (section 4, "Legal questions" below); build only after it.
+
+1. **The parent creates the profile** in Settings: a nickname, the birth year (only to know when the child turns 13), the country. No child email, no password of their own, no Google/GitHub/Microsoft sign-in (all require 13+). The child uses the site on a device where the parent is signed in, switching to their profile, optionally with a PIN.
+2. **Consent:** a clear notice to the parent first (what's kept, why, for how long, where, who sees it, the parent's rights), then "email plus" confirmation: the parent confirms by email, followed by a second confirmation email later.
+3. **What the child can do:** lessons, puzzles, bots and analysis, with progress saved to the profile. **No online play, no public profile, no chat.**
+4. **Coaching: the parent is the coach** — no further consent, since the parent isn't a third party. A second coach, or online play later, requires a stronger verifiable consent first (for example a small refundable card charge).
+5. **The parent's controls:** see everything, export, delete the profile at once, withdraw consent.
+6. **At 13:** the parent can turn the profile into the child's own account, keeping its history.
+7. **Policy pages:** a children's section in the privacy policy (what, why, how long, where — US servers — the parent's rights, the person responsible), and a Chinese version of the children's rules for mainland families.
+
+This makes "a parent coaching their own child" possible at any age, while children under 13 still can't be reached by other adults or play strangers.
+
 ## 5. Receiving money: the US, mainland China, or Hong Kong (researched 2026-10-20)
 
 Players are mainly in Asia (mainland China first), with fewer in the USA and elsewhere. What decides the options is **where the owner receives the money**. General information, not tax or legal advice.
