@@ -4,7 +4,7 @@
 import { BOTS, LESSON_ORDER } from "@xq/content";
 import { learningRank } from "@xq/lessons";
 import { PROVISIONAL_RD } from "@xq/puzzles";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Avatar } from "../bots/Avatar.js";
 import { type BotRating, NEW_BOT_RATING } from "../bots/rating.js";
 import type { Progress } from "../learn/progress.js";
@@ -17,8 +17,14 @@ import { useAccount } from "../account/session.js";
 import { usePuzzles } from "../puzzles/data.js";
 import { THEME_NAMES } from "../puzzles/themes.js";
 import { type GameFilter, NO_FILTER, type Tally, filterGames, pct, puzzlePeak, puzzleThemes, since, summarize } from "./summary.js";
+import { type OnlineGameRow, SPEEDS, type Speed, type SpeedStats, myGames, myOnlineStats } from "../online/api.js";
+import { OnlineGameList, fmtDay, useGamePages, useReasonText } from "../online/history.js";
+import { SPEED_NAME } from "../online/PlayerPage.js";
+import { formatTimeControl } from "@xq/online";
 
 type Tab = "overview" | "games";
+/** Which games the Games tab lists. */
+type Source = "all" | "bots" | "online";
 type Period = "90" | "all";
 
 const botById = (id: string) => BOTS.find((b) => b.id === id);
@@ -36,7 +42,15 @@ export function StatsPage() {
   const [progress, setProgress] = useState<Progress>({});
   const [streak, setStreak] = useState<Streak>({ days: 0, today: false, missed: 0 });
   const [filter, setFilter] = useState<GameFilter>(NO_FILTER);
-  const signedIn = useAccount().state.status === "signedIn";
+  const account = useAccount();
+  const signedIn = account.state.status === "signedIn";
+  const [source, setSource] = useState<Source>("all");
+  const [online, setOnline] = useState<Partial<Record<Speed, SpeedStats>> | null>(null);
+  useEffect(() => {
+    if (signedIn) void account.client().then(myOnlineStats).then(setOnline, () => setOnline({}));
+  }, [signedIn, account]);
+  const loadOnline = useCallback(async (before: string | null) => (signedIn ? myGames(await account.client(), before) : []), [signedIn, account]);
+  const onlinePages = useGamePages(loadOnline);
   const allPuzzles = usePuzzles();
 
   useEffect(() => {
@@ -79,7 +93,7 @@ export function StatsPage() {
         {(
           [
             ["overview", tt("Overview", "概览")],
-            ["games", tt(`Games (${summary.all.games})`, `对局（${summary.all.games}）`)],
+            ["games", tt("Games", "对局")],
           ] as [Tab, string][]
         ).map(([k, label]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "active" : ""} onClick={() => go(k)}>
@@ -125,6 +139,8 @@ export function StatsPage() {
               <span className="muted small">{streak.today ? tt("today counts", "今天已完成") : tt("not yet today", "今天尚未完成")}</span>
             </div>
           </section>
+
+          {signedIn && online && Object.keys(online).length > 0 && <OnlineSection stats={online} from={from} />}
 
           <section aria-labelledby="h-charts">
             <div className="stats-head">
@@ -213,7 +229,32 @@ export function StatsPage() {
           )}
         </>
       ) : (
-        <GameList games={games} filter={filter} onFilter={setFilter} />
+        <>
+          <div className="segmented" role="radiogroup" aria-label={tt("Games to list", "列出的对局")}>
+            {(
+              [
+                ["all", tt("All", "全部")],
+                ["bots", tt("Bots", "人机")],
+                ["online", tt("Online", "在线")],
+              ] as [Source, string][]
+            ).map(([k, label]) => (
+              <button key={k} type="button" role="radio" aria-checked={source === k} className={source === k ? "selected" : ""} onClick={() => setSource(k)}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {source === "bots" ? (
+            <GameList games={games} filter={filter} onFilter={setFilter} />
+          ) : source === "online" ? (
+            signedIn ? (
+              <OnlineGameList pages={onlinePages} empty={tt("No online games yet.", "还没有在线对局。")} />
+            ) : (
+              <p className="muted">{tt("Online games are kept with your account. Log in to see them.", "在线对局保存在账号中，登录后即可查看。")}</p>
+            )
+          ) : (
+            <AllGames bots={games} online={Array.isArray(onlinePages.rows) ? onlinePages.rows : []} more={signedIn && Array.isArray(onlinePages.rows) && !onlinePages.done ? onlinePages.more : null} />
+          )}
+        </>
       )}
     </div>
   );
@@ -384,5 +425,160 @@ function GameList({ games, filter, onFilter }: { games: GameRecord[]; filter: Ga
         </table>
       )}
     </section>
+  );
+}
+
+/** Online ratings, rating charts and results per speed (signed in). */
+function OnlineSection({ stats, from }: { stats: Partial<Record<Speed, SpeedStats>>; from: string | null }) {
+  const { tt, t } = useT();
+  const speeds = SPEEDS.filter((s) => stats[s]);
+  return (
+    <>
+      <section className="stat-cards" aria-label={tt("Online ratings", "在线等级分")}>
+        {speeds.map((s) => {
+          const x = stats[s]!;
+          const peak = x.history.reduce<number | null>((m, h) => (m === null || h.rating > m ? h.rating : m), null);
+          return (
+            <div key={s} className="stat-card">
+              <span className="muted">{tt(`${t(SPEED_NAME[s])} rating`, `${t(SPEED_NAME[s])}等级分`)}</span>
+              <strong>
+                {x.rating ?? "–"}
+                {x.rd !== null && x.rd > 110 && <span title={tt("Provisional: play more rated games", "暂定：再下几盘计分对局")}>?</span>}
+              </strong>
+              <span className="muted small">
+                {x.rated_games ?? 0} {tt("rated games", "盘计分对局")}
+                {peak !== null && ` · ${tt("peak", "最高")} ${peak}`}
+              </span>
+            </div>
+          );
+        })}
+      </section>
+      <section aria-labelledby="h-online">
+        <h2 id="h-online">{tt("Online", "在线对弈")}</h2>
+        <div className="charts">
+          {speeds.map((s) => (
+            <RatingChart key={s} title={tt(`${t(SPEED_NAME[s])} rating`, `${t(SPEED_NAME[s])}等级分`)} points={since(stats[s]!.history, from)} empty={tt("No rated games yet.", "还没有计分对局。")} />
+          ))}
+        </div>
+        <table className="results">
+          <thead>
+            <tr>
+              <th />
+              <th>{tt("Games", "局数")}</th>
+              <th>{tt("Won", "胜")}</th>
+              <th>{tt("Drawn", "和")}</th>
+              <th>{tt("Lost", "负")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {speeds.flatMap((s) =>
+              (["red", "black"] as const).map((c) => {
+                const r = stats[s]!.results[c];
+                return (
+                  <TallyRow
+                    key={`${s}/${c}`}
+                    label={`${t(SPEED_NAME[s])} · ${c === "red" ? tt("as Red", "执红") : tt("as Black", "执黑")}`}
+                    t={{ games: r.games, wins: r.wins, draws: r.draws, losses: r.losses }}
+                  />
+                );
+              }),
+            )}
+          </tbody>
+        </table>
+      </section>
+    </>
+  );
+}
+
+/** Bot and online games together, newest first. */
+function AllGames({ bots, online, more }: { bots: GameRecord[]; online: OnlineGameRow[]; more: (() => void) | null }) {
+  const { tt, t, lang } = useT();
+  const nav = useNav();
+  const reason = useReasonText();
+  type Row = { key: string; at: string; who: React.ReactNode; kind: string; result: string; detail: string; delta: number | null; rated: boolean; href: string; link: string };
+  const rows: Row[] = [
+    ...bots
+      .filter((g) => g.result !== null)
+      .map((g): Row => {
+        const bot = botById(g.botId);
+        return {
+          key: g.id,
+          at: g.endedAt ?? g.startedAt,
+          who: (
+            <>
+              {bot && <Avatar bot={bot} size={20} />} {bot ? t(bot.name) : g.botId}
+            </>
+          ),
+          kind: tt("Bot", "人机"),
+          result: g.result!,
+          detail: reason(g.reason),
+          delta: g.rated && g.ratingAfter !== null && g.ratingBefore !== null ? g.ratingAfter - g.ratingBefore : null,
+          rated: g.rated,
+          href: nav.href(`/analysis?moves=${g.moves.join(",")}`),
+          link: tt("Review", "复盘"),
+        };
+      }),
+    ...online.map(
+      (g): Row => ({
+        key: g.id,
+        at: g.ended_at,
+        who: g.opponent ?? tt("deleted account", "已删除的账号"),
+        kind: `${formatTimeControl(g)} ${t(SPEED_NAME[g.speed])}`,
+        result: g.result,
+        detail: reason(g.reason),
+        delta: g.rated && g.rating_after !== null && g.rating_before !== null ? g.rating_after - g.rating_before : null,
+        rated: g.rated,
+        href: nav.href(`/game?id=${g.id}`),
+        link: tt("Open", "打开"),
+      }),
+    ),
+  ].sort((a, b) => b.at.localeCompare(a.at));
+  if (rows.length === 0)
+    return (
+      <p className="muted">
+        {tt("No games yet.", "还没有对局。")} <a href={nav.href("/bots")}>{tt("Play a bot", "去下一盘")}</a> · <a href={nav.href("/online")}>{tt("Play online", "在线对弈")}</a>
+      </p>
+    );
+  return (
+    <>
+      <table className="game-list">
+        <thead>
+          <tr>
+            <th>{tt("Date", "日期")}</th>
+            <th>{tt("Opponent", "对手")}</th>
+            <th>{tt("Game", "对局")}</th>
+            <th>{tt("Result", "结果")}</th>
+            <th>{tt("Rating", "等级分")}</th>
+            <th>
+              <span className="sr-only">{tt("Open", "打开")}</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key} className={`r-${r.result}`}>
+              <td>{fmtDay(r.at, lang)}</td>
+              <td className="opponent">{r.who}</td>
+              <td className="small">{r.kind}</td>
+              <td>
+                <strong>{r.result === "win" ? tt("Won", "胜") : r.result === "draw" ? tt("Drawn", "和") : r.result === "loss" ? tt("Lost", "负") : "–"}</strong>{" "}
+                <span className="muted small">{r.detail}</span>
+              </td>
+              <td>{r.rated ? r.delta === null ? "–" : <span className={r.delta >= 0 ? "up" : "down"}>{r.delta >= 0 ? `+${r.delta}` : r.delta}</span> : <span className="muted small">{tt("casual", "休闲")}</span>}</td>
+              <td>
+                <a href={r.href}>{r.link}</a>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {more && (
+        <p>
+          <button type="button" onClick={more}>
+            {tt("Show more online games", "显示更多在线对局")}
+          </button>
+        </p>
+      )}
+    </>
   );
 }

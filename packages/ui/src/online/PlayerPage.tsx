@@ -2,13 +2,14 @@
 // A player's public profile (M15): what any visitor may see, at /player?u=<username>. The
 // player's own private page stays at /profile.
 import { PROVISIONAL_RD } from "@xq/puzzles";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { UserAvatar } from "../account/UserAvatar.js";
 import { flagOf } from "../account/avatar.js";
 import { useAccount } from "../account/session.js";
 import { useNav } from "../nav.js";
 import { useT } from "../settings.js";
-import { type PublicProfile, SPEEDS, type Speed, publicProfile, setBlocked } from "./api.js";
+import { type PublicProfile, SPEEDS, type Speed, playerGames, publicProfile, setBlocked } from "./api.js";
+import { OnlineGameList, useGamePages } from "./history.js";
 
 export const SPEED_NAME: Record<Speed, { en: string; zh: string }> = {
   lightning: { en: "Lightning", zh: "闪电" },
@@ -125,6 +126,8 @@ export function PlayerPage() {
         </p>
       </section>
 
+      {!profile.minimal && <PlayerGames username={profile.username} />}
+
       {signedIn && !profile.me && (
         <section>
           <button type="button" disabled={busy} onClick={() => void toggleBlock()}>
@@ -138,5 +141,20 @@ export function PlayerPage() {
         </section>
       )}
     </div>
+  );
+}
+
+/** The player's online games, newest first (not for minimal profiles). */
+function PlayerGames({ username }: { username: string }) {
+  const { tt } = useT();
+  const account = useAccount();
+  const load = useCallback(async (before: string | null) => playerGames(await account.client(), username, before), [account, username]);
+  const pages = useGamePages(load);
+  if (pages.rows === "hidden") return null;
+  return (
+    <section aria-labelledby="h-games">
+      <h2 id="h-games">{tt("Games", "对局")}</h2>
+      <OnlineGameList pages={pages} empty={tt("No online games yet.", "还没有在线对局。")} />
+    </section>
   );
 }

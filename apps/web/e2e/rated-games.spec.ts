@@ -53,13 +53,15 @@ test("the stats page shows the rated game, the rating and the history", async ({
   await expect(card).toContainText(/7\d\d\?/);
   await expect(card).toContainText("1 rated games");
   await expect(page.locator(".results")).toContainText("Little Soldier");
-  await page.getByRole("tab", { name: "Games (1)" }).click();
+  await page.getByRole("tab", { name: "Games" }).click();
   await expect(page).toHaveURL(/tab=games/);
   const row = page.locator(".game-list tbody tr");
   await expect(row).toHaveCount(1);
   await expect(row).toContainText("Lost");
   await expect(row).toContainText("resigned");
   await expect(row.getByRole("link", { name: "Review" })).toHaveAttribute("href", /analysis\/\?moves=h2e2,/);
+  // The bot list has its own filters.
+  await page.getByRole("radio", { name: "Bots" }).click();
   await page.getByLabel("Type").selectOption("casual");
   await expect(page.getByText("No games match these filters.")).toBeVisible();
 });

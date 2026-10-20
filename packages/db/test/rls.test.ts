@@ -1317,6 +1317,63 @@ describe("report triage, phase 1", () => {
   });
 });
 
+describe("game history (after M20)", () => {
+  const [HA, HB, HK] = ["e2", "e3", "e4"].map((x) => `00000000-0000-4000-8000-0000000000${x}`) as [string, string, string];
+  const run = <T>(user: string | null, sql: string, params: unknown[] = []) =>
+    db.transaction(async (tx) => {
+      await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [user ?? ""]);
+      await tx.exec(`set local role ${user ? "authenticated" : "anon"}`);
+      return (await tx.query<{ j: T }>(`select ${sql} as j`, params)).rows[0]!.j;
+    });
+  let adults = "";
+  let withChild = "";
+
+  beforeAll(async () => {
+    await signUp(HA, { username: "hist_a" });
+    await signUp(HB, { username: "hist_b" });
+    await signUp(HK, { username: "hist_kid" });
+    await db.query(`update public.profiles set birth_month = '1990-01-01' where user_id in ($1, $2)`, [HA, HB]);
+    await db.query(`update public.profiles set birth_month = date_trunc('month', now() - interval '12 years') where user_id = $1`, [HK]);
+    const game = async (red: string, black: string, result: string, ago: string, rated = true) =>
+      (
+        await db.query<{ id: string }>(
+          `insert into public.games (red, black, base, inc, speed, rated, relay, status, result, reason, moves, red_rating_before, red_rating_after, black_rating_before, black_rating_after, started_at, ended_at)
+           values ($1, $2, 300, 3, 'blitz', $5, false, 'over', $3, 'resign', array['h2e2', 'h9g7'], 1200, 1210, 1200, 1190, now() - $4::interval, now() - $4::interval) returning id`,
+          [red, black, result, ago, rated],
+        )
+      ).rows[0]!.id;
+    adults = await game(HA, HB, "red", "2 hours");
+    withChild = await game(HK, HA, "black", "1 hour");
+    await game(HB, HA, "draw", "3 hours", false);
+  });
+
+  it("lists a player's own games, newest first and paged, from their side", async () => {
+    const all = await run<{ id: string; color: string; result: string; opponent: string; rating_after: number }[]>(HA, `public.my_games()`);
+    expect(all.map((g) => [g.opponent, g.color, g.result])).toEqual([["hist_kid", "black", "win"], ["hist_b", "red", "win"], ["hist_b", "black", "draw"]]);
+    const page2 = await run<{ id: string }[]>(HA, `public.my_games($1, 1)`, [new Date(Date.now() - 90 * 60_000).toISOString()]);
+    expect(page2.map((g) => g.id)).toEqual([adults]);
+    expect(await run(null, `public.my_games()`).catch((e: Error) => e.message)).toMatch(/permission denied/);
+  });
+
+  it("shows anyone a player's games, but never a game with a player under 16, nor a child's list", async () => {
+    const theirs = await run<{ id: string }[]>(null, `public.player_games('HIST_A')`);
+    expect(theirs.map((g) => g.id)).not.toContain(withChild);
+    expect(theirs.map((g) => g.id)).toContain(adults);
+    expect(await run(null, `public.player_games('hist_kid')`)).toBeNull();
+    // A finished game opens to anyone, unless a child played in it; its players can always open it.
+    expect(await run<{ me: string | null }>(null, `public.game_info($1)`, [adults])).toMatchObject({ me: null, status: "over" });
+    expect(await run(null, `public.game_info($1)`, [withChild])).toBeNull();
+    expect(await run(HB, `public.game_info($1)`, [withChild])).toBeNull();
+    expect(await run<{ me: string }>(HK, `public.game_info($1)`, [withChild])).toMatchObject({ me: "red" });
+  });
+
+  it("summarises a player's online results and rating history per speed", async () => {
+    const s = await run<{ blitz: { history: { rating: number }[]; results: { red: { wins: number }; black: { wins: number; draws: number } } } }>(HA, `public.my_online_stats()`);
+    expect(s.blitz.history.map((h) => h.rating)).toEqual([1210, 1190]);
+    expect(s.blitz.results).toMatchObject({ red: { games: 1, wins: 1 }, black: { games: 2, wins: 1, draws: 1 } });
+  });
+});
+
 /** Runs a query as the database owner and returns its one value. */
 const q2 = <T>(sql: string, params: unknown[] = []) => db.query<{ j: T }>(`select ${sql} as j`, params).then((r) => r.rows[0]!.j);
 

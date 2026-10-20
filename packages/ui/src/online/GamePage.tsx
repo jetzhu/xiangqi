@@ -41,7 +41,8 @@ export function GamePage() {
 
   useEffect(() => {
     if (account.state.status === "loading") return;
-    if (account.state.status !== "signedIn" || !id) return setInfo(null);
+    // Finished games are public (unless a player in them is under 16), so no sign-in is needed.
+    if (!id) return setInfo(null);
     void account
       .client()
       .then((sb) => gameInfo(sb, id))
@@ -54,16 +55,22 @@ export function GamePage() {
     return (
       <div className="online-page">
         <h1>{tt("Game not found", "找不到该对局")}</h1>
-        <p className="muted">{account.state.status === "signedIn" ? tt("Only the two players can open a game.", "只有对局双方可以打开对局。") : tt("Log in to see your games.", "登录后查看你的对局。")}</p>
+        <p className="muted">
+          {tt(
+            "A game in progress, or one with a player under 16, opens only for its two players.",
+            "进行中的对局，或有 16 岁以下棋手参与的对局，只有对局双方可以打开。",
+          )}
+          {account.state.status !== "signedIn" && <> {tt("Log in to see your own games.", "登录后查看你自己的对局。")}</>}
+        </p>
       </div>
     );
   }
-  return info.status === "over" ? <FinishedGame info={info} /> : <LiveGame info={info} />;
+  return info.status === "over" || info.me === null ? <FinishedGame info={info} /> : <LiveGame info={{ ...info, me: info.me }} />;
 }
 
 // The live game -------------------------------------------------------------------------------
 
-function LiveGame({ info }: { info: GameInfo }) {
+function LiveGame({ info }: { info: GameInfo & { me: "red" | "black" } }) {
   const { tt, t, lang } = useT();
   const nav = useNav();
   const account = useAccount();
@@ -489,13 +496,37 @@ function ResultPanel({ info, result, verdict, settling, moves }: { info: GameInf
   const { tt, t } = useT();
   const nav = useNav();
   const me = info.me;
-  const title = result.winner === null ? (result.reason === "aborted" || result.reason === "no-result" ? t(resultText(result)) : tt("Draw", "和棋")) : result.winner === me ? tt("You won!", "你赢了！") : tt("You lost", "你输了");
-  const mine = verdict?.ratings?.[me] ?? null;
+  const title =
+    result.winner === null
+      ? result.reason === "aborted" || result.reason === "no-result"
+        ? t(resultText(result))
+        : tt("Draw", "和棋")
+      : me === null
+        ? result.winner === "red"
+          ? tt(`${info.red.username ?? "Red"} won`, `${info.red.username ?? "红方"}胜`)
+          : tt(`${info.black.username ?? "Black"} won`, `${info.black.username ?? "黑方"}胜`)
+        : result.winner === me
+          ? tt("You won!", "你赢了！")
+          : tt("You lost", "你输了");
+  const mine = me ? (verdict?.ratings?.[me] ?? null) : null;
+  const change = (c: "red" | "black") => {
+    const b = c === "red" ? info.red_rating_before : info.black_rating_before;
+    const a = c === "red" ? info.red_rating_after : info.black_rating_after;
+    return b !== null && a !== null ? `${info[c].username ?? c} ${b} → ${a} (${a >= b ? "+" : ""}${a - b})` : null;
+  };
   return (
     <section className="gameover" aria-label="Game over">
       <h2>{title}</h2>
       <p className="muted">{t(resultText(result))}</p>
-      {mine ? (
+      {me === null ? (
+        info.rated && change("red") ? (
+          <p className="rating-line">
+            {change("red")} · {change("black")}
+          </p>
+        ) : (
+          <p className="rating-line">{info.rated ? tt("Not rated: too short, or no result.", "不计分：对局太短或无结果。") : tt("Casual game.", "休闲对局。")}</p>
+        )
+      ) : mine ? (
         <p className="rating-line">
           {t(SPEED_NAME[info.speed])} {mine.before} → <strong>{mine.after}</strong>{" "}
           <span className={mine.after >= mine.before ? "up" : "down"}>({mine.after >= mine.before ? `+${mine.after - mine.before}` : mine.after - mine.before})</span>
@@ -510,11 +541,11 @@ function ResultPanel({ info, result, verdict, settling, moves }: { info: GameInf
           {tt("Analyse", "分析棋局")}
         </a>
       </div>
-      {verdict && <ReportGame game={info.id} endedAt={info.ended_at} />}
+      {verdict && me && <ReportGame game={info.id} endedAt={info.ended_at} />}
       {/* Once the server has the result, so a rated game's analysis can be sent for the fair-play check. */}
       {(verdict || !settling) && (
         <Suspense fallback={null}>
-          <GameReviewPanel id={info.id} me={me} moves={moves} rated={!!verdict?.rated} />
+          <GameReviewPanel id={info.id} me={me} moves={moves} rated={!!me && !!verdict?.rated} />
         </Suspense>
       )}
     </section>
@@ -549,9 +580,12 @@ function MoveList({ history }: { history: readonly MoveRecord[] }) {
 
 // A finished game ----------------------------------------------------------------------------
 
+/** A finished game, for its players or (a public game) anyone: the board, result, review and moves. */
 function FinishedGame({ info }: { info: GameInfo }) {
   const { tt } = useT();
-  const orientation = useOrientation(info.me);
+  // A viewer who didn't play sees it from Red's side.
+  const side = info.me ?? "red";
+  const orientation = useOrientation(side);
   const game = useMemo(() => {
     const g = new Game();
     for (const m of info.moves) g.move(m);
@@ -561,16 +595,16 @@ function FinishedGame({ info }: { info: GameInfo }) {
     winner: info.result === "red" || info.result === "black" ? info.result : null,
     reason: (info.reason ?? "no-result") as OnlineResult["reason"],
   };
-  const before = info.me === "red" ? info.red_rating_before : info.black_rating_before;
-  const after = info.me === "red" ? info.red_rating_after : info.black_rating_after;
-  const verdict: GameVerdict = { status: "over", result, rated: before !== null, ratings: { red: null, black: null, ...(before !== null && after !== null ? { [info.me]: { before, after } } : {}) } };
-  const opp = info.me === "red" ? "black" : "red";
+  const before = side === "red" ? info.red_rating_before : info.black_rating_before;
+  const after = side === "red" ? info.red_rating_after : info.black_rating_after;
+  const verdict: GameVerdict = { status: "over", result, rated: before !== null, ratings: { red: null, black: null, ...(before !== null && after !== null ? { [side]: { before, after } } : {}) } };
+  const opp = side === "red" ? "black" : "red";
   return (
     <div className="botgame online-game">
       <div className="board-col">
         <PlayerBar player={info[opp]} color={opp} game={null} conn={null} chat={null} />
         <Board fen={game.fen} orientation={orientation} movable="none" lastMove={game.history.at(-1)?.iccs ?? null} />
-        <PlayerBar player={info[info.me]} color={info.me} game={null} conn={null} chat={null} />
+        <PlayerBar player={info[side]} color={side} game={null} conn={null} chat={null} />
       </div>
       <aside className="panel">
         <div className="status over" role="status">

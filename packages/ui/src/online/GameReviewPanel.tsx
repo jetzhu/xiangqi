@@ -31,7 +31,8 @@ const sent = (): string[] => {
   }
 };
 
-export default function GameReviewPanel({ id, me, moves, rated }: { id: string; me: "red" | "black"; moves: readonly string[]; rated: boolean }) {
+/** `me`: the viewer's side, or null for someone who didn't play (both sides' accuracy, no grades). */
+export default function GameReviewPanel({ id, me, moves, rated }: { id: string; me: "red" | "black" | null; moves: readonly string[]; rated: boolean }) {
   const { tt } = useT();
   const account = useAccount();
   const { engine, status } = useEngineInstance(moves.length > 0);
@@ -61,7 +62,7 @@ export default function GameReviewPanel({ id, me, moves, rated }: { id: string; 
   // Sent once both the analysis and the server's word that the game was rated are in (either may come first).
   useEffect(() => {
     const key = `${id}:${me}`;
-    if (!evals || !rated || sent().includes(key)) return;
+    if (!evals || !rated || !me || sent().includes(key)) return;
     const data: AnalysisData = { v: 1, depth: FAIRPLAY_DEPTH, positions: evals.map((p) => ({ b: p.best, s: p.scores.map(encodeScore) })) };
     let live = true;
     void (async () => {
@@ -95,15 +96,17 @@ export default function GameReviewPanel({ id, me, moves, rated }: { id: string; 
     );
   }
   const review = reviewFromEvals(fens, [...moves], evals, { isBook: (i) => isBookMove(moves, i) });
-  const mine = accuracy(review, me === "red");
-  const theirs = accuracy(review, me !== "red");
-  const counts = gradeCounts(review, me === "red");
+  const mine = accuracy(review, (me ?? "red") === "red");
+  const theirs = accuracy(review, (me ?? "red") !== "red");
+  const counts = gradeCounts(review, (me ?? "red") === "red");
   return (
     <section className="game-review" aria-label={tt("Game Review", "复盘")}>
       <h3>{tt("Game Review", "复盘")}</h3>
       <p>
-        {tt("Accuracy", "准确度")}: <strong>{mine === null ? "–" : Math.round(mine)}</strong> {tt("you", "你")} · {theirs === null ? "–" : Math.round(theirs)} {tt("opponent", "对手")}
+        {tt("Accuracy", "准确度")}: <strong>{mine === null ? "–" : Math.round(mine)}</strong> {me ? tt("you", "你") : tt("Red", "红方")} · {theirs === null ? "–" : Math.round(theirs)}{" "}
+        {me ? tt("opponent", "对手") : tt("Black", "黑方")}
       </p>
+      {me && (
       <ul className="grade-counts">
         {GRADES.map((g) => (
           <li key={g.grade} className={`grade-${g.grade}`}>
@@ -111,6 +114,7 @@ export default function GameReviewPanel({ id, me, moves, rated }: { id: string; 
           </li>
         ))}
       </ul>
+      )}
     </section>
   );
 }

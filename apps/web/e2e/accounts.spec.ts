@@ -86,6 +86,8 @@ function mergeRow(table: keyof Tables, old: Record<string, unknown>, row: Record
 
 interface FakeOptions {
   takenNames?: string[];
+  /** The player has played online (ONLINE_GAME in every history list); otherwise no online games. */
+  online?: boolean;
   password?: string;
   /** Sign-in providers switched on in the fake project. */
   providers?: string[];
@@ -102,6 +104,12 @@ const under16 = (born: string) => {
   const [y, m] = born.split("-").map(Number) as [number, number];
   const now = new Date();
   return now.getFullYear() * 12 + now.getMonth() < (y + 16) * 12 + m;
+};
+
+/** An online game as the history lists give it. */
+const ONLINE_GAME = {
+  id: "77777777-1111-4222-8333-444444444444", ended_at: "2026-10-19T10:00:00Z", speed: "blitz", base: 300, inc: 3, rated: true, color: "red",
+  opponent: "bob_xq", result: "win", reason: "resign", plies: 2, rating_before: 1200, rating_after: 1216,
 };
 
 async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> {
@@ -209,6 +217,23 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
           level: 800, target: 800, clean_win: clean, long_games: long, casual_ok: answered, eligible: answered && (clean || long >= 3),
         });
       }
+      // Online game history (after M20): one rated Blitz win over bob_xq, for every list.
+      case "/rest/v1/rpc/my_games":
+      case "/rest/v1/rpc/player_games":
+        if (url.pathname.endsWith("player_games") && String(body?.p_username).toLowerCase() === "bob_xq") return json(route, null);
+        return json(route, opts.online ? [ONLINE_GAME] : []);
+      case "/rest/v1/rpc/my_online_stats":
+        if (!opts.online) return json(route, {});
+        return json(route, {
+          blitz: { rating: 1216, rd: 90, rated_games: 3, history: [{ at: "2026-10-18T10:00:00Z", rating: 1200 }, { at: "2026-10-19T10:00:00Z", rating: 1216 }],
+            results: { red: { games: 2, wins: 2, draws: 0, losses: 0 }, black: { games: 1, wins: 0, draws: 0, losses: 1 } } },
+        });
+      case "/rest/v1/rpc/game_info":
+        return json(route, body?.p_game === ONLINE_GAME.id ? {
+          id: ONLINE_GAME.id, me: null, red: { username: "Alice_1", avatar: null, rating: 1216, rd: 90 }, black: { username: "bob_xq", avatar: null, rating: 1440, rd: 60 },
+          base: 300, inc: 3, speed: "blitz", rated: true, relay: false, status: "over", result: "red", reason: "resign", moves: ["h2e2", "h9g7"],
+          red_rating_before: 1200, red_rating_after: 1216, black_rating_before: 1456, black_rating_after: 1440, ended_at: ONLINE_GAME.ended_at,
+        } : null);
       case "/rest/v1/rpc/public_profile": {
         const name = String(body?.p_username).toLowerCase();
         if (name === profile.username.toLowerCase())
@@ -878,6 +903,37 @@ test("a public profile shows online ratings and the fair-play record; block and 
   await page.goto(at("/en/profile/"));
   await page.getByRole("link", { name: "See your public profile" }).click();
   await expect(page.getByText("This is how other players see you.")).toBeVisible();
+});
+
+test("online games in My stats, on Home, on profiles, and open to anyone once finished", async ({ page }) => {
+  await fakeSupabase(page, { online: true });
+  await signIn(page);
+  await page.goto(at("/en/stats/"));
+  await expect(page.getByText("Blitz rating").first()).toBeVisible();
+  await expect(page.getByRole("row", { name: /Blitz · as Red 2 2/ })).toBeVisible();
+  await page.getByRole("tab", { name: "Games" }).click();
+  // All: bot and online games together; Online: the online list with its opponent and rating change.
+  await expect(page.getByRole("row", { name: /bob_xq 5\+3 Blitz Won resigned \+16/ })).toBeVisible();
+  await page.getByRole("radio", { name: "Online" }).click();
+  await expect(page.getByRole("row", { name: /bob_xq · as Red 5\+3 Blitz Won resigned \+16 1/ })).toBeVisible();
+  await page.goto(at("/en/"));
+  await expect(page.getByText("vs bob_xq online")).toBeVisible();
+  // A profile lists the player's games (not for a minimal profile).
+  await page.goto(at("/en/player/?u=Alice_1"));
+  await expect(page.getByRole("heading", { name: "Games" })).toBeVisible();
+  await page.goto(at("/en/player/?u=bob_xq"));
+  await expect(page.getByRole("heading", { name: "bob_xq" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Games" })).toHaveCount(0);
+});
+
+test("anyone can open a finished public game", async ({ page }) => {
+  await fakeSupabase(page);
+  await page.goto(at(`/en/game/?id=${ONLINE_GAME.id}`));
+  await expect(page.getByRole("heading", { name: "Alice_1 won" })).toBeVisible();
+  await expect(page.getByText("Alice_1 1200 → 1216 (+16) · bob_xq 1456 → 1440 (-16)")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Report" })).toHaveCount(0);
+  await page.goto(at("/en/game/?id=00000000-0000-4000-8000-000000000000"));
+  await expect(page.getByRole("heading", { name: "Game not found" })).toBeVisible();
 });
 
 test("a guest sees public profiles without the block button; unknown names say so", async ({ page }) => {

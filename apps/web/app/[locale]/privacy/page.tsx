@@ -3,7 +3,7 @@ import { type Locale, pageMetadata } from "../../../lib/site";
 
 // Rendered on the server, so anyone (and Google's consent-screen check) can read it without
 // running the app. Keep it true to what the code does: packages/db holds what an account stores.
-const UPDATED = "2026-10-18";
+const UPDATED = "2026-10-20";
 const CONTACT = "jianjetzhu@gmail.com";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -67,7 +67,9 @@ function En() {
       <p>
         Accounts are run by <a href="https://supabase.com/privacy">Supabase</a>, which stores this data for us in the United States (AWS, Oregon). Only
         you can read your account data from the site; the database's access rules block everyone else. The exception is your <strong>public profile</strong>,
-        which anyone can see: your username, online ratings and completion rate (the share of your recent games you didn't leave, stall or abort), and, if you're 16 or older, your avatar, country and when you joined. Opponents see your avatar in a game only if you're 16 or older too.
+        which anyone can see: your username, online ratings and completion rate (the share of your recent games you didn't leave, stall or abort), and, if you're 16 or older, your avatar, country and when you joined, and your list of online games. Opponents see your avatar in a game only if you're 16 or older too.
+        Like on other chess sites, a finished online game (the players, moves, result and rating changes) can be opened and replayed by anyone, unless one
+        of its players is under 16: then only its two players can open it. Games in progress are never shown to others.
       </p>
       <p>
         In online games the two players' browsers normally connect directly, which shows each player's internet (IP) address to the other. Settings →
@@ -139,7 +141,7 @@ function Zh() {
         </li>
       </ul>
       <p>
-        账号服务由 <a href="https://supabase.com/privacy">Supabase</a> 提供，数据存放在美国（AWS 俄勒冈）。只有你本人能在网站上读取自己的账号数据，数据库的访问规则会阻止其他所有人。例外是你的<strong>公开资料</strong>，任何人都能看到：用户名、在线等级分和完成率（最近对局中你没有离开、拖延或取消的比例）；如果你已满 16 岁，还有头像、国家或地区以及注册时间。对局中，对手也只有在你已满 16 岁时才能看到你的头像。
+        账号服务由 <a href="https://supabase.com/privacy">Supabase</a> 提供，数据存放在美国（AWS 俄勒冈）。只有你本人能在网站上读取自己的账号数据，数据库的访问规则会阻止其他所有人。例外是你的<strong>公开资料</strong>，任何人都能看到：用户名、在线等级分和完成率（最近对局中你没有离开、拖延或取消的比例）；如果你已满 16 岁，还有头像、国家或地区、注册时间以及你的在线对局列表。与其他象棋网站一样，已结束的在线对局（双方、着法、结果和等级分变化）任何人都可以打开回放，除非其中一方未满 16 岁：这时只有对局双方可以打开。进行中的对局不会向他人显示。对局中，对手也只有在你已满 16 岁时才能看到你的头像。
       </p>
       <p>
         在线对局时，双方浏览器通常会直接连接，这会让对方看到你的网络（IP）地址。在“设置 → 在线对弈”中开启“不向对手透露我的网络地址”后，你的对局将经服务器中转；16 岁以下的棋手始终如此。为了建立直接连接，你的浏览器会向公共 STUN 服务器（由 Google 或 Cloudflare 运营）查询自己的网络地址；该服务器能看到你的 IP 地址，但看不到你的身份或对局内容。

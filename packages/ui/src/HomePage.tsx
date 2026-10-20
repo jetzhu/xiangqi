@@ -5,6 +5,7 @@ import { PROVISIONAL_RD } from "@xq/puzzles";
 import { useEffect, useState } from "react";
 import { Board } from "./Board.js";
 import { useAccount } from "./account/session.js";
+import { type OnlineGameRow, myGames } from "./online/api.js";
 import { type BotRating, NEW_BOT_RATING } from "./bots/rating.js";
 import type { Stars } from "./bots/stars.js";
 import { milestones } from "./home/milestones.js";
@@ -25,7 +26,13 @@ export function HomePage() {
   const { tt, t } = useT();
   const nav = useNav();
   const store = useStore();
-  const account = useAccount().state;
+  const accountCtx = useAccount();
+  const account = accountCtx.state;
+  /** The latest online games (signed in), mixed into "Recent games". */
+  const [online, setOnline] = useState<OnlineGameRow[]>([]);
+  useEffect(() => {
+    if (account.status === "signedIn") void accountCtx.client().then((sb) => myGames(sb, null, 5)).then(setOnline, () => {});
+  }, [account.status, accountCtx]);
   const [progress, setProgress] = useState<Progress>({});
   const [puzzles, setPuzzles] = useState<PuzzleState | null>(null);
   const [stars, setStars] = useState<Stars>({});
@@ -103,14 +110,34 @@ export function HomePage() {
         </a>
       </section>
 
-      {games.length > 0 && (
+      {(games.length > 0 || online.length > 0) && (
         <section className="recent" aria-labelledby="h-recent">
           <div className="stats-head">
             <h2 id="h-recent">{tt("Recent games", "最近对局")}</h2>
             <a href={nav.href("/stats?tab=games")}>{tt("All games", "全部对局")}</a>
           </div>
           <ul className="recent-games">
-            {games.map((g) => {
+            {[
+              ...games.map((g) => ({ at: g.endedAt ?? g.startedAt, bot: g, online: null })),
+              ...online.map((g) => ({ at: g.ended_at, bot: null, online: g })),
+            ]
+              .sort((a, b) => b.at.localeCompare(a.at))
+              .slice(0, 5)
+              .map(({ bot: botGame, online: o }) => {
+              if (o) {
+                const change = o.rated && o.rating_before !== null && o.rating_after !== null ? o.rating_after - o.rating_before : null;
+                return (
+                  <li key={o.id}>
+                    <span className={`result ${o.result}`}>{o.result === "none" ? "–" : t(RESULT[o.result])}</span>
+                    <span className="who">
+                      {tt("vs", "对")} {o.opponent ?? tt("deleted account", "已删除的账号")} <span className="muted small">{tt("online", "在线")}</span>
+                    </span>
+                    <span className="muted">{!o.rated ? tt("casual", "不计分") : change === null ? tt("rated", "计分") : `${change >= 0 ? "+" : ""}${change}`}</span>
+                    <a href={nav.href(`/game?id=${o.id}`)}>{tt("Review", "复盘")}</a>
+                  </li>
+                );
+              }
+              const g = botGame!;
               const bot = BOTS.find((b) => b.id === g.botId);
               const change = g.ratingBefore !== null && g.ratingAfter !== null ? g.ratingAfter - g.ratingBefore : null;
               return (

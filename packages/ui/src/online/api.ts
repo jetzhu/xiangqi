@@ -98,7 +98,8 @@ export interface GamePlayer {
 
 export interface GameInfo {
   id: string;
-  me: "red" | "black";
+  /** The viewer's side, or null for anyone else looking at a finished public game. */
+  me: "red" | "black" | null;
   red: GamePlayer;
   black: GamePlayer;
   base: number;
@@ -356,3 +357,36 @@ export const modResetSportsmanship = (sb: SupabaseClient, username: string, note
 export const triageAgreement = (sb: SupabaseClient) => rpc<TriageAgreement[]>(sb, "triage_agreement");
 export const modLogRecent = (sb: SupabaseClient) =>
   rpc<{ at: string; action: string; details: { note?: string }; moderator: string | null; target: string | null }[]>(sb, "mod_log_recent", { p_limit: 50 });
+
+// Game history (online games in Stats, Home and profiles, migration 20261022000000_game_history.sql) --
+
+/** A finished online game from one player's side. */
+export interface OnlineGameRow {
+  id: string;
+  ended_at: string;
+  speed: Speed;
+  base: number;
+  inc: number;
+  rated: boolean;
+  color: "red" | "black";
+  opponent: string | null;
+  result: "win" | "draw" | "loss" | "none";
+  reason: string | null;
+  plies: number;
+  rating_before: number | null;
+  rating_after: number | null;
+}
+
+export interface SpeedStats {
+  rating: number | null;
+  rd: number | null;
+  rated_games: number | null;
+  history: { at: string; rating: number }[];
+  results: Record<"red" | "black", { games: number; wins: number; draws: number; losses: number }>;
+}
+
+export const myGames = (sb: SupabaseClient, before: string | null, limit = 20) => rpc<OnlineGameRow[]>(sb, "my_games", { p_before: before, p_limit: limit });
+/** A player's public games; null for a minimal profile (under 16). */
+export const playerGames = (sb: SupabaseClient, username: string, before: string | null, limit = 20) =>
+  rpc<OnlineGameRow[] | null>(sb, "player_games", { p_username: username, p_before: before, p_limit: limit });
+export const myOnlineStats = (sb: SupabaseClient) => rpc<Partial<Record<Speed, SpeedStats>>>(sb, "my_online_stats");
