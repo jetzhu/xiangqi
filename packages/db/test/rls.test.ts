@@ -1374,6 +1374,29 @@ describe("game history (after M20)", () => {
   });
 });
 
+describe("site settings: the operator's contact block", () => {
+  const SM = "00000000-0000-4000-8000-0000000000e5";
+  const run = <T>(user: string | null, sql: string, params: unknown[] = []) =>
+    db.transaction(async (tx) => {
+      await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [user ?? ""]);
+      await tx.exec(`set local role ${user ? "authenticated" : "anon"}`);
+      return (await tx.query<{ j: T }>(`select ${sql} as j`, params)).rows[0]!.j;
+    });
+
+  it("starts from the template, anyone can read it, and only moderators change it (logged)", async () => {
+    await signUp(SM, { username: "settings_mod" });
+    expect(await run(null, `public.site_contact()`)).toEqual({ name: "Xiangqi School 象棋学堂", address: "P.O. Box 10000, Cupertino, CA 95014, USA", phone: null, email: "jianjetzhu@gmail.com" });
+    const set = `public.mod_set_contact('Xiangqi School', 'P.O. Box 42, Cupertino, CA 95015, USA', ' +1 408 555 0100 ', 'help@example.com', 'new box')`;
+    expect(await failsAs(SM, `select ${set}`)).toMatch(/moderators only/);
+    await db.query(`insert into public.moderators (user_id) values ($1)`, [SM]);
+    expect(await failsAs(SM, `select public.mod_set_contact('X', 'Box 1', null, 'not-an-email', 'x')`)).toMatch(/valid email/);
+    await run(SM, set);
+    expect(await run(null, `public.site_contact()`)).toEqual({ name: "Xiangqi School", address: "P.O. Box 42, Cupertino, CA 95015, USA", phone: "+1 408 555 0100", email: "help@example.com" });
+    expect((await run<{ action: string; details: { note: string } }[]>(SM, `public.mod_log_recent()`))[0]).toMatchObject({ action: "set-contact", details: { note: "new box" } });
+    expect(await failsAs(SM, `update public.site_settings set value = '{}'`)).toMatch(/permission denied/);
+  });
+});
+
 /** Runs a query as the database owner and returns its one value. */
 const q2 = <T>(sql: string, params: unknown[] = []) => db.query<{ j: T }>(`select ${sql} as j`, params).then((r) => r.rows[0]!.j);
 

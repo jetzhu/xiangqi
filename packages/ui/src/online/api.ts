@@ -390,3 +390,16 @@ export const myGames = (sb: SupabaseClient, before: string | null, limit = 20) =
 export const playerGames = (sb: SupabaseClient, username: string, before: string | null, limit = 20) =>
   rpc<OnlineGameRow[] | null>(sb, "player_games", { p_username: username, p_before: before, p_limit: limit });
 export const myOnlineStats = (sb: SupabaseClient) => rpc<Partial<Record<Speed, SpeedStats>>>(sb, "my_online_stats");
+
+// Site settings (migration 20261023000000_site_settings.sql) ---------------------------------------
+
+/** The operator's contact block shown in the privacy policy. */
+export interface OperatorContact {
+  name: string;
+  address: string;
+  phone: string | null;
+  email: string;
+}
+export const siteContact = (sb: SupabaseClient) => rpc<OperatorContact | null>(sb, "site_contact");
+export const modSetContact = (sb: SupabaseClient, c: OperatorContact, note: string) =>
+  rpc<null>(sb, "mod_set_contact", { p_name: c.name, p_address: c.address, p_phone: c.phone, p_email: c.email, p_note: note });

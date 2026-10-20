@@ -24,6 +24,9 @@ import {
   modResetSportsmanship,
   modLogRecent,
   modQueue,
+  modSetContact,
+  type OperatorContact,
+  siteContact,
   type TriageAgreement,
   type TriageVerdict,
   triageAgreement,
@@ -149,6 +152,8 @@ function Queue() {
           </tbody>
         </table>
       )}
+
+      <ContactSettings />
 
       <h2>{tt("Recent actions", "最近操作")}</h2>
       <ul className="mod-log">
@@ -498,5 +503,63 @@ function FindPlayer() {
       </label>{" "}
       <button type="submit">{tt("Open", "打开")}</button>
     </form>
+  );
+}
+
+/** The operator's contact block shown in the privacy policy (a PO box keeps a home address private). */
+function ContactSettings() {
+  const { tt } = useT();
+  const account = useAccount();
+  const [c, setC] = useState<OperatorContact | null>(null);
+  const [note, setNote] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  useEffect(() => {
+    void account
+      .client()
+      .then(siteContact)
+      .then(setC, () => {});
+  }, [account]);
+  if (!c) return null;
+  const field = (k: keyof OperatorContact, label: string) => (
+    <label>
+      {label}
+      <input value={c[k] ?? ""} onChange={(e) => setC({ ...c, [k]: k === "phone" && !e.target.value ? null : e.target.value })} />
+    </label>
+  );
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    setMessage(null);
+    try {
+      await modSetContact(await account.client(), c, note);
+      setMessage(tt("Saved: the privacy policy shows it now.", "已保存：隐私政策已显示新信息。"));
+      setNote("");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : String(err));
+    }
+  };
+  return (
+    <section aria-labelledby="h-contact">
+      <h2 id="h-contact">{tt("Operator contact (privacy policy)", "运营方联系方式（隐私政策）")}</h2>
+      <p className="muted small">
+        {tt(
+          "US children's privacy rules ask for the operator's name, postal address, phone and email. A PO box and a virtual phone number keep home details private.",
+          "美国儿童隐私规则要求公布运营方名称、通信地址、电话和邮箱。使用邮政信箱和虚拟电话号码可以保护住址隐私。",
+        )}
+      </p>
+      <form className="contact-form" onSubmit={(e) => void save(e)}>
+        {field("name", tt("Operator name", "运营方名称"))}
+        {field("address", tt("Postal address", "通信地址"))}
+        {field("phone", tt("Phone (optional)", "电话（可选）"))}
+        {field("email", tt("Email", "邮箱"))}
+        <label>
+          {tt("Reason (kept in the log)", "理由（记入日志）")}
+          <input value={note} onChange={(e) => setNote(e.target.value)} />
+        </label>
+        <button type="submit" disabled={!note.trim()}>
+          {tt("Save contact", "保存联系方式")}
+        </button>
+      </form>
+      {message && <p role="status">{message}</p>}
+    </section>
   );
 }

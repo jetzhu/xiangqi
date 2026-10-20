@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { OperatorContact } from "@xq/ui/online/OperatorContact.js";
 import { type Locale, pageMetadata } from "../../../lib/site";
 
 // Rendered on the server, so anyone (and Google's consent-screen check) can read it without
@@ -105,6 +106,7 @@ function En() {
       <p>
         If this policy changes, the date at the top changes too. Questions: <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.
       </p>
+      <OperatorContact lang="en" />
     </article>
   );
 }
@@ -169,6 +171,7 @@ function Zh() {
       <p>
         本政策如有变更，顶部日期会随之更新。如有疑问，请联系 <a href={`mailto:${CONTACT}`}>{CONTACT}</a>。
       </p>
+      <OperatorContact lang="zh" />
     </article>
   );
 }

@@ -507,3 +507,6 @@ button.danger { background: #b3261e; color: #fff; border-color: #b3261e; }
 .triage { list-style: none; padding-left: 12px; margin: 2px 0 6px; font-size: 13px; }
 .triage-valid strong { color: #b3261e; }
 .triage-invalid strong { color: #2e8b57; }
+.contact-form { display: grid; gap: 6px; max-width: 520px; }
+.contact-form label { display: flex; flex-direction: column; gap: 2px; }
+.operator-contact { font-style: normal; margin: 8px 0 16px; line-height: 1.6; }

@@ -41,6 +41,7 @@ function world(relay: boolean) {
     sanction: null as null | object,
     board: [] as { rank: number; username: string; rating: number; games: number }[],
     moderator: false,
+    contact: { name: "Xiangqi School 象棋学堂", address: "P.O. Box 10000, Cupertino, CA 95014, USA", phone: null as string | null, email: "jianjetzhu@gmail.com" },
     /** Fair-play analyses each browser sent after the game (M18). */
     analyses: [] as { by: "red" | "black"; analysis: { v: number; depth: number; positions: { b: string | null; s: number[] }[] } }[],
   };
@@ -83,6 +84,12 @@ async function player(page: Page, w: World, who: { id: string; username: string;
         return json(route, w.moderator);
       case "/rest/v1/rpc/mod_queue":
         return json(route, [{ username: "bob_xq", rating: 1150, score: 5.4, verdict: "likely", reports: 2, weight: 1.2, unchecked: 1, priority: 20, last_outcome: "inconclusive", last_note: "too few games", last_reviewed: "2026-10-10T00:00:00Z", triage: { valid: 1, invalid: 0, inconclusive: 1 } }]);
+      case "/rest/v1/rpc/site_contact":
+        return json(route, w.contact);
+      case "/rest/v1/rpc/mod_set_contact":
+        w.contact = { name: body!.p_name as string, address: body!.p_address as string, phone: body!.p_phone as string | null, email: body!.p_email as string };
+        w.calls.push(`contact:${body!.p_note}`);
+        return json(route, null);
       case "/rest/v1/rpc/triage_agreement":
         return json(route, [{ source: "rules", category: "stalling", decisions: 20, agreed: 19, confident: 18, confident_agreed: 18 }]);
       case "/rest/v1/rpc/mod_log_recent":
@@ -366,6 +373,24 @@ test("the review page is for moderators: the queue, a case, and a decision", asy
   await alice.getByRole("button", { name: "Confirm violation: sanction, refunds, public mark" }).click();
   await expect(alice.getByText("Violation confirmed.")).toBeVisible();
   expect(w.calls).toContain("mod_confirm:bob_xq:engine match far above 1150 in 12 games");
+});
+
+test("moderators keep the operator's contact block, which the privacy policy shows", async ({ context }) => {
+  const { w, alice } = await twoPlayers(context, false);
+  await alice.goto(at("/en/privacy/"));
+  await expect(alice.locator(".operator-contact")).toContainText("P.O. Box 10000, Cupertino, CA 95014, USA");
+  w.moderator = true;
+  await alice.goto(at("/en/moderate/"));
+  await alice.getByLabel("Postal address").fill("P.O. Box 77, Cupertino, CA 95015, USA");
+  await alice.getByLabel("Phone (optional)").fill("+1 408 555 0100");
+  await expect(alice.getByRole("button", { name: "Save contact" })).toBeDisabled();
+  await alice.getByLabel("Reason (kept in the log)").fill("new PO box");
+  await alice.getByRole("button", { name: "Save contact" }).click();
+  await expect(alice.getByText("Saved: the privacy policy shows it now.")).toBeVisible();
+  expect(w.calls).toContain("contact:new PO box");
+  await alice.goto(at("/zh/privacy/"));
+  await expect(alice.locator(".operator-contact")).toContainText("P.O. Box 77, Cupertino, CA 95015, USA");
+  await expect(alice.locator(".operator-contact")).toContainText("电话: +1 408 555 0100");
 });
 
 for (const relay of [false, true]) {
