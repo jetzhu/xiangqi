@@ -469,6 +469,8 @@ for (const relay of [false, true]) {
     }
     // Game Review in both browsers; each sends the same fair-play analysis of the rated game.
     for (const p of [alice, bob]) await expect(p.getByRole("region", { name: "Game Review" })).toContainText(/Accuracy: \d+ you/, { timeout: 30_000 });
+    // The evaluation graph, from each player's side.
+    for (const p of [alice, bob]) await expect(p.getByRole("img", { name: "Your winning chances over the game" })).toBeVisible();
     await expect.poll(() => w.analyses.length, { timeout: 15_000 }).toBe(2);
     const [a, b] = w.analyses;
     expect(a!.analysis).toMatchObject({ v: 1, depth: 8 });

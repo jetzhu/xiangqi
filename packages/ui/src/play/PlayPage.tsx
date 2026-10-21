@@ -134,7 +134,8 @@ export function PlayPage() {
       });
     }, 200);
     return () => clearInterval(id);
-  }, [version, clock === null, flagged]); // eslint-disable-line react-hooks/exhaustive-deps
+    // `game` too: New game replaces it, and the old game's timer must stop with it.
+  }, [game, version, clock === null, flagged]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onMove = (move: string) => {
     if (flagged) return;

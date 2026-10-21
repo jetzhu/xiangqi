@@ -3,6 +3,7 @@ import { formatScore, scoreToBar } from "@xq/engine";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GameTree, Position, START_FEN, type TreeNode, explainIllegal, parseSquare, squareName, toIccs } from "xiangqi-core";
 import { EnginePanel } from "./EnginePanel.js";
+import { GameGraph } from "./GameGraph.js";
 import { MoveTreeView } from "./MoveTreeView.js";
 import { PositionEditor } from "./PositionEditor.js";
 import type { SavedAnalysis } from "./storage.js";
@@ -228,6 +229,7 @@ export function AnalysisPage() {
         </div>
 
         <MoveTreeView tree={t} current={current} style={style} onSelect={go} />
+        <GameGraph tree={t} current={current} onSelect={go} disabled={liveGame} />
 
         <div className="buttons">
           <button

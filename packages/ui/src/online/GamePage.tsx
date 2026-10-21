@@ -25,6 +25,8 @@ import { ReportGame } from "./ReportGame.js";
 
 // The review loads the engine, so it comes in its own chunk once a game is over.
 const GameReviewPanel = lazy(() => import("./GameReviewPanel.js"));
+/** What a picked key moment shows on the board (the type only: the panel loads later). */
+type ReviewFocusView = import("./GameReviewPanel.js").ReviewFocusView;
 import { Link, type LinkState, realtimeSignaling, tabSignaling } from "./link.js";
 import { LIVE_GAME_KEY } from "./live.js";
 import { SPEED_NAME } from "./PlayerPage.js";
@@ -89,6 +91,8 @@ function LiveGame({ info }: { info: GameInfo & { me: "red" | "black" } }) {
   /** One queued move for when it's my turn (Lightning and Blitz, if premoves are on). */
   const [premove, setPremove] = useState<string | null>(null);
   const premoves = settings.premoves && info.speed !== "rapid";
+  /** A key moment picked in the Game Review after the game: shown on the board. */
+  const [reviewFocus, setReviewFocus] = useState<ReviewFocusView | null>(null);
   /** Whether the page lost focus during this turn: sent with the move for the fair-play record (M18). */
   const lostFocus = useRef(false);
   useEffect(() => {
@@ -238,7 +242,7 @@ function LiveGame({ info }: { info: GameInfo & { me: "red" | "black" } }) {
       <div className="board-col">
         <PlayerBar player={info[opp]} color={opp} game={game} conn={connText(linkState, game.rtt, tt)} chat={chat} />
         <Board
-          fen={fen}
+          fen={reviewFocus?.fen ?? fen}
           orientation={orientation}
           movable={myTurn || (premoves && !result && game.plies > 0) ? me : "none"}
           legalMoves={myTurn ? game.game.legalMoves().map(toIccs) : premoves && !result ? premoveCandidates(fen) : []}
@@ -249,7 +253,7 @@ function LiveGame({ info }: { info: GameInfo & { me: "red" | "black" } }) {
           }}
           lastMove={last?.iccs ?? null}
           check={checkSquare}
-          arrows={premove ? [{ from: premove.slice(0, 2), to: premove.slice(2, 4), color: "blue" }] : []}
+          arrows={reviewFocus ? reviewFocus.arrows : premove ? [{ from: premove.slice(0, 2), to: premove.slice(2, 4), color: "blue" }] : []}
           announce={last ? announceMove(last, settings.notation, lang, last.color === me ? tt("You", "你") : (info[opp].username ?? "")) : ""}
         />
         <PlayerBar player={info[me]} color={me} game={game} conn={null} chat={null} />
@@ -334,7 +338,7 @@ function LiveGame({ info }: { info: GameInfo & { me: "red" | "black" } }) {
           </div>
         )}
 
-        {result && <ResultPanel info={info} result={result} verdict={verdict} settling={settling} moves={game.moves} />}
+        {result && <ResultPanel info={info} result={result} verdict={verdict} settling={settling} moves={game.moves} onReviewFocus={setReviewFocus} />}
 
         <MoveList history={history} />
         {!result && <p className="muted small">{tt("Analysis is off while you play. The clock keeps running if you leave.", "对局期间分析功能关闭。离开页面时时钟仍会继续走。")}</p>}
@@ -492,7 +496,21 @@ function AwayBanner({ claim, now, game }: { claim: ClaimState; now: number; game
   );
 }
 
-function ResultPanel({ info, result, verdict, settling, moves }: { info: GameInfo; result: OnlineResult; verdict: GameVerdict | null; settling: boolean; moves: string[] }) {
+function ResultPanel({
+  info,
+  result,
+  verdict,
+  settling,
+  moves,
+  onReviewFocus,
+}: {
+  info: GameInfo;
+  result: OnlineResult;
+  verdict: GameVerdict | null;
+  settling: boolean;
+  moves: string[];
+  onReviewFocus: (f: ReviewFocusView | null) => void;
+}) {
   const { tt, t } = useT();
   const nav = useNav();
   const me = info.me;
@@ -545,7 +563,7 @@ function ResultPanel({ info, result, verdict, settling, moves }: { info: GameInf
       {/* Once the server has the result, so a rated game's analysis can be sent for the fair-play check. */}
       {(verdict || !settling) && (
         <Suspense fallback={null}>
-          <GameReviewPanel id={info.id} me={me} moves={moves} rated={!!me && !!verdict?.rated} />
+          <GameReviewPanel id={info.id} me={me} moves={moves} rated={!!me && !!verdict?.rated} onFocus={onReviewFocus} />
         </Suspense>
       )}
     </section>
@@ -585,6 +603,7 @@ function FinishedGame({ info }: { info: GameInfo }) {
   const { tt } = useT();
   // A viewer who didn't play sees it from Red's side.
   const side = info.me ?? "red";
+  const [reviewFocus, setReviewFocus] = useState<ReviewFocusView | null>(null);
   const orientation = useOrientation(side);
   const game = useMemo(() => {
     const g = new Game();
@@ -603,7 +622,13 @@ function FinishedGame({ info }: { info: GameInfo }) {
     <div className="botgame online-game">
       <div className="board-col">
         <PlayerBar player={info[opp]} color={opp} game={null} conn={null} chat={null} />
-        <Board fen={game.fen} orientation={orientation} movable="none" lastMove={game.history.at(-1)?.iccs ?? null} />
+        <Board
+          fen={reviewFocus?.fen ?? game.fen}
+          orientation={orientation}
+          movable="none"
+          lastMove={reviewFocus ? null : (game.history.at(-1)?.iccs ?? null)}
+          arrows={reviewFocus?.arrows ?? []}
+        />
         <PlayerBar player={info[side]} color={side} game={null} conn={null} chat={null} />
       </div>
       <aside className="panel">
@@ -611,7 +636,7 @@ function FinishedGame({ info }: { info: GameInfo }) {
           <span className="dot" aria-hidden />
           {tt("Game over", "对局结束")}
         </div>
-        <ResultPanel info={info} result={result} verdict={verdict} settling={false} moves={info.moves} />
+        <ResultPanel info={info} result={result} verdict={verdict} settling={false} moves={info.moves} onReviewFocus={setReviewFocus} />
         <MoveList history={game.history} />
       </aside>
     </div>

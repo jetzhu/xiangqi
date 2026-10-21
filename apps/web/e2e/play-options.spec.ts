@@ -50,6 +50,9 @@ test("two-player: New game clears the board, the moves and the clock", async ({ 
   await page.getByRole("button", { name: "New game" }).click();
   await expect(page.getByText("No moves yet.")).toBeVisible();
   await expect(page.locator(".play-clocks")).toContainText("Red 5:00");
+  // The clock waits for the first move: the old game's timer stopped with it.
+  await page.waitForTimeout(1_500);
+  await expect(page.locator(".play-clocks")).toContainText("Red 5:00");
   await play(page, "h2e2");
   await expect(page.locator("ol.moves li")).toHaveCount(1);
 });

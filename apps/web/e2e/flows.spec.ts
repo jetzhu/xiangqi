@@ -77,3 +77,16 @@ test("lesson pages carry their text in the HTML", async ({ request }) => {
   expect(html).toContain('<article class="lesson-text">');
   expect(html).toContain('hrefLang="en"');
 });
+
+test("analysis board: review the game shows the graph, and a key moment's dot jumps to that position", async ({ page }) => {
+  // Red's cannon takes the e6 soldier and is lost to the horse: a blunder.
+  await page.goto(at("/en/analysis/?moves=h2e2,h9g7,e2e6,g7e6"));
+  await page.getByRole("button", { name: "Review the game" }).click();
+  const graph = page.getByRole("img", { name: "Red's winning chances over the main line" });
+  await expect(graph).toBeVisible({ timeout: 60_000 });
+  const dots = graph.locator("circle");
+  await expect(dots.first()).toBeVisible();
+  const before = page.url();
+  await dots.first().click({ force: true });
+  await expect.poll(() => page.url()).not.toBe(before);
+});

@@ -9,7 +9,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Game, isBookMove } from "xiangqi-core";
 import { useAccount } from "../account/session.js";
 import { useEngineInstance } from "../bots/useEngineInstance.js";
-import { useT } from "../settings.js";
+import { useSettings, useT } from "../settings.js";
+import type { Arrow } from "@xq/board";
+import { EvalGraph, GRADE_COLOR, keyMoments } from "../review/EvalGraph.js";
 import { submitAnalysis } from "./api.js";
 
 const GRADES: { grade: MoveGrade; en: string; zh: string }[] = [
@@ -20,6 +22,16 @@ const GRADES: { grade: MoveGrade; en: string; zh: string }[] = [
   { grade: "mistake", en: "Mistake", zh: "失误" },
   { grade: "blunder", en: "Blunder", zh: "败着" },
 ];
+const GRADE_NAME: Record<MoveGrade, { en: string; zh: string }> = {
+  book: { en: "Book move", zh: "开局定式" },
+  best: { en: "Best move", zh: "最佳着法" },
+  excellent: { en: "Excellent", zh: "好棋" },
+  good: { en: "Good", zh: "不错" },
+  inaccuracy: { en: "Inaccuracy", zh: "欠准" },
+  mistake: { en: "Mistake", zh: "失误" },
+  miss: { en: "Miss", zh: "错失良机" },
+  blunder: { en: "Blunder", zh: "败着" },
+};
 /** Games (and sides) already sent from this browser, so a revisit doesn't send them again. */
 const SENT = "xq:fairplay-sent";
 
@@ -32,8 +44,29 @@ const sent = (): string[] => {
 };
 
 /** `me`: the viewer's side, or null for someone who didn't play (both sides' accuracy, no grades). */
-export default function GameReviewPanel({ id, me, moves, rated }: { id: string; me: "red" | "black" | null; moves: readonly string[]; rated: boolean }) {
+/** A key moment picked in the review: the board shows the position before that move, with the move played and the engine's choice. */
+export interface ReviewFocusView {
+  fen: string;
+  arrows: Arrow[];
+}
+
+export default function GameReviewPanel({
+  id,
+  me,
+  moves,
+  rated,
+  onFocus,
+}: {
+  id: string;
+  me: "red" | "black" | null;
+  moves: readonly string[];
+  rated: boolean;
+  /** Shows a picked moment on the game's board (null: back to the final position). */
+  onFocus?: (f: ReviewFocusView | null) => void;
+}) {
   const { tt } = useT();
+  const notation = useSettings().settings.notation;
+  const [focus, setFocus] = useState<number | null>(null);
   const account = useAccount();
   const { engine, status } = useEngineInstance(moves.length > 0);
   const [progress, setProgress] = useState(0);
@@ -96,6 +129,21 @@ export default function GameReviewPanel({ id, me, moves, rated }: { id: string; 
     );
   }
   const review = reviewFromEvals(fens, [...moves], evals, { isBook: (i) => isBookMove(moves, i) });
+  const keys = keyMoments(review, me ?? "both");
+  const notate = (fen: string, iccs: string | null) => {
+    if (!iccs) return null;
+    const rec = new Game(fen).move(iccs);
+    return rec ? (notation === "wxf" ? rec.wxf : notation === "iccs" ? rec.iccs : rec.chinese) : iccs;
+  };
+  const pick = (i: number | null) => {
+    setFocus(i);
+    if (i === null) return onFocus?.(null);
+    const m = review[i]!;
+    const arrows: Arrow[] = [{ from: m.move.slice(0, 2), to: m.move.slice(2, 4), color: "red" }];
+    if (m.bestMove && m.bestMove !== m.move) arrows.push({ from: m.bestMove.slice(0, 2), to: m.bestMove.slice(2, 4), color: "green" });
+    onFocus?.({ fen: fens[i]!, arrows });
+  };
+  const sel = focus === null ? null : review[focus]!;
   const mine = accuracy(review, (me ?? "red") === "red");
   const theirs = accuracy(review, (me ?? "red") !== "red");
   const counts = gradeCounts(review, (me ?? "red") === "red");
@@ -114,6 +162,38 @@ export default function GameReviewPanel({ id, me, moves, rated }: { id: string; 
           </li>
         ))}
       </ul>
+      )}
+      <EvalGraph
+        reviewed={review}
+        perspective={me ?? "red"}
+        keys={keys}
+        focusIndex={focus}
+        onSelect={pick}
+        label={me ? tt("Your winning chances over the game", "你在整盘棋中的胜率变化") : tt("Red's winning chances over the game", "红方在整盘棋中的胜率变化")}
+      />
+      {keys.length === 0 ? (
+        <p className="muted small">{me ? tt("No inaccuracies, mistakes or blunders. Well played!", "没有欠准、失误或败着。下得好！") : tt("No inaccuracies, mistakes or blunders.", "没有欠准、失误或败着。")}</p>
+      ) : (
+        <ol className="key-list">
+          {keys.map((k) => (
+            <li key={k.index} className={focus === k.index ? "selected" : ""}>
+              <button type="button" className="link" onClick={() => pick(focus === k.index ? null : k.index)}>
+                <span className="dot" style={{ background: GRADE_COLOR[k.grade] }} aria-hidden /> {Math.floor(k.index / 2) + 1}
+                {k.index % 2 ? "…" : "."} {notate(fens[k.index]!, k.move)}: {tt(GRADE_NAME[k.grade].en, GRADE_NAME[k.grade].zh)}
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+      {sel && (
+        <p className="small" role="status">
+          {sel.bestMove && sel.bestMove !== sel.move
+            ? tt(`Best was ${notate(fens[focus!]!, sel.bestMove)} (green arrow).`, `最佳着法是 ${notate(fens[focus!]!, sel.bestMove)}（绿色箭头）。`)
+            : ""}{" "}
+          <button type="button" className="link" onClick={() => pick(null)}>
+            {tt("Final position", "终局")}
+          </button>
+        </p>
       )}
     </section>
   );

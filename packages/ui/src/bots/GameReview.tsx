@@ -1,12 +1,11 @@
 // Post-game review: accuracy for both sides, an eval graph, and the player's key moments,
 // each of which can be shown on the board or retried (as chess.com's Game Review does).
-import { type MoveGrade, type ReviewedMove, accuracy, winChance } from "@xq/engine";
+import { type MoveGrade, type ReviewedMove, accuracy } from "@xq/engine";
 import type { Color, MoveRecord } from "xiangqi-core";
 import type { Text } from "../settings.js";
 import { useT } from "../settings.js";
 
-const KEY_GRADES: MoveGrade[] = ["inaccuracy", "mistake", "miss", "blunder"];
-const GRADE_COLOR: Partial<Record<MoveGrade, string>> = { inaccuracy: "#c99a1e", mistake: "#e58f2a", miss: "#d2683c", blunder: "#ca3431" };
+import { EvalGraph, keyMoments } from "../review/EvalGraph.js";
 
 export interface ReviewFocus {
   /** Index of the reviewed move; the board shows the position before it. */
@@ -35,20 +34,10 @@ export function GameReview({ reviewed, history, playerColor, botName, gradeText,
   const red = playerColor === "red";
   const mine = accuracy(reviewed, red);
   const theirs = accuracy(reviewed, !red);
-  const keys = reviewed.filter((m) => m.moverIsRed === red && KEY_GRADES.includes(m.grade));
+  const keys = keyMoments(reviewed, playerColor);
   const keyPos = focus ? keys.findIndex((k) => k.index === focus.index) : -1;
   const go = (i: number) => onFocus({ index: i, showBest: false, retry: false, verdict: null });
 
-  // The graph: the player's win chance after each move, 0 at the bottom, 1 at the top.
-  const W = 300;
-  const H = 72;
-  const n = Math.max(1, reviewed.length);
-  const x = (i: number) => ((i + 1) / n) * W;
-  const y = (m: ReviewedMove) => {
-    const w = winChance(m.after);
-    return (1 - (red ? w : 1 - w)) * H;
-  };
-  const path = `M0 ${H / 2} ${reviewed.map((m, i) => `L${x(i).toFixed(1)} ${y(m).toFixed(1)}`).join(" ")}`;
   const moveNo = (i: number) => `${Math.floor(i / 2) + 1}${i % 2 ? "…" : "."}`;
   const sel = focus ? reviewed[focus.index] : undefined;
   const best = focus ? bestText(focus.index) : null;
@@ -65,15 +54,14 @@ export function GameReview({ reviewed, history, playerColor, botName, gradeText,
           <strong>{theirs === null ? "–" : theirs.toFixed(1)}</strong>
         </div>
       </div>
-      <svg className="eval-graph" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={tt("Your winning chances over the game", "你在整盘棋中的胜率变化")}>
-        <rect width={W} height={H} className="eval-bg" />
-        <path d={`${path} L${W} ${H} L0 ${H} Z`} className="eval-area" />
-        <line x1="0" x2={W} y1={H / 2} y2={H / 2} className="eval-mid" />
-        {focus && <line x1={x(focus.index)} x2={x(focus.index)} y1="0" y2={H} className="eval-cursor" />}
-        {keys.map((k) => (
-          <circle key={k.index} cx={x(k.index)} cy={y(k)} r="3.5" fill={GRADE_COLOR[k.grade]} onClick={() => go(k.index)} style={{ cursor: "pointer" }} />
-        ))}
-      </svg>
+      <EvalGraph
+        reviewed={reviewed}
+        perspective={playerColor}
+        keys={keys}
+        focusIndex={focus?.index ?? null}
+        onSelect={go}
+        label={tt("Your winning chances over the game", "你在整盘棋中的胜率变化")}
+      />
 
       {keys.length === 0 ? (
         <p className="muted">{tt("No inaccuracies, mistakes or blunders. Well played!", "没有欠准、失误或败着。下得好！")}</p>
