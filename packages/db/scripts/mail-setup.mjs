@@ -5,8 +5,9 @@
 //
 // The sender is the Gmail account sign-in emails already use (the project's SMTP settings);
 // its app password is read from ~/.config/xiangqi-gmail-app-password (or SMTP_PASS) and stored
-// only as a function secret. A fresh key that the database sends with each poke is stored as
-// a function secret and in the private mailer_config table. --test queues a test email.
+// in the database's vault (encrypted; only the server reads it, through mailer_settings), with
+// the other settings. A fresh key that the database sends with each poke goes in the private
+// mailer_config table. --test queues a test email.
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -44,21 +45,26 @@ if (!pass) {
 const key = randomBytes(32).toString("hex");
 const sender = auth.smtp_admin_email || auth.smtp_user;
 const secrets = {
-  MAILER_KEY: key,
   // Port 465 (implicit TLS): Supabase's functions can't connect out on 25 or 587.
-  SMTP_HOST: auth.smtp_host,
-  SMTP_PORT: "465",
-  SMTP_USER: auth.smtp_user,
-  SMTP_PASS: pass,
-  MAIL_FROM: `${auth.smtp_sender_name || "Xiangqi School 象棋学堂"} <${sender}>`,
-  SITE_URL: "https://jetzhu.github.io/xiangqi",
+  mailer_smtp_host: auth.smtp_host,
+  mailer_smtp_port: "465",
+  mailer_smtp_user: auth.smtp_user,
+  mailer_smtp_pass: pass,
+  mailer_mail_from: `${auth.smtp_sender_name || "Xiangqi School 象棋学堂"} <${sender}>`,
+  mailer_site_url: "https://jetzhu.github.io/xiangqi",
 };
-await api("/secrets", { method: "POST", body: JSON.stringify(Object.entries(secrets).map(([name, value]) => ({ name, value }))) });
+const values = Object.entries(secrets)
+  .map(([name, value]) => `(${sqlText(name)}, ${sqlText(value)})`)
+  .join(", ");
+await sql(
+  `select vault.update_secret(s.id, x.v) from vault.secrets s join (values ${values}) x(n, v) on s.name = x.n;
+   select vault.create_secret(x.v, x.n) from (values ${values}) x(n, v) where not exists (select 1 from vault.secrets s where s.name = x.n);`,
+);
 await sql(
   `insert into public.mailer_config (key, value) values ('url', ${sqlText(`${projectUrl.replace(/\/$/, "")}/functions/v1/mailer`)}), ('key', ${sqlText(key)})
    on conflict (key) do update set value = excluded.value`,
 );
-console.log(`Mailer set up: sending as ${secrets.MAIL_FROM} through ${auth.smtp_host}:465.`);
+console.log(`Mailer set up: sending as ${secrets.mailer_mail_from} through ${auth.smtp_host}:465.`);
 
 const i = process.argv.indexOf("--test");
 if (i >= 0) {

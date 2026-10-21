@@ -1,6 +1,7 @@
 // The `mailer` server function (Supabase Edge Function), docs/v0.4-design.md M23: sends the
 // emails waiting in the database's outbox over SMTP. The database pokes it every minute while
-// mail is due (poke_mailer), with a shared key; scripts/mail-setup.mjs sets the secrets.
+// mail is due (poke_mailer), with a shared key. Its settings (SMTP account, sender, key) come
+// from the database's vault (mailer_settings); scripts/mail-setup.mjs stores them.
 import { Smtp } from "./smtp.js";
 import { render } from "./templates.js";
 
@@ -10,11 +11,21 @@ declare const Deno: {
   connectTls(o: { hostname: string; port: number }): Promise<{ readable: ReadableStream<Uint8Array>; writable: WritableStream<Uint8Array>; close(): void }>;
 };
 
-const env = (name: string, fallback?: string) => {
-  const v = Deno.env.get(name) ?? fallback;
+const env = (name: string) => {
+  const v = Deno.env.get(name);
   if (v === undefined) throw new Error(`the mailer needs ${name}`);
   return v;
 };
+
+interface Settings {
+  key?: string;
+  smtp_host?: string;
+  smtp_port?: string;
+  smtp_user?: string;
+  smtp_pass?: string;
+  mail_from?: string;
+  site_url?: string;
+}
 
 function serviceKey(): string {
   const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -41,19 +52,26 @@ async function rpc<T>(fn: string, args: object): Promise<T> {
 const same = (a: string, b: string) => a.length === b.length && [...a].reduce((x, c, i) => x | (c.charCodeAt(0) ^ b.charCodeAt(i)), 0) === 0;
 
 Deno.serve(async (req) => {
-  if (req.method !== "POST" || !same(req.headers.get("x-mailer-key") ?? "", env("MAILER_KEY"))) return new Response("no", { status: 403 });
+  if (req.method !== "POST") return new Response("no", { status: 405 });
+  const settings = await rpc<Settings>("mailer_settings", {});
+  if (!settings.key || !same(req.headers.get("x-mailer-key") ?? "", settings.key)) return new Response("no", { status: 403 });
+  const setting = (name: keyof Settings, fallback?: string) => {
+    const v = settings[name] ?? fallback;
+    if (!v) throw new Error(`the mailer needs ${name} (scripts/mail-setup.mjs)`);
+    return v;
+  };
   const batch = await rpc<{ id: number; to: string; template: string; lang: string; data: Record<string, unknown> }[]>("mail_claim", { p_limit: 20 });
   if (batch.length === 0) return Response.json({ sent: 0 });
-  const host = env("SMTP_HOST", "smtp.gmail.com");
-  const user = env("SMTP_USER");
-  const from = env("MAIL_FROM", `Xiangqi School 象棋学堂 <${user}>`);
-  const site = env("SITE_URL", "https://jetzhu.github.io/xiangqi");
+  const host = setting("smtp_host", "smtp.gmail.com");
+  const user = setting("smtp_user");
+  const from = setting("mail_from", `Xiangqi School 象棋学堂 <${user}>`);
+  const site = setting("site_url", "https://jetzhu.github.io/xiangqi");
   let sent = 0;
   const handled = new Set<number>();
   let smtp: Smtp | null = null;
   try {
-    smtp = new Smtp(await Deno.connectTls({ hostname: host, port: Number(env("SMTP_PORT", "465")) }));
-    await smtp.open("xiangqi-mailer", user, env("SMTP_PASS"));
+    smtp = new Smtp(await Deno.connectTls({ hostname: host, port: Number(setting("smtp_port", "465")) }));
+    await smtp.open("xiangqi-mailer", user, setting("smtp_pass"));
     for (const m of batch) {
       try {
         const { subject, text } = render(m.template, m.lang, m.data, site);

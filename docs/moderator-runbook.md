@@ -258,7 +258,7 @@ The caps live in `triage_config`: `coach_under16_cap` (15), `family_cap` (3), `c
 
 Guardian confirmations, and later the notices to parents, go through the **mail outbox**. The `mailer` function sends them over the Gmail account sign-in uses (port 465), at most 100 an hour. The database asks it every minute while mail is due.
 
-- Set up, or after changing the Gmail app password (saved in `~/.config/xiangqi-gmail-app-password`):
+- Set up, or after changing the Gmail app password (saved in `~/.config/xiangqi-gmail-app-password`; the script stores it encrypted in Supabase Vault):
   ```
   SUPABASE_ACCESS_TOKEN=$(tr -d '\n' < ~/.config/xiangqi-supabase-token) ~/.local/node/bin/node packages/db/scripts/mail-setup.mjs --test you@example.com
   ```
