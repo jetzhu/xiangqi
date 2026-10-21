@@ -15,7 +15,10 @@ import { Board } from "../Board.js";
 import { type Nav, useNav } from "../nav.js";
 import { type NotationStyle, announceMove, useSettings, useSound, useT } from "../settings.js";
 
-/** Read "?fen=…&moves=h2e2,h9g7" into a tree and the node at the end of the moves. */
+/**
+ * Read "?fen=…&moves=h2e2,h9g7,…&at=1" into a tree and the node shown: the move `at` of the line
+ * (counting from 1), or its end.
+ */
 function fromUrl(nav: Nav): { tree: GameTree; node: TreeNode } {
   const q = nav.params();
   let tree: GameTree;
@@ -25,20 +28,31 @@ function fromUrl(nav: Nav): { tree: GameTree; node: TreeNode } {
     tree = new GameTree();
   }
   let node = tree.root;
+  const line: TreeNode[] = [];
   for (const m of (q.get("moves") ?? "").split(",").filter(Boolean)) {
     const next = tree.play(node, m);
     if (!next) break;
     node = next;
+    line.push(node);
   }
+  const at = Number(q.get("at"));
+  if (q.has("at") && Number.isInteger(at) && at >= 0 && at < line.length) node = at === 0 ? tree.root : line[at - 1]!;
   return { tree, node };
 }
 
-/** App path for a position: "/analysis?fen=…&moves=…&side=black". */
+/**
+ * App path for a position: "/analysis?fen=…&moves=…&at=…&side=black". The moves are the whole line
+ * through the position (to its end), and `at` says where in it the position is, so stepping back
+ * or picking an earlier move never drops the rest of the game from the link.
+ */
 function sharePath(tree: GameTree, node: TreeNode, side: "red" | "black"): string {
   const q = new URLSearchParams();
   if (tree.startFen !== new GameTree().startFen) q.set("fen", tree.startFen);
-  const moves = tree.path(node).map((n) => n.move!.iccs);
+  const upTo = tree.path(node).map((n) => n.move!.iccs);
+  const after = tree.mainline(node).map((n) => n.move!.iccs);
+  const moves = [...upTo, ...after];
   if (moves.length) q.set("moves", moves.join(","));
+  if (after.length) q.set("at", String(upTo.length));
   if (side === "black") q.set("side", "black");
   return `/analysis${q.size ? `?${q}` : ""}`;
 }

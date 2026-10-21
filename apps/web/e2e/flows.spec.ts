@@ -104,3 +104,16 @@ test("analysis board: a game opened as Black turns the board and reviews Black's
   await expect(page.getByRole("img", { name: "Red's winning chances over the main line" }).locator("circle").first()).toBeVisible();
   await expect(page).not.toHaveURL(/side=black/);
 });
+
+test("analysis board: going back in a game keeps the whole game in the link, through a reload", async ({ page }) => {
+  await page.goto(at("/en/analysis/?moves=h2e2,h9g7,e2e6,g7e6"));
+  await expect(page.locator(".tree .tok")).toHaveCount(4);
+  // Back two moves: the link keeps all four, and says where the board is.
+  await page.locator("body").press("ArrowLeft");
+  await page.locator("body").press("ArrowLeft");
+  await expect.poll(() => new URL(page.url()).searchParams.get("at")).toBe("2");
+  expect(new URL(page.url()).searchParams.get("moves")).toBe("h2e2,h9g7,e2e6,g7e6");
+  await page.reload();
+  await expect(page.locator(".tree .tok")).toHaveCount(4);
+  await expect(page.locator(".tree .mv.current")).toHaveText(/h9g7|马|H2\+3|8\+7/);
+});
