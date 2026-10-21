@@ -41,6 +41,9 @@ function world(relay: boolean) {
     sanction: null as null | object,
     board: [] as { rank: number; username: string; rating: number; games: number }[],
     moderator: false,
+    /** M21: feedback sent and filed, and the Support page's donation links. */
+    feedback: [] as { id: number; at: string; kind: string; message: string; page: string | null; version: string | null; lang: string | null; status: string; note: string | null; username: string | null; reply_to: string | null }[],
+    donations: { stripe: null as string | null, github: null as string | null },
     contact: { name: "Xiangqi School 象棋学堂", address: "P.O. Box 10000, Cupertino, CA 95014, USA", phone: null as string | null, email: "jianjetzhu@gmail.com" },
     /** Fair-play analyses each browser sent after the game (M18). */
     analyses: [] as { by: "red" | "black"; analysis: { v: number; depth: number; positions: { b: string | null; s: number[] }[] } }[],
@@ -89,6 +92,26 @@ async function player(page: Page, w: World, who: { id: string; username: string;
       case "/rest/v1/rpc/mod_set_contact":
         w.contact = { name: body!.p_name as string, address: body!.p_address as string, phone: body!.p_phone as string | null, email: body!.p_email as string };
         w.calls.push(`contact:${body!.p_note}`);
+        return json(route, null);
+      case "/rest/v1/rpc/send_feedback":
+        w.feedback.push({ id: w.feedback.length + 1, at: "2026-10-21T10:00:00Z", kind: body!.p_kind as string, message: body!.p_message as string, page: body!.p_page as string, version: body!.p_version as string, lang: body!.p_lang as string, status: "new", note: null, username: who.username, reply_to: body!.p_may_reply ? `${who.username}@example.com` : null });
+        return json(route, null);
+      case "/rest/v1/rpc/mod_feedback":
+        return json(route, w.feedback.filter((f) => (body!.p_status ? f.status === body!.p_status : ["new", "noted", "planned"].includes(f.status))));
+      case "/rest/v1/rpc/mod_feedback_counts":
+        return json(route, Object.fromEntries(["new", "noted", "planned", "done", "wontdo"].map((st) => [st, w.feedback.filter((f) => f.status === st).length])));
+      case "/rest/v1/rpc/mod_set_feedback": {
+        const f = w.feedback.find((x) => x.id === body!.p_id)!;
+        f.status = body!.p_status as string;
+        f.note = body!.p_note as string | null;
+        w.calls.push(`feedback:${f.id}:${f.status}:${f.note}`);
+        return json(route, null);
+      }
+      case "/rest/v1/rpc/site_donations":
+        return json(route, w.donations);
+      case "/rest/v1/rpc/mod_set_donations":
+        w.donations = { stripe: body!.p_stripe as string | null, github: body!.p_github as string | null };
+        w.calls.push(`donations:${body!.p_note}`);
         return json(route, null);
       case "/rest/v1/rpc/triage_agreement":
         return json(route, [{ source: "rules", category: "stalling", decisions: 20, agreed: 19, confident: 18, confident_agreed: 18 }]);
@@ -381,16 +404,56 @@ test("moderators keep the operator's contact block, which the privacy policy sho
   await expect(alice.locator(".operator-contact")).toContainText("P.O. Box 10000, Cupertino, CA 95014, USA");
   w.moderator = true;
   await alice.goto(at("/en/moderate/"));
+  await alice.getByRole("link", { name: "Site settings" }).click();
   await alice.getByLabel("Postal address").fill("P.O. Box 77, Cupertino, CA 95015, USA");
   await alice.getByLabel("Phone (optional)").fill("+1 408 555 0100");
   await expect(alice.getByRole("button", { name: "Save contact" })).toBeDisabled();
-  await alice.getByLabel("Reason (kept in the log)").fill("new PO box");
+  await alice.getByLabel("Reason (kept in the log)").last().fill("new PO box");
   await alice.getByRole("button", { name: "Save contact" }).click();
   await expect(alice.getByText("Saved: the privacy policy shows it now.")).toBeVisible();
   expect(w.calls).toContain("contact:new PO box");
   await alice.goto(at("/zh/privacy/"));
   await expect(alice.locator(".operator-contact")).toContainText("P.O. Box 77, Cupertino, CA 95015, USA");
   await expect(alice.locator(".operator-contact")).toContainText("电话: +1 408 555 0100");
+});
+
+test("feedback reaches the moderators, who file it; a player may allow a reply", async ({ context }) => {
+  const { w, alice } = await twoPlayers(context, false);
+  await alice.goto(at("/en/help/"));
+  await alice.getByRole("link", { name: "Send feedback" }).click();
+  await alice.getByRole("radio", { name: "Something doesn't work" }).check();
+  await alice.getByLabel("Your message").fill("The clock froze after a reconnect");
+  await alice.getByLabel("You may reply to my account email").check();
+  await alice.getByRole("button", { name: "Send feedback" }).click();
+  await expect(alice.getByText("Thank you! Your feedback has reached us.")).toBeVisible();
+  expect(w.feedback[0]).toMatchObject({ kind: "problem", message: "The clock froze after a reconnect", page: `${at("/en/help/")}`, lang: "en", reply_to: "alice_xq@example.com" });
+
+  w.moderator = true;
+  await alice.goto(at("/en/moderate/?tab=feedback"));
+  await expect(alice.getByRole("button", { name: "Open (1)" })).toHaveAttribute("aria-pressed", "true");
+  await expect(alice.getByText("The clock froze after a reconnect")).toBeVisible();
+  await expect(alice.getByRole("link", { name: "alice_xq@example.com" })).toHaveAttribute("href", "mailto:alice_xq@example.com");
+  await alice.getByLabel("Status").selectOption("planned");
+  await alice.getByLabel("Private note").fill("relay reconnect bug");
+  await alice.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(alice.getByRole("button", { name: "Planned (1)" })).toBeVisible();
+  expect(w.calls).toContain("feedback:1:planned:relay reconnect bug");
+});
+
+test("the Support page shows the donation links the moderators set", async ({ context }) => {
+  const { w, alice } = await twoPlayers(context, false);
+  await alice.goto(at("/en/support/"));
+  await expect(alice.getByText("Ways to give are coming soon.")).toBeVisible();
+  w.moderator = true;
+  await alice.goto(at("/en/moderate/?tab=settings"));
+  await alice.getByLabel("Stripe Payment Link").fill("https://buy.stripe.com/test_00g5kE");
+  await alice.getByLabel("Reason (kept in the log)").first().fill("Stripe ready");
+  await alice.getByRole("button", { name: "Save links" }).click();
+  await expect(alice.getByText("Saved: the Support page shows it now.")).toBeVisible();
+  expect(w.calls).toContain("donations:Stripe ready");
+  await alice.goto(at("/zh/support/"));
+  await expect(alice.getByRole("link", { name: "捐助（银行卡、支付宝、微信支付）" })).toHaveAttribute("href", "https://buy.stripe.com/test_00g5kE");
+  await expect(alice.getByRole("link", { name: "在 GitHub Sponsors 上赞助" })).toHaveCount(0);
 });
 
 for (const relay of [false, true]) {

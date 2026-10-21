@@ -25,8 +25,16 @@ import {
   modLogRecent,
   modQueue,
   modSetContact,
+  type DonationLinks,
+  type FeedbackItem,
+  type FeedbackStatus,
+  modFeedback,
+  modFeedbackCounts,
+  modSetDonations,
+  modSetFeedback,
   type OperatorContact,
   siteContact,
+  siteDonations,
   type TriageAgreement,
   type TriageVerdict,
   triageAgreement,
@@ -43,6 +51,7 @@ export function ModeratePage() {
   const account = useAccount();
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const username = nav.params().get("u");
+  const tab = nav.params().get("tab");
 
   useEffect(() => {
     if (account.state.status !== "signedIn") return setAllowed(account.state.status === "loading" ? null : false);
@@ -54,7 +63,32 @@ export function ModeratePage() {
 
   if (allowed === null) return <p className="muted" style={{ padding: 24 }}>…</p>;
   if (!allowed) return <p style={{ padding: 24 }}>{tt("This page is for moderators.", "此页面仅供管理员使用。")}</p>;
-  return <div className="online-page moderate-page">{username ? <Case username={username} /> : <Queue />}</div>;
+  if (username) return <div className="online-page moderate-page"><Case username={username} /></div>;
+  return (
+    <div className="online-page moderate-page">
+      <nav className="mod-tabs" aria-label={tt("Review page", "审核页面")}>
+        <a href={nav.href("/moderate")} aria-current={!tab ? "page" : undefined}>
+          {tt("Queue", "审核队列")}
+        </a>
+        <a href={nav.href("/moderate?tab=feedback")} aria-current={tab === "feedback" ? "page" : undefined}>
+          {tt("Feedback", "意见反馈")}
+        </a>
+        <a href={nav.href("/moderate?tab=settings")} aria-current={tab === "settings" ? "page" : undefined}>
+          {tt("Site settings", "网站设置")}
+        </a>
+      </nav>
+      {tab === "feedback" ? (
+        <FeedbackTab />
+      ) : tab === "settings" ? (
+        <>
+          <DonationSettings />
+          <ContactSettings />
+        </>
+      ) : (
+        <Queue />
+      )}
+    </div>
+  );
 }
 
 function Queue() {
@@ -152,8 +186,6 @@ function Queue() {
           </tbody>
         </table>
       )}
-
-      <ContactSettings />
 
       <h2>{tt("Recent actions", "最近操作")}</h2>
       <ul className="mod-log">
@@ -557,6 +589,179 @@ function ContactSettings() {
         </label>
         <button type="submit" disabled={!note.trim()}>
           {tt("Save contact", "保存联系方式")}
+        </button>
+      </form>
+      {message && <p role="status">{message}</p>}
+    </section>
+  );
+}
+
+const FEEDBACK_STATUS: { id: FeedbackStatus; en: string; zh: string }[] = [
+  { id: "new", en: "New", zh: "新" },
+  { id: "noted", en: "Noted", zh: "已记录" },
+  { id: "planned", en: "Planned", zh: "已计划" },
+  { id: "done", en: "Done", zh: "已完成" },
+  { id: "wontdo", en: "Won't do", zh: "不处理" },
+];
+const FEEDBACK_KIND: Record<FeedbackItem["kind"], [string, string]> = {
+  problem: ["Problem", "问题"],
+  idea: ["Idea", "建议"],
+  content: ["Lessons, puzzles, bots", "课程、题目、机器人"],
+  translation: ["Wording", "文字"],
+  other: ["Other", "其他"],
+};
+
+/** Feedback from the Feedback page: open items (new, noted, planned) by default, or one status. */
+function FeedbackTab() {
+  const { tt } = useT();
+  const account = useAccount();
+  const [status, setStatus] = useState<FeedbackStatus | null>(null);
+  const [items, setItems] = useState<FeedbackItem[] | null>(null);
+  const [counts, setCounts] = useState<Partial<Record<FeedbackStatus, number>>>({});
+  const load = useCallback(() => {
+    void account.client().then(async (sb) => {
+      setItems(await modFeedback(sb, status));
+      setCounts(await modFeedbackCounts(sb));
+    });
+  }, [account, status]);
+  useEffect(load, [load]);
+  const file = async (f: FeedbackItem, next: FeedbackStatus, note: string) => {
+    await modSetFeedback(await account.client(), f.id, next, note || null);
+    load();
+  };
+  return (
+    <section aria-labelledby="h-feedback">
+      <h1 id="h-feedback">{tt("Feedback", "意见反馈")}</h1>
+      <p className="muted small">
+        {tt(
+          "Reply by email only where the sender allowed it (an address is shown). Done and declined items are deleted after 12 months, the rest after 24.",
+          "仅在发送者允许时（显示了邮箱）通过邮件回复。已完成和不处理的反馈 12 个月后删除，其余 24 个月后删除。",
+        )}
+      </p>
+      <div className="segmented" role="group" aria-label={tt("Show", "显示")}>
+        <button type="button" aria-pressed={status === null} onClick={() => setStatus(null)}>
+          {tt("Open", "未结")} ({(counts.new ?? 0) + (counts.noted ?? 0) + (counts.planned ?? 0)})
+        </button>
+        {FEEDBACK_STATUS.map((st) => (
+          <button key={st.id} type="button" aria-pressed={status === st.id} onClick={() => setStatus(st.id)}>
+            {tt(st.en, st.zh)} ({counts[st.id] ?? 0})
+          </button>
+        ))}
+      </div>
+      {items === null ? (
+        <p className="muted">…</p>
+      ) : items.length === 0 ? (
+        <p className="muted">{tt("Nothing here.", "暂无内容。")}</p>
+      ) : (
+        <ul className="feedback-list">
+          {items.map((f) => (
+            <FeedbackRow key={f.id} f={f} onFile={file} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function FeedbackRow({ f, onFile }: { f: FeedbackItem; onFile: (f: FeedbackItem, s: FeedbackStatus, note: string) => Promise<void> }) {
+  const { tt } = useT();
+  const [note, setNote] = useState(f.note ?? "");
+  const [next, setNext] = useState<FeedbackStatus>(f.status);
+  const [error, setError] = useState<string | null>(null);
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      await onFile(f, next, note);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+  return (
+    <li>
+      <div className="small muted">
+        {new Date(f.at).toLocaleString()} · <strong>{tt(...FEEDBACK_KIND[f.kind])}</strong> · {f.username ?? tt("guest", "访客")}
+        {f.page && ` · ${f.page}`}
+        {f.version && ` · ${f.version}`}
+        {f.lang && ` · ${f.lang}`}
+        {f.reply_to && (
+          <>
+            {" · "}
+            {tt("reply to", "回复至")} <a href={`mailto:${f.reply_to}`}>{f.reply_to}</a>
+          </>
+        )}
+      </div>
+      <p className="message">{f.message}</p>
+      <form className="row" onSubmit={(e) => void save(e)}>
+        <label>
+          {tt("Status", "状态")}{" "}
+          <select value={next} onChange={(e) => setNext(e.target.value as FeedbackStatus)}>
+            {FEEDBACK_STATUS.map((st) => (
+              <option key={st.id} value={st.id}>
+                {tt(st.en, st.zh)}
+              </option>
+            ))}
+          </select>
+        </label>{" "}
+        <label>
+          {tt("Private note", "内部备注")} <input value={note} onChange={(e) => setNote(e.target.value)} />
+        </label>{" "}
+        <button type="submit">{tt("Save", "保存")}</button>
+        {error && <span role="alert"> {error}</span>}
+      </form>
+    </li>
+  );
+}
+
+/** The Support page's donation links (a Stripe Payment Link and GitHub Sponsors); empty hides a button. */
+function DonationSettings() {
+  const { tt } = useT();
+  const account = useAccount();
+  const [d, setD] = useState<DonationLinks | null>(null);
+  const [note, setNote] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  useEffect(() => {
+    void account
+      .client()
+      .then(siteDonations)
+      .then((x) => setD(x ?? { stripe: null, github: null }), () => {});
+  }, [account]);
+  if (!d) return null;
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    setMessage(null);
+    try {
+      await modSetDonations(await account.client(), d, note);
+      setMessage(tt("Saved: the Support page shows it now.", "已保存：“支持我们”页面已更新。"));
+      setNote("");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : String(err));
+    }
+  };
+  return (
+    <section aria-labelledby="h-donations">
+      <h2 id="h-donations">{tt("Donation links (Support page)", "捐助链接（支持我们页面）")}</h2>
+      <p className="muted small">
+        {tt(
+          "A Stripe Payment Link (https://buy.stripe.com/…) and a GitHub Sponsors page (https://github.com/sponsors/…). Leave one empty to hide its button.",
+          "Stripe 付款链接（https://buy.stripe.com/…）和 GitHub Sponsors 页面（https://github.com/sponsors/…）。留空则隐藏对应按钮。",
+        )}
+      </p>
+      <form className="contact-form" onSubmit={(e) => void save(e)}>
+        <label>
+          {tt("Stripe Payment Link", "Stripe 付款链接")}
+          <input value={d.stripe ?? ""} onChange={(e) => setD({ ...d, stripe: e.target.value || null })} />
+        </label>
+        <label>
+          {tt("GitHub Sponsors page", "GitHub Sponsors 页面")}
+          <input value={d.github ?? ""} onChange={(e) => setD({ ...d, github: e.target.value || null })} />
+        </label>
+        <label>
+          {tt("Reason (kept in the log)", "理由（记入日志）")}
+          <input value={note} onChange={(e) => setNote(e.target.value)} />
+        </label>
+        <button type="submit" disabled={!note.trim()}>
+          {tt("Save links", "保存链接")}
         </button>
       </form>
       {message && <p role="status">{message}</p>}

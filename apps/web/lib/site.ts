@@ -28,7 +28,7 @@ export const ACCOUNTS =
     : null;
 export const SITE_NAME = { zh: "象棋学堂", en: "Xiangqi School" } as const;
 
-type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "profile" | "signup" | "login" | "resetPassword" | "authCallback" | "privacy" | "terms" | "player" | "online" | "fairPlay" | "sportsmanship" | "friend" | "challenge" | "game" | "leaderboard" | "moderate";
+type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "profile" | "signup" | "login" | "resetPassword" | "authCallback" | "privacy" | "terms" | "player" | "online" | "fairPlay" | "sportsmanship" | "friend" | "challenge" | "game" | "leaderboard" | "moderate" | "feedback" | "support";
 const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; description: Record<Locale, string> }> = {
   home: {
     path: "/",
@@ -110,6 +110,16 @@ const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; desc
     path: "/moderate",
     title: { zh: "审核", en: "Review" },
     description: { zh: "管理员审核页面。", en: "The moderators' review page." },
+  },
+  feedback: {
+    path: "/feedback",
+    title: { zh: "意见反馈", en: "Feedback" },
+    description: { zh: "告诉我们象棋学堂哪里可以改进。", en: "Tell us what to improve on Xiangqi School." },
+  },
+  support: {
+    path: "/support",
+    title: { zh: "支持我们", en: "Support us" },
+    description: { zh: "象棋学堂永久免费、没有广告。你可以帮助承担运行费用。", en: "Xiangqi School is free with no ads, forever. You can help pay for running it." },
   },
   fairPlay: {
     path: "/fair-play",

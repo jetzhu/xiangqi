@@ -1397,6 +1397,64 @@ describe("site settings: the operator's contact block", () => {
   });
 });
 
+describe("feedback and donation links (M21)", () => {
+  const FM = "00000000-0000-4000-8000-0000000001f1";
+  const FP = "00000000-0000-4000-8000-0000000001f2";
+  /** Runs one select as a user or a guest, from a network address (sent as Supabase's headers). */
+  const run = <T>(user: string | null, sql: string, ip = "203.0.113.7") =>
+    db.transaction(async (tx) => {
+      await tx.query(`select set_config('request.jwt.claim.sub', $1, true), set_config('request.headers', $2, true)`, [user ?? "", JSON.stringify({ "x-forwarded-for": `${ip}, 10.0.0.1` })]);
+      await tx.exec(`set local role ${user ? "authenticated" : "anon"}`);
+      return (await tx.query<{ j: T }>(`select ${sql} as j`)).rows[0]!.j;
+    });
+  const fails = (user: string | null, sql: string, ip?: string) => run(user, sql, ip).then(() => "no error", (e: Error) => e.message);
+
+  it("takes feedback from guests and players, with limits, and only moderators read it", async () => {
+    await signUp(FM, { username: "feedback_mod" });
+    await signUp(FP, { username: "feedback_player" });
+    await run(null, `public.send_feedback('idea', '  More endgame lessons  ', '/en/learn/', 'abc1234', 'en', true)`);
+    await run(FP, `public.send_feedback('problem', 'The clock froze', '/en/game/', 'abc1234', 'zh', true)`);
+    expect(await fails(null, `public.send_feedback('idea', '   ')`)).toMatch(/write something/);
+    expect(await fails(null, `public.send_feedback('spam', 'x')`)).toMatch(/check constraint/);
+    for (let i = 0; i < 4; i++) await run(null, `public.send_feedback('other', 'more ${i}')`);
+    expect(await fails(null, `public.send_feedback('other', 'sixth')`)).toMatch(/limit/);
+    // Another network still gets through; the address itself is never kept.
+    await run(null, `public.send_feedback('other', 'from elsewhere')`, "198.51.100.9");
+    const kept = await q2<string[]>(`(select jsonb_agg(network) from public.feedback where user_id is null)`);
+    expect(new Set(kept).size).toBe(2);
+    expect(JSON.stringify(kept)).not.toContain("203.0.113.7");
+    for (let i = 0; i < 4; i++) await run(FP, `public.send_feedback('idea', 'idea ${i}')`);
+    expect(await fails(FP, `public.send_feedback('idea', 'one too many')`)).toMatch(/limit/);
+
+    expect(await fails(FP, `public.mod_feedback()`)).toMatch(/moderators only/);
+    expect(await fails(FP, `(select count(*) from public.feedback)`)).toMatch(/permission denied/);
+    await db.query(`insert into public.moderators (user_id) values ($1)`, [FM]);
+    const items = await run<{ id: number; message: string; username: string | null; reply_to: string | null; kind: string }[]>(FM, `public.mod_feedback()`);
+    expect(items).toHaveLength(11);
+    const guest = items.find((f) => f.message === "More endgame lessons")!;
+    expect(guest).toMatchObject({ username: null, reply_to: null, kind: "idea" }); // a guest can't ask for a reply
+    expect(items.find((f) => f.message === "The clock froze")).toMatchObject({ username: "feedback_player", reply_to: "2@example.com" });
+    expect(items.find((f) => f.message === "idea 0")).toMatchObject({ reply_to: null });
+
+    await run(FM, `public.mod_set_feedback(${guest.id}, 'planned', 'next lesson batch')`);
+    expect(await run(FM, `public.mod_feedback('planned')`)).toMatchObject([{ message: "More endgame lessons", note: "next lesson batch" }]);
+    expect(await run(FM, `public.mod_feedback_counts()`)).toMatchObject({ new: 10, planned: 1 });
+    await run(FM, `public.mod_set_feedback(${guest.id}, 'done')`);
+    await db.query(`update public.feedback set at = now() - interval '13 months' where id = $1`, [guest.id]);
+    expect(await q2(`public.purge_old_feedback()`)).toBe(1);
+  });
+
+  it("keeps the donation links, which only moderators set, to Stripe and GitHub Sponsors only", async () => {
+    expect(await run(null, `public.site_donations()`)).toEqual({ stripe: null, github: null });
+    expect(await fails(FP, `public.mod_set_donations('https://buy.stripe.com/abc', null, 'x')`)).toMatch(/moderators only/);
+    expect(await fails(FM, `public.mod_set_donations('https://evil.example/pay', null, 'x')`)).toMatch(/Stripe link/);
+    expect(await fails(FM, `public.mod_set_donations(null, 'https://github.com/jetzhu', 'x')`)).toMatch(/GitHub link/);
+    await run(FM, `public.mod_set_donations(' https://buy.stripe.com/test_00g5kE ', 'https://github.com/sponsors/jetzhu', 'accounts ready')`);
+    expect(await run(null, `public.site_donations()`)).toEqual({ stripe: "https://buy.stripe.com/test_00g5kE", github: "https://github.com/sponsors/jetzhu" });
+    expect((await run<{ action: string }[]>(FM, `public.mod_log_recent()`))[0]).toMatchObject({ action: "set-donations" });
+  });
+});
+
 /** Runs a query as the database owner and returns its one value. */
 const q2 = <T>(sql: string, params: unknown[] = []) => db.query<{ j: T }>(`select ${sql} as j`, params).then((r) => r.rows[0]!.j);
 

@@ -171,6 +171,22 @@ Today every verdict is shadow-only. The queue page's **Triage agreement** table 
 
 When a category's confident verdicts agree about 95 % of the time over 20 or more decisions, it could be allowed to act on its own. The switches exist (`auto_stalling`, `auto_chat`, `auto_engine`, `auto_username` in `triage_config`, all 0) but the automatic actions themselves are phase 2 and not built yet. They will only ever be private and reversible: closing a likely-invalid report, muting a chat spammer for 7 days.
 
+## Feedback
+
+The **Feedback** tab on the review page lists what people sent from the Feedback page (`/feedback`): open items (new, noted, planned) first, or one status at a time.
+
+- Read the new ones on your daily round. Give each a status (noted, planned, done, won't do) and, if useful, a private note.
+- Reply by email **only** where an address is shown: the sender ticked "you may reply to my account email". Guests can't be replied to, by design (no child's email is ever collected).
+- Never quote feedback publicly with a username. A bug worth tracking publicly goes to GitHub in your own words.
+- Done and declined items are deleted after 12 months, the rest after 24 (daily job `purge-old-feedback`).
+
+## Site settings
+
+The **Site settings** tab keeps things the site shows that change without a release, each change logged with its reason:
+
+- **Donation links** for the Support page: a Stripe Payment Link (`https://buy.stripe.com/…`) and a GitHub Sponsors page (`https://github.com/sponsors/…`). Any other address is refused. Leave one empty to hide its button.
+- **Operator contact** shown in the privacy policy.
+
 ## Private settings
 
 These live in the database, not the repository (the repository is public, so the starting values in the migrations are public; changes made with these commands are not).
@@ -215,6 +231,7 @@ The Supabase access token expires; when a command says "Invalid access token", c
 | `mark-unchecked-games` | hourly (:17) | Strong players' and leaderboard players' rated games that nobody checked within a day join the queue |
 | `retriage-open-reports` | hourly (:41) | The rules look at open reports again as evidence arrives |
 | `purge-old-game-records` | daily (03:23 UTC) | Deletes detailed game records older than 12 months, except where a report, an undecided case or an appeal involves a player |
+| `purge-old-feedback` | daily (03:35 UTC) | Deletes feedback 12 months after it was done or declined, 24 months after it was sent |
 | `purge-deleted-accounts` | daily (03:17 UTC) | Finishes account deletions after their 10-day wait |
 | `pack-game-logs` | daily (03:29 UTC) | Packs the per-move log of games over for more than 8 days into one value per game (a sixth of the size) |
 | Sportsmanship | at the end of each game | Marks, completion rate, warnings and pairing waits: no moderator involved |

@@ -2,7 +2,7 @@
 
 > This file is the master copy of this proposal. Update it here, in the same commit as any change it leads to.
 
-Oct 20, 2026 · Jet Zhu · **Draft for discussion** — nothing here is built yet
+Oct 20, 2026 · Jet Zhu · **Research and proposal**; the plan being built is in [v0.4-design.md](v0.4-design.md) (decided 2026-10-21)
 
 Three questions, researched on 2026-10-20: what coach features to support (an under-16 player especially should be able to link a coach who can see their games), how to accept donations so the site can keep running, and whether anything should be paid for — in particular by coaches teaching groups with the site. Prices and rules change; each figure below has its source and the date it was checked, and anything that couldn't be verified says so.
 

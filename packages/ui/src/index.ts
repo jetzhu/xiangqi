@@ -9,6 +9,7 @@ export { PuzzlesPage } from "./puzzles/PuzzlesPage.js";
 export { HomePage } from "./HomePage.js";
 export { SettingsPage, type SettingsPageProps } from "./SettingsPage.js";
 export { SiteNav } from "./SiteNav.js";
+export { SiteFooter } from "./SiteFooter.js";
 export { HelpPage, type HelpPageProps } from "./HelpPage.js";
 export { StatsPage } from "./stats/StatsPage.js";
 export { LessonPage } from "./learn/LessonPage.js";

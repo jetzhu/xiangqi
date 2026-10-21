@@ -4,7 +4,7 @@ import { type Locale, pageMetadata } from "../../../lib/site";
 
 // Rendered on the server, so anyone (and Google's consent-screen check) can read it without
 // running the app. Keep it true to what the code does: packages/db holds what an account stores.
-const UPDATED = "2026-10-20";
+const UPDATED = "2026-10-21";
 const CONTACT = "jianjetzhu@gmail.com";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -86,6 +86,18 @@ function En() {
         requirements. It is not shared with anyone, not used for advertising, and not used to train AI models.
       </p>
 
+      <h2>Feedback and donations</h2>
+      <p>
+        The <a href="../feedback/">feedback page</a> keeps what you write, its kind, the page you came from, the site version and your language, and,
+        if you're signed in, your account (so you can be answered only if you tick "you may reply"). To limit floods from guests we keep a hash of
+        your network address salted afresh each day, never the address itself. Moderators read feedback; an AI service (currently Anthropic's Claude)
+        may sort it into themes. Feedback is kept 12 months once dealt with, 24 months at most. Please don't put personal details in it.
+      </p>
+      <p>
+        Donations are made on <a href="https://stripe.com/privacy">Stripe</a> or <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub Sponsors</a>,
+        which handle the payment and its details under their own policies; the site itself receives no payment details.
+      </p>
+
       <h2>What we don't do</h2>
       <p>No advertising, no analytics or tracking scripts, no tracking cookies, and we never sell or rent your data. Signing in uses your browser's local storage, not cookies.</p>
 
@@ -153,6 +165,14 @@ function Zh() {
       <p>
         从 Google 获得的信息只用于让你登录象棋学堂。我们对这些信息的使用和传输遵守{" "}
         <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API 服务用户数据政策</a>，包括其中的“有限使用”要求：不与任何人分享，不用于广告，也不用于训练 AI 模型。
+      </p>
+
+      <h2>反馈与捐助</h2>
+      <p>
+        <a href="../feedback/">意见反馈</a>页面会保存你写的内容、类别、你来自的页面、网站版本和语言；如果你已登录，还会关联你的账号（只有勾选"可以回复"时我们才会回复）。为防止访客刷屏，我们保存你网络地址的哈希值（每天更换盐值），从不保存地址本身。管理员会阅读反馈；AI 服务（目前为 Anthropic 的 Claude）可能会帮助归类。处理完毕的反馈保存 12 个月，最长 24 个月。请不要在反馈中填写个人信息。
+      </p>
+      <p>
+        捐助通过 <a href="https://stripe.com/privacy">Stripe</a> 或 <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub Sponsors</a> 完成，付款及其信息由它们按各自的政策处理；本站不接收任何付款信息。
       </p>
 
       <h2>我们不做的事</h2>

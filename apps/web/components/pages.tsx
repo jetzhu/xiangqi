@@ -22,6 +22,8 @@ export const ChallengeApp = dynamic(() => import("@xq/ui/online/ChallengePage.js
 export const GameApp = dynamic(() => import("@xq/ui/online/GamePage.js").then((m) => m.GamePage), { ssr: false, loading });
 export const LeaderboardApp = dynamic(() => import("@xq/ui/online/LeaderboardPage.js").then((m) => m.LeaderboardPage), { ssr: false, loading });
 export const ModerateApp = dynamic(() => import("@xq/ui/online/ModeratePage.js").then((m) => m.ModeratePage), { ssr: false, loading });
+export const FeedbackApp = dynamic(() => import("@xq/ui/support/FeedbackPage.js").then((m) => m.FeedbackPage), { ssr: false, loading });
+export const DonateButtons = dynamic(() => import("@xq/ui/support/DonateButtons.js").then((m) => m.DonateButtons), { ssr: false, loading });
 export const HelpApp = dynamic(() => import("@xq/ui/HelpPage.js").then((m) => m.HelpPage), { ssr: false, loading });
 export const SignUpApp = dynamic(() => import("@xq/ui/account/AuthPages.js").then((m) => m.SignUpPage), { ssr: false, loading });
 export const LogInApp = dynamic(() => import("@xq/ui/account/AuthPages.js").then((m) => m.LogInPage), { ssr: false, loading });

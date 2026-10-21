@@ -1,5 +1,5 @@
 "use client";
-import { AccountProvider, AccountStoreProvider, NavProvider, SettingsProvider, SiteNav, SkillQuestion, SyncNotice, prefixNav } from "@xq/ui";
+import { AccountProvider, AccountStoreProvider, NavProvider, SettingsProvider, SiteFooter, SiteNav, SkillQuestion, SyncNotice, prefixNav } from "@xq/ui";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useMemo } from "react";
 import { ACCOUNTS, BASE_PATH } from "../lib/site";
@@ -28,6 +28,7 @@ export function Shell({ locale, children }: { locale: "zh" | "en"; children: Rea
             <SyncNotice />
             <SkillQuestion />
             {children}
+            <SiteFooter />
           </AccountStoreProvider>
         </AccountProvider>
       </NavProvider>

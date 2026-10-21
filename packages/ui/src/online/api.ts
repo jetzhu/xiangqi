@@ -403,3 +403,37 @@ export interface OperatorContact {
 export const siteContact = (sb: SupabaseClient) => rpc<OperatorContact | null>(sb, "site_contact");
 export const modSetContact = (sb: SupabaseClient, c: OperatorContact, note: string) =>
   rpc<null>(sb, "mod_set_contact", { p_name: c.name, p_address: c.address, p_phone: c.phone, p_email: c.email, p_note: note });
+
+// Feedback and donations (migration 20261024000000_feedback_support.sql) --------------------------
+
+export type FeedbackKind = "problem" | "idea" | "content" | "translation" | "other";
+export type FeedbackStatus = "new" | "noted" | "planned" | "done" | "wontdo";
+export interface FeedbackItem {
+  id: number;
+  at: string;
+  kind: FeedbackKind;
+  message: string;
+  page: string | null;
+  version: string | null;
+  lang: "en" | "zh" | null;
+  status: FeedbackStatus;
+  note: string | null;
+  username: string | null;
+  /** The sender's account email, only when they allowed a reply. */
+  reply_to: string | null;
+}
+export const sendFeedback = (sb: SupabaseClient, f: { kind: FeedbackKind; message: string; page: string; version: string; lang: string; mayReply: boolean }) =>
+  rpc<null>(sb, "send_feedback", { p_kind: f.kind, p_message: f.message, p_page: f.page, p_version: f.version, p_lang: f.lang, p_may_reply: f.mayReply });
+export const modFeedback = (sb: SupabaseClient, status: FeedbackStatus | null) => rpc<FeedbackItem[]>(sb, "mod_feedback", { p_status: status });
+export const modFeedbackCounts = (sb: SupabaseClient) => rpc<Partial<Record<FeedbackStatus, number>>>(sb, "mod_feedback_counts");
+export const modSetFeedback = (sb: SupabaseClient, id: number, status: FeedbackStatus, note: string | null) =>
+  rpc<null>(sb, "mod_set_feedback", { p_id: id, p_status: status, p_note: note });
+
+/** The Support page's donation links; null hides a button. */
+export interface DonationLinks {
+  stripe: string | null;
+  github: string | null;
+}
+export const siteDonations = (sb: SupabaseClient) => rpc<DonationLinks | null>(sb, "site_donations");
+export const modSetDonations = (sb: SupabaseClient, d: DonationLinks, note: string) =>
+  rpc<null>(sb, "mod_set_donations", { p_stripe: d.stripe, p_github: d.github, p_note: note });

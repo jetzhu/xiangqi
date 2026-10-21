@@ -146,6 +146,19 @@ export function HelpPage({ version, issuesUrl }: HelpPageProps) {
         </ol>
       </section>
 
+      <section aria-labelledby="h-feedback">
+        <h2 id="h-feedback">{tt("Feedback", "意见反馈")}</h2>
+        <p>
+          {tt(
+            "Tell us privately what doesn't work or what you'd like: every message is read.",
+            "私下告诉我们哪里有问题或你希望增加什么：每条反馈都会被阅读。",
+          )}{" "}
+          <a className="button primary" href={nav.href("/feedback")}>
+            {tt("Send feedback", "发送反馈")}
+          </a>
+        </p>
+      </section>
+
       {report && (
         <section aria-labelledby="h-report">
           <h2 id="h-report">{tt("Report a problem", "报告问题")}</h2>
@@ -155,7 +168,7 @@ export function HelpPage({ version, issuesUrl }: HelpPageProps) {
               "这会在 GitHub 上新建一个问题，并自动填入版本、页面和浏览器信息。发送前请检查内容：它将公开可见。",
             )}
           </p>
-          <a className="button primary" href={report} target="_blank" rel="noreferrer">
+          <a className="button" href={report} target="_blank" rel="noreferrer">
             {tt("Report a problem on GitHub", "在 GitHub 上报告问题")}
           </a>
         </section>
@@ -187,7 +200,8 @@ export function HelpPage({ version, issuesUrl }: HelpPageProps) {
 
       <p className="muted small">
         <a href={nav.href("/privacy")}>{tt("Privacy policy", "隐私政策")}</a> · <a href={nav.href("/terms")}>{tt("Terms of use", "使用条款")}</a> ·{" "}
-        <a href={nav.href("/fair-play")}>{tt("Fair play", "公平竞技")}</a> · <a href={nav.href("/sportsmanship")}>{tt("Sportsmanship", "棋品规则")}</a>
+        <a href={nav.href("/fair-play")}>{tt("Fair play", "公平竞技")}</a> · <a href={nav.href("/sportsmanship")}>{tt("Sportsmanship", "棋品规则")}</a> ·{" "}
+        <a href={nav.href("/feedback")}>{tt("Feedback", "意见反馈")}</a> · <a href={nav.href("/support")}>{tt("Support us", "支持我们")}</a>
       </p>
       <p className="muted small">
         {tt("Version", "版本")} {version}
