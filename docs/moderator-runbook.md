@@ -176,27 +176,60 @@ Once a day the AI assistant, which runs on the owner's PC, gives open reports it
 - the feedback grouped into themes
 - anything unusual
 
-If the summary is more than two days old, the page says so: check the timer on the PC.
+If the summary is more than two days old, the page says so: check the computer that runs it ([Setting up the daily run](#setting-up-the-daily-run)).
 
-```
-packages/triage/scripts/install-timer.sh               # install the daily timer (07:30, and at log-in if missed)
-systemctl --user start xiangqi-triage                  # run once now
-journalctl --user -u xiangqi-triage                    # what it did
-packages/triage/scripts/install-timer.sh --uninstall   # remove it
-```
+How to set up the daily run on a computer (any one; it can move later) is in [Setting up the daily run](#setting-up-the-daily-run).
 
-To run it by hand, without saving anything first:
+To run it by hand:
 
 ```
 cd ~/Projects/OOPolaris/ChessWebsite
-SUPABASE_ACCESS_TOKEN=$(tr -d '\n' < ~/.config/xiangqi-supabase-token) ~/.local/node/bin/node packages/triage/scripts/triage.mjs --dry-run   # prints verdicts and the summary, saves nothing
-packages/triage/scripts/run-daily.sh                                                                                                    # the real run, as the timer does it
+~/.local/node/bin/node packages/triage/scripts/daily.mjs --dry-run   # prints verdicts and the summary, saves nothing
+~/.local/node/bin/node packages/triage/scripts/daily.mjs             # the real run, as the scheduler does it
 ```
 
 - Each run takes up to 20 reports (`--limit N`), only those it hasn't seen since they last changed, and skips any answer it can't read.
 - To use another AI, copy the example config to `~/.config/xiangqi-triage.json` and set `"adviser"` ([triage.config.example.json](../packages/triage/triage.config.example.json)). API keys go in environment variables named by `apiKeyEnv`, never in the file.
 - What it's sent: usernames, the report's reason and note, the game's result, chat and fair-play figures, the rules' verdict, and for the summary the day's figures and feedback text. Never email addresses. The privacy policy says so.
 - When the Supabase access token expires, the run fails (see the journal): save a new token as below.
+
+## Setting up the daily run
+
+The daily run is one Node script, `packages/triage/scripts/daily.mjs`, that works the same on Linux, macOS and Windows. Any one computer can run it. The site doesn't care which, so it can move to another machine at any time. Run it on **one** computer only: two would just repeat the work.
+
+**What the computer needs:**
+
+1. **Node 24 or newer**, and a copy of the repository with its packages installed:
+   ```
+   git clone https://github.com/jetzhu/xiangqi.git && cd xiangqi && pnpm install
+   ```
+2. **An AI to ask.** By default this is Claude Code, installed and signed in on that computer's account: run `claude` once and sign in. To use another AI instead, see [The daily summary and the AI assistant](#the-daily-summary-and-the-ai-assistant).
+3. **A Supabase access token** (supabase.com/dashboard/account/tokens), saved as `~/.config/xiangqi-supabase-token`. Readable only by you: on Linux and macOS, `chmod 600`. On Windows the file is `%USERPROFILE%\.config\xiangqi-supabase-token`. Alternatively set `SUPABASE_ACCESS_TOKEN` or point `XQ_TOKEN_FILE` at the file.
+
+**Try it first, then schedule it:**
+
+```
+node packages/triage/scripts/daily.mjs --dry-run             # must end with "exit 0"
+node packages/triage/scripts/schedule.mjs print              # shows exactly what install will set up
+node packages/triage/scripts/schedule.mjs install            # daily at 07:30; --at 06:00 for another time
+node packages/triage/scripts/schedule.mjs uninstall          # remove it (do this on the old machine when moving)
+```
+
+`schedule.mjs` uses the system's own scheduler:
+
+| System | What it sets up | Run once now | If the computer was off at 07:30 |
+| --- | --- | --- | --- |
+| Linux | A systemd user timer (`~/.config/systemd/user/xiangqi-triage.*`), or a crontab line without systemd | `systemctl --user start xiangqi-triage` | Runs at the next log-in (crontab: skipped until the next day) |
+| macOS | A launchd agent (`~/Library/LaunchAgents/com.xiangqi.triage.plist`) | `launchctl kickstart gui/$(id -u)/com.xiangqi.triage` | Runs on waking from sleep; skipped after power-off |
+| Windows | A Task Scheduler task `xiangqi-triage` | `schtasks /Run /TN xiangqi-triage` | Runs as soon as possible afterwards |
+
+**Where to look:**
+- Every run writes `~/.xiangqi-triage/YYYY-MM-DD.log`, kept 30 days. On Linux it also goes to `journalctl --user -u xiangqi-triage`.
+- The review page shows the newest summary, and warns when it's more than two days old.
+
+The logs hold usernames and case details: keep them on that computer.
+
+**Moving to another computer:** set up the new one as above, then run `schedule.mjs uninstall` on the old one.
 
 ## Feedback
 

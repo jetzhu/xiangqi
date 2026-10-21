@@ -1,4 +1,4 @@
-// Runs one triage pass (src/cli.ts): bundles the TypeScript sources, then runs them. The project
+// Runs one triage pass (src/cli.ts; daily.mjs is the scheduled wrapper): bundles the TypeScript sources, then runs them. The project
 // comes from apps/web/.env (or SUPABASE_PROJECT_REF), as for the deploy scripts.
 //
 //   SUPABASE_ACCESS_TOKEN=$(cat ~/.config/xiangqi-supabase-token) node packages/triage/scripts/triage.mjs [--dry-run] [--limit N]
