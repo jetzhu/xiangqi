@@ -1,4 +1,5 @@
-// What an adviser sees and says (docs/v0.3-online-design.md, "Moderation", triage phase 3).
+// What an adviser sees and says (docs/v0.3-online-design.md, "Moderation", triage phase 3; since
+// phase 2, docs/v0.4-design.md, a confident verdict may take a private, reversible step).
 // A case is exactly what the database's triage_pending gives: the report, the game, the
 // suspect's chat and standing, and the rules' verdict. No email addresses, nothing else.
 
@@ -26,7 +27,10 @@ export interface TriageCase {
   rules: { verdict: Verdict; confidence: number; rule: string; reason: string } | null;
 }
 
-/** An adviser's verdict on one report: advice for the moderator, never an action. */
+/**
+ * An adviser's verdict on one report. A confident one (0.8 or more) that the rules don't
+ * contradict may close the report, pause chat or hide a username; a moderator reviews it later.
+ */
 export interface Advice {
   verdict: Verdict;
   /** 0 to 1. */
@@ -42,4 +46,22 @@ export interface Adviser {
   /** The model, if known, stored with the verdict so decisions can be traced. */
   readonly model?: string | undefined;
   advise(c: TriageCase): Promise<Advice>;
+  /** Free text for a system prompt and a message (the daily summary); absent for advisers that only judge. */
+  complete?(system: string, user: string, maxTokens?: number): Promise<string>;
+}
+
+/** What the daily summary covers (the database's triage_digest_input). */
+export interface DigestInput {
+  since: string;
+  steps: { kind: string; source: string; category: string; n: number }[];
+  waiting_review: number;
+  oldest_waiting: string | null;
+  open_reports: number;
+  players_with_open_reports: number;
+  reports_made: number;
+  reports_per_day_30d: number;
+  switched_off: { category: string; note: string }[];
+  switches: Record<string, number>;
+  feedback: { id: number; kind: string; lang: string | null; page: string | null; message: string }[];
+  feedback_open: number;
 }

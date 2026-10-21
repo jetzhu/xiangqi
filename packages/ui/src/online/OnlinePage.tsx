@@ -240,6 +240,16 @@ function Notices() {
         );
       case "sanction":
         return tt("A fair-play violation was confirmed on your account. See below.", "你的账号被确认违反公平竞技规则，详见下文。");
+      case "chat-muted":
+        return tt(
+          `Your chat is paused until ${n.data.until ? new Date(n.data.until).toLocaleString() : "next week"}, after reports of misuse. A moderator will review it.`,
+          `由于被举报滥用聊天，你的聊天已暂停至 ${n.data.until ? new Date(n.data.until).toLocaleString() : "下周"}。管理员会复核。`,
+        );
+      case "username-hidden":
+        return tt(
+          "Your username was hidden after a report and replaced with a temporary one. Please choose a new username in Settings → Account. A moderator will review it.",
+          "你的用户名被举报后已隐藏，并换成临时用户名。请在“设置 → 账号”中选择新用户名。管理员会复核。",
+        );
       case "appeal":
         return n.data.outcome === "overturned"
           ? tt("Your appeal succeeded: the sanction has been lifted.", "你的申诉成功，处罚已撤销。")

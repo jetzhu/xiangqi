@@ -141,7 +141,8 @@ function LiveGame({ info }: { info: GameInfo & { me: "red" | "black" } }) {
         send: (m) => link?.send(m),
         report: (r) => reporter.report(r),
         changed: rerender,
-        chat: (phrase) => setChat({ phrase, at: Date.now() }),
+        // A player whose chat triage paused: their phrases aren't shown (their own browser doesn't send them either).
+        chat: (phrase) => !mutedNow(info[info.me === "red" ? "black" : "red"]) && setChat({ phrase, at: Date.now() }),
         dispute: onDispute,
       },
     );
@@ -328,7 +329,12 @@ function LiveGame({ info }: { info: GameInfo & { me: "red" | "black" } }) {
           </div>
         )}
 
-        {settings.chat && (
+        {settings.chat && mutedNow(info[info.me]) && (
+          <p className="muted small">
+            {tt(`Your chat is paused until ${new Date(info[info.me].chat_muted_until!).toLocaleString()}.`, `你的聊天已暂停至 ${new Date(info[info.me].chat_muted_until!).toLocaleString()}。`)}
+          </p>
+        )}
+        {settings.chat && !mutedNow(info[info.me]) && (
           <div className="phrases" aria-label={tt("Chat", "快捷聊天")}>
             {(Object.keys(PHRASES) as Phrase[]).map((p) => (
               <button key={p} type="button" className="phrase" onClick={() => game.sendChat(p)}>
@@ -407,6 +413,9 @@ function Clock({ game, color }: { game: OnlineGame | null; color: "red" | "black
     </span>
   );
 }
+
+/** Whether triage has paused this player's chat. */
+const mutedNow = (p: GamePlayer) => !!p.chat_muted_until && Date.parse(p.chat_muted_until) > Date.now();
 
 function PlayerBar({ player, color, game, conn, chat }: { player: GamePlayer; color: "red" | "black"; game: OnlineGame | null; conn: string | null; chat: { phrase: Phrase; at: number } | null }) {
   const { tt, t } = useT();

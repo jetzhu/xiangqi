@@ -39,29 +39,23 @@ export const exec: Exec = (command, args, input, timeoutMs) =>
  * off, so it can only read the case and answer.
  */
 export function claudeCode(o: { command?: string; model?: string; timeoutMs?: number } = {}, run: Exec = exec): Adviser {
-  const args = ["-p", "--output-format", "json", "--system-prompt", SYSTEM, "--tools", "", ...(o.model ? ["--model", o.model] : [])];
-  return {
-    name: "claude-code",
-    model: o.model,
-    async advise(c) {
-      const out = await run(o.command ?? "claude", args, casePrompt(c), o.timeoutMs ?? 120_000);
-      let text = out;
-      try {
-        text = String((JSON.parse(out) as { result?: unknown }).result ?? out);
-      } catch {
-        // Plain text output: read it as it is.
-      }
-      return parseAdvice(text);
-    },
+  const complete = async (system: string, user: string) => {
+    const args = ["-p", "--output-format", "json", "--system-prompt", system, "--tools", "", ...(o.model ? ["--model", o.model] : [])];
+    const out = await run(o.command ?? "claude", args, user, o.timeoutMs ?? 120_000);
+    try {
+      return String((JSON.parse(out) as { result?: unknown }).result ?? out);
+    } catch {
+      // Plain text output: read it as it is.
+      return out;
+    }
   };
+  return { name: "claude-code", model: o.model, complete, advise: async (c) => parseAdvice(await complete(SYSTEM, casePrompt(c))) };
 }
 
 /** Any program: the system prompt and the case on stdin, the answer on stdout. */
 export function command(o: { command: string; args?: string[]; timeoutMs?: number }, run: Exec = exec): Adviser {
-  return {
-    name: `command:${o.command.split("/").pop()}`,
-    advise: async (c) => parseAdvice(await run(o.command, o.args ?? [], `${SYSTEM}\n\n${casePrompt(c)}`, o.timeoutMs ?? 120_000)),
-  };
+  const complete = (system: string, user: string) => run(o.command, o.args ?? [], `${system}\n\n${user}`, o.timeoutMs ?? 120_000);
+  return { name: `command:${o.command.split("/").pop()}`, complete, advise: async (c) => parseAdvice(await complete(SYSTEM, casePrompt(c))) };
 }
 
 async function postJson(fetchFn: typeof fetch, url: string, headers: Record<string, string>, body: object): Promise<unknown> {
@@ -73,38 +67,32 @@ async function postJson(fetchFn: typeof fetch, url: string, headers: Record<stri
 
 /** The Anthropic Messages API. */
 export function anthropic(o: { apiKey: string; model: string; baseUrl?: string; maxTokens?: number }, fetchFn: typeof fetch = fetch): Adviser {
-  return {
-    name: "anthropic",
-    model: o.model,
-    async advise(c) {
-      const data = (await postJson(
-        fetchFn,
-        `${o.baseUrl ?? "https://api.anthropic.com"}/v1/messages`,
-        { "x-api-key": o.apiKey, "anthropic-version": "2023-06-01" },
-        { model: o.model, max_tokens: o.maxTokens ?? 400, system: SYSTEM, messages: [{ role: "user", content: casePrompt(c) }] },
-      )) as { content?: { type: string; text?: string }[] };
-      return parseAdvice((data.content ?? []).filter((b) => b.type === "text").map((b) => b.text ?? "").join(""));
-    },
+  const complete = async (system: string, user: string, maxTokens?: number) => {
+    const data = (await postJson(
+      fetchFn,
+      `${o.baseUrl ?? "https://api.anthropic.com"}/v1/messages`,
+      { "x-api-key": o.apiKey, "anthropic-version": "2023-06-01" },
+      { model: o.model, max_tokens: maxTokens ?? o.maxTokens ?? 400, system, messages: [{ role: "user", content: user }] },
+    )) as { content?: { type: string; text?: string }[] };
+    return (data.content ?? []).filter((b) => b.type === "text").map((b) => b.text ?? "").join("");
   };
+  return { name: "anthropic", model: o.model, complete, advise: async (c) => parseAdvice(await complete(SYSTEM, casePrompt(c))) };
 }
 
 /** Any OpenAI-compatible chat completions API (a key is optional, for local servers). */
 export function openaiCompatible(o: { baseUrl: string; model: string; apiKey?: string | undefined }, fetchFn: typeof fetch = fetch): Adviser {
-  return {
-    name: "openai-compatible",
-    model: o.model,
-    async advise(c) {
-      const data = (await postJson(fetchFn, `${o.baseUrl.replace(/\/$/, "")}/chat/completions`, o.apiKey ? { authorization: `Bearer ${o.apiKey}` } : {}, {
-        model: o.model,
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: casePrompt(c) },
-        ],
-        temperature: 0,
-      })) as { choices?: { message?: { content?: string } }[] };
-      return parseAdvice(data.choices?.[0]?.message?.content ?? "");
-    },
+  const complete = async (system: string, user: string) => {
+    const data = (await postJson(fetchFn, `${o.baseUrl.replace(/\/$/, "")}/chat/completions`, o.apiKey ? { authorization: `Bearer ${o.apiKey}` } : {}, {
+      model: o.model,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+      temperature: 0,
+    })) as { choices?: { message?: { content?: string } }[] };
+    return data.choices?.[0]?.message?.content ?? "";
   };
+  return { name: "openai-compatible", model: o.model, complete, advise: async (c) => parseAdvice(await complete(SYSTEM, casePrompt(c))) };
 }
 
 /** A fixed answer, for trying the pipeline without any AI ("adviser": "none" in the config). */

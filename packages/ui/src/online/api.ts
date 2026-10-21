@@ -94,6 +94,8 @@ export interface GamePlayer {
   avatar: string | null;
   rating: number | null;
   rd: number | null;
+  /** Until when triage paused this player's chat (M22); both browsers hold their phrases back. */
+  chat_muted_until?: string | null;
 }
 
 export interface GameInfo {
@@ -216,8 +218,8 @@ export const reportedGame = (sb: SupabaseClient, game: string) => rpc<boolean>(s
 
 export interface Notice {
   id: number;
-  kind: "report-upheld" | "refund" | "sanction" | "appeal";
-  data: { points?: number; games?: number; level?: number; outcome?: "upheld" | "overturned" };
+  kind: "report-upheld" | "refund" | "sanction" | "appeal" | "chat-muted" | "username-hidden";
+  data: { points?: number; games?: number; level?: number; outcome?: "upheld" | "overturned"; until?: string };
   at: string;
 }
 export const myNotices = (sb: SupabaseClient) => rpc<Notice[]>(sb, "my_notices");
@@ -437,3 +439,45 @@ export interface DonationLinks {
 export const siteDonations = (sb: SupabaseClient) => rpc<DonationLinks | null>(sb, "site_donations");
 export const modSetDonations = (sb: SupabaseClient, d: DonationLinks, note: string) =>
   rpc<null>(sb, "mod_set_donations", { p_stripe: d.stripe, p_github: d.github, p_note: note });
+
+// Triage phase 2 (migration 20261025000000_triage_phase2.sql) ------------------------------------
+
+export type AutoStepKind = "close-report" | "mute-chat" | "hide-username";
+export interface AutoStep {
+  id: number;
+  at: string;
+  source: string;
+  kind: AutoStepKind;
+  category: ReportReason;
+  verdict: "valid" | "invalid";
+  confidence: number;
+  reason: string;
+  details: { until?: string; old?: string; new?: string };
+  review: "kept" | "undone" | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  reviewed_by: string | null;
+  target: string | null;
+  report: number | null;
+  report_note: string | null;
+  reporter: string | null;
+  game: string | null;
+}
+export interface TriageSwitch {
+  category: ReportReason;
+  on: boolean;
+  pending: number;
+  reviewed: number;
+  undone: number;
+}
+export interface TriageDigest {
+  id: number;
+  at: string;
+  source: string;
+  summary: string;
+}
+export const modAutoActions = (sb: SupabaseClient, pending: boolean) => rpc<AutoStep[]>(sb, "mod_auto_actions", { p_pending: pending });
+export const modReviewAuto = (sb: SupabaseClient, id: number, keep: boolean, note: string | null) => rpc<null>(sb, "mod_review_auto", { p_id: id, p_keep: keep, p_note: note });
+export const modTriageSwitches = (sb: SupabaseClient) => rpc<TriageSwitch[]>(sb, "mod_triage_switches");
+export const modSetAuto = (sb: SupabaseClient, category: ReportReason, on: boolean, note: string) => rpc<null>(sb, "mod_set_auto", { p_category: category, p_on: on, p_note: note });
+export const modLatestDigest = (sb: SupabaseClient) => rpc<TriageDigest | null>(sb, "mod_latest_digest");

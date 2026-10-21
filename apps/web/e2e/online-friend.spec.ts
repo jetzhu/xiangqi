@@ -44,6 +44,11 @@ function world(relay: boolean) {
     /** M21: feedback sent and filed, and the Support page's donation links. */
     feedback: [] as { id: number; at: string; kind: string; message: string; page: string | null; version: string | null; lang: string | null; status: string; note: string | null; username: string | null; reply_to: string | null }[],
     donations: { stripe: null as string | null, github: null as string | null },
+    /** M22: automatic steps, the category switches, the daily summary, and a paused chat. */
+    steps: [] as { id: number; at: string; source: string; kind: string; category: string; verdict: string; confidence: number; reason: string; details: object; review: string | null; reviewed_at: string | null; review_note: string | null; reviewed_by: string | null; target: string; report: number; report_note: string | null; reporter: string; game: string }[],
+    switches: [] as { category: string; on: boolean; pending: number; reviewed: number; undone: number }[],
+    digest: null as null | { id: number; at: string; source: string; summary: string },
+    blackMutedUntil: null as string | null,
     contact: { name: "Xiangqi School 象棋学堂", address: "P.O. Box 10000, Cupertino, CA 95014, USA", phone: null as string | null, email: "jianjetzhu@gmail.com" },
     /** Fair-play analyses each browser sent after the game (M18). */
     analyses: [] as { by: "red" | "black"; analysis: { v: number; depth: number; positions: { b: string | null; s: number[] }[] } }[],
@@ -113,6 +118,26 @@ async function player(page: Page, w: World, who: { id: string; username: string;
         w.donations = { stripe: body!.p_stripe as string | null, github: body!.p_github as string | null };
         w.calls.push(`donations:${body!.p_note}`);
         return json(route, null);
+      case "/rest/v1/rpc/mod_latest_digest":
+        return json(route, w.digest);
+      case "/rest/v1/rpc/mod_auto_actions":
+        return json(route, w.steps.filter((st) => (body!.p_pending ? st.review === null : st.review !== null)));
+      case "/rest/v1/rpc/mod_review_auto": {
+        const st = w.steps.find((x) => x.id === body!.p_id)!;
+        st.review = body!.p_keep ? "kept" : "undone";
+        st.review_note = body!.p_note as string | null;
+        st.reviewed_by = who.username;
+        st.reviewed_at = "2026-10-21T12:00:00Z";
+        w.calls.push(`review:${st.id}:${st.review}:${st.review_note}`);
+        return json(route, null);
+      }
+      case "/rest/v1/rpc/mod_triage_switches":
+        return json(route, w.switches);
+      case "/rest/v1/rpc/mod_set_auto": {
+        w.switches.find((x) => x.category === body!.p_category)!.on = body!.p_on as boolean;
+        w.calls.push(`auto:${body!.p_category}:${body!.p_on}:${body!.p_note}`);
+        return json(route, null);
+      }
       case "/rest/v1/rpc/triage_agreement":
         return json(route, [{ source: "rules", category: "stalling", decisions: 20, agreed: 19, confident: 18, confident_agreed: 18 }]);
       case "/rest/v1/rpc/mod_log_recent":
@@ -156,7 +181,7 @@ async function player(page: Page, w: World, who: { id: string; username: string;
       case "/rest/v1/rpc/game_info": {
         const c = w.challenge!;
         return json(route, {
-          id: GAME, me: who.color, red: players.red, black: players.black, base: c.base, inc: c.inc, speed: "lightning", rated: c.rated, relay: w.relay,
+          id: GAME, me: who.color, red: players.red, black: { ...players.black, chat_muted_until: w.blackMutedUntil }, base: c.base, inc: c.inc, speed: "lightning", rated: c.rated, relay: w.relay,
           status: "playing", result: null, reason: null, moves: [], red_rating_before: null, red_rating_after: null, black_rating_before: null, black_rating_after: null,
         });
       }
@@ -438,6 +463,57 @@ test("feedback reaches the moderators, who file it; a player may allow a reply",
   await alice.getByRole("button", { name: "Save", exact: true }).click();
   await expect(alice.getByRole("button", { name: "Planned (1)" })).toBeVisible();
   expect(w.calls).toContain("feedback:1:planned:relay reconnect bug");
+});
+
+test("moderators read the daily summary, keep or undo automatic steps, and switch categories", async ({ context }) => {
+  const { w, alice } = await twoPlayers(context, false);
+  const step = (id: number, kind: string, category: string, verdict: string, target: string) => ({
+    id, at: "2026-10-21T08:00:00Z", source: id === 1 ? "rules" : "ai:claude-code", kind, category, verdict, confidence: 0.9, reason: `reason ${id}`,
+    details: kind === "hide-username" ? { old: "rude_name", new: "player-1234567" } : {}, review: null, reviewed_at: null, review_note: null, reviewed_by: null,
+    target, report: id, report_note: "kept saying wow", reporter: "alice_xq", game: GAME,
+  });
+  w.steps = [step(1, "mute-chat", "chat", "valid", "bob_xq"), step(2, "hide-username", "username", "valid", "player-1234567")];
+  w.switches = ["chat", "engine", "other", "stalling", "username"].map((category) => ({ category, on: category !== "stalling", pending: 0, reviewed: 3, undone: category === "stalling" ? 2 : 0 }));
+  w.digest = { id: 1, at: new Date().toISOString(), source: "ai:claude-code", summary: "## Triage summary, 2026-10-21\n\n- **2 automatic steps** (mute-chat 1).\n\n### Feedback themes\n- Clock freezes (2) [14, 17]" };
+  w.moderator = true;
+  await alice.goto(at("/en/moderate/"));
+  const digest = alice.locator(".digest");
+  await expect(digest.getByRole("heading", { name: "Triage summary, 2026-10-21" })).toBeVisible();
+  await expect(digest.locator("strong", { hasText: "2 automatic steps" })).toBeVisible();
+  await expect(digest.getByRole("listitem").filter({ hasText: "Clock freezes (2) [14, 17]" })).toBeVisible();
+  await expect(alice.getByText("Is the PC's timer running?")).toHaveCount(0);
+
+  const steps = alice.locator(".auto-steps > li");
+  await expect(steps).toHaveCount(2);
+  await expect(steps.nth(1)).toContainText("Hid the username (now player-1234567) · rude_name");
+  await steps.nth(0).getByLabel("Note (optional, kept in the log)").fill("clear spam");
+  await steps.nth(0).getByRole("button", { name: "Keep" }).click();
+  await expect(steps).toHaveCount(1);
+  await steps.nth(0).getByRole("button", { name: "Undo" }).click();
+  await expect(alice.getByText("Nothing waiting.")).toBeVisible();
+  expect(w.calls).toEqual(expect.arrayContaining(["review:1:kept:clear spam", "review:2:undone:null"]));
+  await alice.getByRole("button", { name: "Reviewed" }).click();
+  await expect(steps.first()).toContainText("Kept · alice_xq");
+
+  await expect(alice.getByRole("button", { name: "Turn on Stalling" })).toBeDisabled();
+  await alice.getByLabel("Reason for switching (kept in the log)").fill("rule fixed");
+  await alice.getByRole("button", { name: "Turn on Stalling" }).click();
+  await expect(alice.getByRole("button", { name: "Turn off Stalling" })).toBeVisible();
+  expect(w.calls).toContain("auto:stalling:true:rule fixed");
+
+  // An old summary says the assistant on the PC has stopped.
+  w.digest = { ...w.digest, at: "2026-10-01T07:30:00Z" };
+  await alice.reload();
+  await expect(alice.getByText("Is the PC's timer running?")).toBeVisible();
+});
+
+test("a player whose chat is paused sees until when, and has no phrases to send", async ({ context }) => {
+  const { w, alice, bob } = await twoPlayers(context, false);
+  w.blackMutedUntil = new Date(Date.now() + 5 * 86_400_000).toISOString();
+  await startGame(alice, bob);
+  await expect(bob.getByText(/Your chat is paused until/)).toBeVisible();
+  await expect(bob.getByRole("button", { name: "Good luck" })).toHaveCount(0);
+  await expect(alice.getByRole("button", { name: "Good luck" })).toBeVisible();
 });
 
 test("the Support page shows the donation links the moderators set", async ({ context }) => {

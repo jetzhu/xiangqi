@@ -1265,6 +1265,8 @@ describe("report triage, phase 1", () => {
   beforeAll(async () => {
     for (const [u, name] of [[TMOD, "tmod_xq"], [R1, "rep_xq"], [S1, "sus_xq"], [S2, "badwordy_xq"]] as const) await signUp(u, { username: name });
     await db.query(`insert into public.moderators (user_id) values ($1)`, [TMOD]);
+    // Shadow mode, as phase 1 ran: verdicts only, no automatic steps (phase 2 is tested below).
+    await db.query(`update public.triage_config set value = 0 where key ~ '^auto_[a-z]+$'`);
   });
 
   it("judges stalling by the game's marks", async () => {
@@ -1314,6 +1316,134 @@ describe("report triage, phase 1", () => {
     expect(agreement.find((a) => a.source === "rules" && a.category === "stalling")).toMatchObject({ decisions: 2, agreed: 1 });
     expect(agreement.find((a) => a.source === "rules" && a.category === "chat")).toMatchObject({ decisions: 4, agreed: 1 });
     expect(await failsAs(R1, `select public.triage_agreement()`)).toMatch(/moderators only/);
+  });
+});
+
+describe("report triage, phase 2: automatic steps, reviewed later", () => {
+  const [MOD, REP, CHAT, NAME, STALL, OTHER] = ["d1", "d2", "d3", "d4", "d5", "d6"].map((x) => `00000000-0000-4000-8000-0000000002${x}`) as [string, string, string, string, string, string];
+  const run = <T>(user: string, sql: string, params: unknown[] = []) =>
+    db.transaction(async (tx) => {
+      await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [user]);
+      await tx.exec(`set local role authenticated`);
+      return (await tx.query<{ j: T }>(`select ${sql} as j`, params)).rows[0]!.j;
+    });
+  const chatOf = (phrases: string[]) => ({ kind: "end", chat: phrases.map((phrase, i) => ({ ply: 20 + i, by: "black", phrase })) });
+  /** REP (red) loses a finished game to the suspect (black) and reports it; returns the report and game ids. */
+  const reportOn = async (suspect: string, reason: string, game: { labels?: object; chat?: string[] } = {}) => {
+    const g = (
+      await db.query<{ id: string }>(
+        `insert into public.games (red, black, base, inc, speed, rated, relay, status, result, reason, moves, labels, red_end, black_end, started_at, ended_at)
+         values ($1, $2, 300, 3, 'blitz', true, false, 'over', 'black', 'timeout', array_fill('h2e2'::text, array[40]), $3, $4, $4, now(), now()) returning id`,
+        [REP, suspect, JSON.stringify(game.labels ?? {}), game.chat ? JSON.stringify(chatOf(game.chat)) : null],
+      )
+    ).rows[0]!.id;
+    const r = await db.query<{ id: number }>(`insert into public.reports (game_id, reporter, suspect, reason) values ($1, $2, $3, $4) returning id`, [g, REP, suspect, reason]);
+    return { report: r.rows[0]!.id, game: g };
+  };
+  const status = (report: number) => q2<string>(`(select status from public.reports where id = $1)`, [report]);
+  const steps = () => run<{ id: number; kind: string; target: string; source: string; report: number; verdict: string }[]>(MOD, `public.mod_auto_actions()`);
+
+  beforeAll(async () => {
+    for (const [u, name] of [[MOD, "p2mod"], [REP, "p2rep"], [CHAT, "p2chatty"], [NAME, "p2rudeword"], [STALL, "p2stall"], [OTHER, "p2other"]] as const) await signUp(u, { username: name });
+    await db.query(`insert into public.moderators (user_id) values ($1)`, [MOD]);
+    await db.query(`update public.triage_config set value = 1 where key ~ '^auto_[a-z]+$'`);
+    await db.query(`insert into public.username_blocklist (word) values ('rudeword') on conflict do nothing`);
+  });
+
+  it("pauses a chat spammer's chat for 7 days; more reports on the same episode are just closed", async () => {
+    const a = await reportOn(CHAT, "chat", { chat: ["wow", "wow", "wow", "wow", "wow"] });
+    expect(await status(a.report)).toBe("auto-closed");
+    const info = await run<{ black: { chat_muted_until: string | null }; red: { chat_muted_until: string | null } }>(REP, `public.game_info($1)`, [a.game]);
+    expect(Date.parse(info.black.chat_muted_until!) - Date.now()).toBeGreaterThan(6.9 * 86_400_000);
+    expect(info.red.chat_muted_until).toBeNull();
+    expect((await run<{ kind: string }[]>(CHAT, `public.my_notices()`)).map((n) => n.kind)).toContain("chat-muted");
+    const b = await reportOn(CHAT, "chat", { chat: ["oops", "oops", "oops"] });
+    expect(await status(b.report)).toBe("auto-closed");
+    const mine = (await steps()).filter((s) => s.target === "p2chatty");
+    expect(mine.map((s) => s.kind).sort()).toEqual(["close-report", "mute-chat"]);
+    // Nobody but a moderator sees the list; the reporter's record doesn't count undecided steps.
+    expect(await failsAs(REP, `select public.mod_auto_actions()`)).toMatch(/moderators only/);
+    expect(await q2(`public.reporter_record($1)`, [REP])).toMatchObject({ made: 0, upheld: 0 });
+  });
+
+  it("keeping a step decides the report; a second offence after a kept step goes to a person", async () => {
+    const mute = (await steps()).find((s) => s.kind === "mute-chat")!;
+    await run(MOD, `public.mod_review_auto($1, true, 'clear spam')`, [mute.id]);
+    expect(await status(mute.report)).toBe("upheld");
+    expect((await run<{ kind: string }[]>(REP, `public.my_notices()`)).map((n) => n.kind)).toContain("report-upheld");
+    expect(await failsAs(MOD, `select public.mod_review_auto(${mute.id}, false)`)).toMatch(/already reviewed/);
+    await db.query(`update public.reports set created_at = now() - interval '9 days' where suspect = $1`, [CHAT]);
+    await db.query(`update public.auto_actions set at = now() - interval '9 days' where target = $1`, [CHAT]);
+    const again = await reportOn(CHAT, "chat", { chat: ["wow", "wow", "wow"] });
+    expect(await status(again.report)).toBe("open");
+  });
+
+  it("hides an offensive username until the player chooses another, and undoing gives it back", async () => {
+    const r = await reportOn(NAME, "username");
+    expect(await status(r.report)).toBe("auto-closed");
+    const hidden = await q2<{ username: string; username_chosen: boolean }>(`(select to_jsonb(p) from public.profiles p where user_id = $1)`, [NAME]);
+    expect(hidden.username).toMatch(/^player-\d{7}$/);
+    expect(hidden.username_chosen).toBe(false);
+    expect(await q2(`public.username_problem('P2RudeWord')`)).toBe("reserved");
+    const step = (await steps()).find((s) => s.target === hidden.username)!;
+    await run(MOD, `public.mod_review_auto($1, false, 'a surname, not a slur')`, [step.id]);
+    expect(await q2(`(select username from public.profiles where user_id = $1)`, [NAME])).toBe("p2rudeword");
+    expect(await status(r.report)).toBe("open");
+    expect((await run<{ kind: string }[]>(NAME, `public.my_notices()`)).map((n) => n.kind)).not.toContain("username-hidden");
+  });
+
+  it("lets an adviser act only when it's confident and the rules don't disagree; engine and 'other' findings stay with a person", async () => {
+    const a = await reportOn(OTHER, "other");
+    await db.query(`select public.save_triage_advice($1, 'ai:test', 'valid', 0.95, 'm', 'Sounds bad.')`, [a.report]);
+    expect(await status(a.report)).toBe("open");
+    await db.query(`select public.save_triage_advice($1, 'ai:test', 'invalid', 0.7, 'm', 'Probably fine.')`, [a.report]);
+    expect(await status(a.report)).toBe("open");
+    expect(await q2(`public.save_triage_advice($1, 'ai:test', 'invalid', 0.9, 'm', 'The note describes a normal loss.')`, [a.report])).toBeGreaterThan(0);
+    expect(await status(a.report)).toBe("auto-closed");
+    // The rules say stalled; an adviser saying "invalid" doesn't overrule them.
+    await db.query(`update public.triage_config set value = 0 where key = 'auto_stalling'`);
+    const s = await reportOn(STALL, "stalling", { labels: { black: ["stalled"] } });
+    await db.query(`update public.triage_config set value = 1 where key = 'auto_stalling'`);
+    expect(await q2(`public.save_triage_advice($1, 'ai:test', 'invalid', 0.99, 'm', 'Looks fine.')`, [s.report])).toBeNull();
+    expect(await status(s.report)).toBe("open");
+  });
+
+  it("switches a category off when its steps are undone too often, and a moderator can switch it back", async () => {
+    const closed: number[] = [];
+    for (let i = 0; i < 3; i++) closed.push((await reportOn(STALL, "stalling")).report);
+    const mine = (await steps()).filter((s) => s.target === "p2stall" && closed.includes(s.report));
+    expect(mine).toHaveLength(3);
+    await run(MOD, `public.mod_review_auto($1, true)`, [mine[0]!.id]);
+    expect(await status(mine[0]!.report)).toBe("dismissed");
+    await run(MOD, `public.mod_review_auto($1, false, 'was stalling after all')`, [mine[1]!.id]);
+    expect((await run<{ category: string; on: boolean }[]>(MOD, `public.mod_triage_switches()`)).find((c) => c.category === "stalling")!.on).toBe(true);
+    await run(MOD, `public.mod_review_auto($1, false)`, [mine[2]!.id]);
+    const sw = (await run<{ category: string; on: boolean; undone: number; reviewed: number }[]>(MOD, `public.mod_triage_switches()`)).find((c) => c.category === "stalling")!;
+    expect(sw).toMatchObject({ on: false, undone: 2, reviewed: 3 });
+    expect((await run<{ action: string }[]>(MOD, `public.mod_log_recent()`))[0]).toMatchObject({ action: "auto-off" });
+    const agreement = await run<{ source: string; category: string; decisions: number; agreed: number }[]>(MOD, `public.triage_agreement()`);
+    expect(agreement.find((x) => x.source === "rules" && x.category === "stalling")).toMatchObject({ decisions: 5, agreed: 2 }); // phase 1's two decisions, then keep, undo, undo
+    // Off: a new report stays open.
+    expect(await status((await reportOn(STALL, "stalling")).report)).toBe("open");
+    await run(MOD, `public.mod_set_auto('stalling', true, 'fixed the rule')`);
+    expect(await failsAs(REP, `select public.mod_set_auto('chat', false, 'x')`)).toMatch(/moderators only/);
+  });
+
+  it("gathers what the daily summary covers and keeps the summary for the review page", async () => {
+    await db.query(`select public.send_feedback('idea', 'Please add a puzzle streak')`);
+    const input = await q2<{ steps: { kind: string; n: number }[]; waiting_review: number; feedback: { message: string }[]; switched_off: object[]; switches: Record<string, number> }>(`public.triage_digest_input()`);
+    expect(input.steps.length).toBeGreaterThan(0);
+    expect(input.waiting_review).toBeGreaterThan(0);
+    expect(input.switched_off).toHaveLength(1);
+    expect(Object.keys(input.switches).sort()).toEqual(["auto_chat", "auto_engine", "auto_other", "auto_stalling", "auto_username"]);
+    expect(input.feedback.map((f) => f.message)).toContain("Please add a puzzle streak");
+    expect(JSON.stringify(input)).not.toMatch(/@example\.com/);
+    await db.query(`select public.save_triage_digest('ai:test', '## Today\nAll quiet.', '{"waiting_review": 3}')`);
+    expect(await run(MOD, `public.mod_latest_digest()`)).toMatchObject({ source: "ai:test", summary: "## Today\nAll quiet." });
+    expect(await failsAs(REP, `select public.mod_latest_digest()`)).toMatch(/moderators only/);
+    expect(await failsAs(MOD, `select public.triage_digest_input()`)).toMatch(/permission denied/);
+    // Since the last summary: nothing new.
+    expect((await q2<{ steps: object[] }>(`public.triage_digest_input()`)).steps).toEqual([]);
   });
 });
 
@@ -1420,7 +1550,7 @@ describe("feedback and donation links (M21)", () => {
     expect(await fails(null, `public.send_feedback('other', 'sixth')`)).toMatch(/limit/);
     // Another network still gets through; the address itself is never kept.
     await run(null, `public.send_feedback('other', 'from elsewhere')`, "198.51.100.9");
-    const kept = await q2<string[]>(`(select jsonb_agg(network) from public.feedback where user_id is null)`);
+    const kept = await q2<string[]>(`(select jsonb_agg(network) from public.feedback where user_id is null and network is not null)`);
     expect(new Set(kept).size).toBe(2);
     expect(JSON.stringify(kept)).not.toContain("203.0.113.7");
     for (let i = 0; i < 4; i++) await run(FP, `public.send_feedback('idea', 'idea ${i}')`);
@@ -1430,7 +1560,7 @@ describe("feedback and donation links (M21)", () => {
     expect(await fails(FP, `(select count(*) from public.feedback)`)).toMatch(/permission denied/);
     await db.query(`insert into public.moderators (user_id) values ($1)`, [FM]);
     const items = await run<{ id: number; message: string; username: string | null; reply_to: string | null; kind: string }[]>(FM, `public.mod_feedback()`);
-    expect(items).toHaveLength(11);
+    expect(items.filter((f) => f.message !== "Please add a puzzle streak")).toHaveLength(11);
     const guest = items.find((f) => f.message === "More endgame lessons")!;
     expect(guest).toMatchObject({ username: null, reply_to: null, kind: "idea" }); // a guest can't ask for a reply
     expect(items.find((f) => f.message === "The clock froze")).toMatchObject({ username: "feedback_player", reply_to: "2@example.com" });
@@ -1438,7 +1568,7 @@ describe("feedback and donation links (M21)", () => {
 
     await run(FM, `public.mod_set_feedback(${guest.id}, 'planned', 'next lesson batch')`);
     expect(await run(FM, `public.mod_feedback('planned')`)).toMatchObject([{ message: "More endgame lessons", note: "next lesson batch" }]);
-    expect(await run(FM, `public.mod_feedback_counts()`)).toMatchObject({ new: 10, planned: 1 });
+    expect(await run(FM, `public.mod_feedback_counts()`)).toMatchObject({ new: 11, planned: 1 });
     await run(FM, `public.mod_set_feedback(${guest.id}, 'done')`);
     await db.query(`update public.feedback set at = now() - interval '13 months' where id = $1`, [guest.id]);
     expect(await q2(`public.purge_old_feedback()`)).toBe(1);

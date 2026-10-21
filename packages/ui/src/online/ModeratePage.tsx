@@ -4,7 +4,7 @@
 // against same-rating baselines, each checked game's accuracy, engine match, timing and focus,
 // the reports with their reporters' records, sanctions and appeals, and the log. Games still
 // unchecked can be analysed in the moderator's own browser, which settles them.
-import { type FormEvent, Suspense, lazy, useCallback, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { useAccount } from "../account/session.js";
 import { useNav } from "../nav.js";
 import { PHRASES, type Phrase } from "@xq/online";
@@ -25,7 +25,15 @@ import {
   modLogRecent,
   modQueue,
   modSetContact,
+  type AutoStep,
   type DonationLinks,
+  modAutoActions,
+  modLatestDigest,
+  modReviewAuto,
+  modSetAuto,
+  modTriageSwitches,
+  type TriageDigest,
+  type TriageSwitch,
   type FeedbackItem,
   type FeedbackStatus,
   modFeedback,
@@ -109,6 +117,9 @@ function Queue() {
     <>
       <h1>{tt("Review queue", "审核队列")}</h1>
       <FindPlayer />
+      <DigestPanel />
+      <AutoSteps />
+      <h2>{tt("Cases", "案件")}</h2>
       {cases === null ? (
         <p className="muted">…</p>
       ) : cases.length === 0 ? (
@@ -156,8 +167,8 @@ function Queue() {
       <h2>{tt("Triage agreement, last 90 days", "初筛一致率（最近 90 天）")}</h2>
       <p className="muted small">
         {tt(
-          "How often each source's verdict matched your decision. Shadow mode: verdicts are shown, never acted on. A category could act on its own once its confident verdicts agree about 95 % of the time over 20 or more decisions.",
-          "各来源的初筛结论与你的处理一致的比例。影子模式：只显示结论，不自动处理。当某类别的高置信度结论在 20 次以上的处理中约 95% 一致时，可考虑让其自动处理。",
+          "How often each source's verdict matched your decision, including automatic steps you kept (agreed) or undid (not).",
+          "各来源的初筛结论与你的处理一致的比例，包括你保留（一致）或撤销（不一致）的自动处理。",
         )}
       </p>
       {agreement.length === 0 ? (
@@ -186,6 +197,8 @@ function Queue() {
           </tbody>
         </table>
       )}
+
+      <TriageSwitches />
 
       <h2>{tt("Recent actions", "最近操作")}</h2>
       <ul className="mod-log">
@@ -765,6 +778,245 @@ function DonationSettings() {
         </button>
       </form>
       {message && <p role="status">{message}</p>}
+    </section>
+  );
+}
+
+const STEP_TEXT: Record<AutoStep["kind"], [string, string]> = {
+  "close-report": ["Closed the report", "关闭举报"],
+  "mute-chat": ["Paused chat for 7 days", "暂停聊天 7 天"],
+  "hide-username": ["Hid the username", "隐藏用户名"],
+};
+const CATEGORY_TEXT: Record<string, [string, string]> = {
+  chat: ["Chat", "聊天"],
+  engine: ["Engine help", "引擎辅助"],
+  other: ["Other", "其他"],
+  stalling: ["Stalling", "拖延"],
+  username: ["Username", "用户名"],
+};
+
+/** Whether the daily assistant has run lately: its summary is a day old at most, give or take. */
+const STALE_MS = 48 * 3600_000;
+
+/** The newest daily summary (packages/triage), as plain headings, bullets and bold text. */
+function DigestPanel() {
+  const { tt } = useT();
+  const account = useAccount();
+  const [d, setD] = useState<TriageDigest | null | undefined>(undefined);
+  useEffect(() => {
+    void account
+      .client()
+      .then(modLatestDigest)
+      .then(setD, () => setD(null));
+  }, [account]);
+  if (d === undefined) return null;
+  const stale = !d || Date.now() - Date.parse(d.at) > STALE_MS;
+  return (
+    <section aria-labelledby="h-digest" className="digest">
+      <h2 id="h-digest">{tt("Daily summary", "每日摘要")}</h2>
+      {stale && (
+        <p className="form-error small">
+          {d
+            ? tt(`The daily assistant last ran ${new Date(d.at).toLocaleString()}. Is the PC's timer running?`, `每日助手上次运行于 ${new Date(d.at).toLocaleString()}。电脑上的定时任务是否在运行？`)
+            : tt("No summary yet: the daily assistant hasn't run.", "暂无摘要：每日助手尚未运行。")}
+        </p>
+      )}
+      {d && <Markdownish text={d.summary} />}
+    </section>
+  );
+}
+
+/** Just enough Markdown for the summary: ## and ### headings, "- " bullets, **bold**. Text only, no HTML. */
+function Markdownish({ text }: { text: string }) {
+  const inline = (line: string) => line.split(/(\*\*[^*]+\*\*)/).map((part, i) => (part.startsWith("**") && part.endsWith("**") ? <strong key={i}>{part.slice(2, -2)}</strong> : part));
+  const out: ReactNode[] = [];
+  let bullets: string[] = [];
+  const flush = () => {
+    if (bullets.length) out.push(<ul key={`u${out.length}`}>{bullets.map((b, i) => <li key={i}>{inline(b)}</li>)}</ul>);
+    bullets = [];
+  };
+  for (const line of text.split("\n")) {
+    if (line.startsWith("- ")) {
+      bullets.push(line.slice(2));
+      continue;
+    }
+    flush();
+    if (line.startsWith("### ")) out.push(<h4 key={out.length}>{inline(line.slice(4))}</h4>);
+    else if (line.startsWith("## ")) out.push(<h3 key={out.length}>{inline(line.slice(3))}</h3>);
+    else if (line.trim()) out.push(<p key={out.length}>{inline(line)}</p>);
+  }
+  flush();
+  return <div className="markdownish">{out}</div>;
+}
+
+/** Automatic steps waiting for a look (or the latest reviewed), each with Keep and Undo. */
+function AutoSteps() {
+  const { tt } = useT();
+  const nav = useNav();
+  const account = useAccount();
+  const [pending, setPending] = useState(true);
+  const [steps, setSteps] = useState<AutoStep[] | null>(null);
+  const load = useCallback(() => {
+    void account
+      .client()
+      .then((sb) => modAutoActions(sb, pending))
+      .then(setSteps, () => setSteps([]));
+  }, [account, pending]);
+  useEffect(load, [load]);
+  return (
+    <section aria-labelledby="h-steps">
+      <h2 id="h-steps">{tt("Automatic steps", "自动处理")}</h2>
+      <p className="muted small">
+        {tt(
+          "Taken on their own by the rules or the AI assistant: private and reversible. Keep one to decide its report; undo it to reverse the step and reopen the report.",
+          "由规则或 AI 助手自动执行：不公开、可撤销。保留即对相应举报作出决定；撤销即恢复原状并重新打开举报。",
+        )}
+      </p>
+      <div className="segmented" role="group" aria-label={tt("Show", "显示")}>
+        <button type="button" aria-pressed={pending} onClick={() => setPending(true)}>
+          {tt("Waiting for a look", "待复核")}
+        </button>
+        <button type="button" aria-pressed={!pending} onClick={() => setPending(false)}>
+          {tt("Reviewed", "已复核")}
+        </button>
+      </div>
+      {steps === null ? (
+        <p className="muted">…</p>
+      ) : steps.length === 0 ? (
+        <p className="muted">{pending ? tt("Nothing waiting.", "没有待复核的处理。") : tt("None yet.", "暂无。")}</p>
+      ) : (
+        <ul className="feedback-list auto-steps">
+          {steps.map((st) => (
+            <AutoStepRow key={st.id} st={st} onDone={load} nav={nav} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function AutoStepRow({ st, onDone, nav }: { st: AutoStep; onDone: () => void; nav: ReturnType<typeof useNav> }) {
+  const { tt } = useT();
+  const account = useAccount();
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const review = async (keep: boolean) => {
+    setError(null);
+    try {
+      await modReviewAuto(await account.client(), st.id, keep, note || null);
+      onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+  const who = st.kind === "hide-username" ? (st.details.old ?? st.target) : st.target;
+  return (
+    <li>
+      <div className="small muted">
+        {new Date(st.at).toLocaleString()} · {st.source} · {tt(...(CATEGORY_TEXT[st.category] ?? [st.category, st.category]))} · {tt("confidence", "置信度")} {Number(st.confidence).toFixed(2)}
+        {st.reporter && ` · ${tt("reported by", "举报人")} ${st.reporter}`}
+      </div>
+      <p>
+        <strong>{tt(...STEP_TEXT[st.kind])}</strong>
+        {st.kind === "hide-username" && st.details.new ? ` (${tt("now", "现为")} ${st.details.new})` : ""} ·{" "}
+        {st.target ? <a href={nav.href(`/moderate?u=${encodeURIComponent(st.target)}`)}>{who}</a> : who} · {st.verdict === "valid" ? tt("likely valid", "可能成立") : tt("likely invalid", "可能不成立")}
+      </p>
+      <p className="message">{st.reason}</p>
+      {st.report_note && <p className="small">{tt("Reporter's note:", "举报说明：")} {st.report_note}</p>}
+      {st.game && (
+        <p className="small">
+          <a href={nav.href(`/game?id=${st.game}`)}>{tt("Open the game", "打开对局")}</a>
+        </p>
+      )}
+      {st.review ? (
+        <p className="small">
+          {st.review === "kept" ? tt("Kept", "已保留") : tt("Undone", "已撤销")} · {st.reviewed_by ?? "–"} · {st.reviewed_at && new Date(st.reviewed_at).toLocaleString()}
+          {st.review_note && ` · ${st.review_note}`}
+        </p>
+      ) : (
+        <div className="row">
+          <label>
+            {tt("Note (optional, kept in the log)", "备注（可选，记入日志）")} <input value={note} onChange={(e) => setNote(e.target.value)} />
+          </label>{" "}
+          <button type="button" onClick={() => void review(true)}>
+            {tt("Keep", "保留")}
+          </button>{" "}
+          <button type="button" onClick={() => void review(false)}>
+            {tt("Undo", "撤销")}
+          </button>
+          {error && <span role="alert"> {error}</span>}
+        </div>
+      )}
+    </li>
+  );
+}
+
+/** Each category's switch, with how its reviewed steps went. */
+function TriageSwitches() {
+  const { tt } = useT();
+  const account = useAccount();
+  const [rows, setRows] = useState<TriageSwitch[]>([]);
+  const [note, setNote] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const load = useCallback(() => {
+    void account
+      .client()
+      .then(modTriageSwitches)
+      .then(setRows, () => {});
+  }, [account]);
+  useEffect(load, [load]);
+  const flip = async (r: TriageSwitch) => {
+    setMessage(null);
+    try {
+      await modSetAuto(await account.client(), r.category, !r.on, note);
+      setNote("");
+      load();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : String(e));
+    }
+  };
+  if (rows.length === 0) return null;
+  return (
+    <section aria-labelledby="h-switches">
+      <h2 id="h-switches">{tt("Automatic steps by category", "各类别的自动处理")}</h2>
+      <p className="muted small">
+        {tt(
+          "A category switches itself off when more than 1 in 10 of its last 20 reviewed steps were undone (and at least 2). Engine findings and 'other' reports are only ever closed automatically when unfounded.",
+          "当某类别最近 20 次已复核的处理中撤销超过十分之一（且至少 2 次）时，该类别会自动关闭。引擎和“其他”类举报只会在明显不成立时被自动关闭。",
+        )}
+      </p>
+      <label>
+        {tt("Reason for switching (kept in the log)", "切换理由（记入日志）")} <input value={note} onChange={(e) => setNote(e.target.value)} />
+      </label>
+      <table className="mod-table">
+        <thead>
+          <tr>
+            <th scope="col">{tt("Category", "类别")}</th>
+            <th scope="col">{tt("Automatic", "自动")}</th>
+            <th scope="col">{tt("Waiting", "待复核")}</th>
+            <th scope="col">{tt("Undone (last 20 reviewed)", "撤销（最近 20 次）")}</th>
+            <th scope="col" />
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.category}>
+              <td>{tt(...(CATEGORY_TEXT[r.category] ?? [r.category, r.category]))}</td>
+              <td>{r.on ? tt("On", "开") : tt("Off", "关")}</td>
+              <td>{r.pending}</td>
+              <td>
+                {r.undone}/{r.reviewed}
+              </td>
+              <td>
+                <button type="button" disabled={!note.trim()} onClick={() => void flip(r)}>
+                  {r.on ? tt(`Turn off ${CATEGORY_TEXT[r.category]?.[0] ?? r.category}`, `关闭${CATEGORY_TEXT[r.category]?.[1] ?? r.category}`) : tt(`Turn on ${CATEGORY_TEXT[r.category]?.[0] ?? r.category}`, `开启${CATEGORY_TEXT[r.category]?.[1] ?? r.category}`)}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {message && <p role="alert">{message}</p>}
     </section>
   );
 }

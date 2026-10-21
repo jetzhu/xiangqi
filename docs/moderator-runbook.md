@@ -6,7 +6,7 @@ Oct 18, 2026 · for the moderators of Xiangqi School
 
 ## The job in one paragraph
 
-Players report opponents; the site gathers evidence on its own (fair-play statistics from both players' browsers, sportsmanship marks from the server's clock, both browsers' chat records), and rules and an AI adviser give each report a first verdict. A moderator decides only what needs a person: anything public (a violation mark, a suspension, rating refunds), second offences, appeals, and the cases the rules and the adviser can't settle. Two principles never bend: **one game proves nothing**, and **a person confirms before anything public happens**.
+Players report opponents; the site gathers evidence on its own (fair-play statistics from both players' browsers, sportsmanship marks from the server's clock, both browsers' chat records), and rules and an AI assistant give each report a first verdict. Confident verdicts take private, reversible steps on their own, which a moderator keeps or undoes later ([Automatic steps](#automatic-steps-triage-phase-2)). A moderator decides only what needs a person: anything public (a violation mark, a suspension, rating refunds), second offences, appeals, and the cases the rules and the adviser can't settle. Two principles never bend: **one game proves nothing**, and **a person confirms before anything public happens**.
 
 ```mermaid
 ---
@@ -14,7 +14,10 @@ title: Where a moderator comes in
 ---
 flowchart LR
   report["Report"] --> rules["Rules verdict<br/>(automatic)"]
-  rules --> ai["AI adviser verdict<br/>(when run)"]
+  rules --> ai["AI assistant verdict<br/>(daily)"]
+  rules -- "confident" --> step["Automatic step<br/>(private, reversible)"]
+  ai -- "confident" --> step
+  step --> look["Keep / Undo<br/>(when there's time)"]
   stats["Fair-play standing,<br/>unchecked games"] --> queue
   ai --> queue["<b>Review queue</b>"]
   rules --> queue
@@ -40,11 +43,11 @@ node packages/db/scripts/sql.mjs --write "delete from public.moderators where us
 
 ## A daily round (about 5 minutes when quiet)
 
-1. Optionally run the AI adviser first, so its verdicts are on the page ([AI adviser](#the-ai-adviser)).
-2. Open the review page. Work the queue from the top: it's ordered by strength of evidence, then rating.
-3. For each case, read it ([Reading a case](#reading-a-case)), write a reason, decide ([Decisions](#decisions)).
-4. Check your email for appeals, and record each one ([Appeals](#appeals)).
-5. Now and then, glance at "Triage agreement" at the bottom of the queue page; it says when a category of reports could be handled automatically ([Triage settings](#triage-settings-phase-2)).
+1. Open the review page and read the **daily summary** at the top ([The daily summary](#the-daily-summary-and-the-ai-assistant)).
+2. Keep or undo the **automatic steps** waiting for a look ([Automatic steps](#automatic-steps-triage-phase-2)). They're already in force, so this can wait for a day when you have time.
+3. Work the cases from the top: they're ordered by strength of evidence, then rating. For each, read it ([Reading a case](#reading-a-case)), write a reason, decide ([Decisions](#decisions)).
+4. File new items on the **Feedback** tab ([Feedback](#feedback)).
+5. Check your email for appeals, and record each one ([Appeals](#appeals)).
 
 An empty queue says "Nothing to review." That's the normal state.
 
@@ -150,26 +153,50 @@ node packages/db/scripts/sql.mjs --write "begin; select set_config('request.jwt.
 node packages/db/scripts/sql.mjs --write "begin; select set_config('request.jwt.claim.sub', (select user_id::text from public.profiles where username = 'jetzhu'), true); select public.mod_excuse_label('<game id>', 'name', 'aborted', 'why'); commit;"
 ```
 
-## The AI adviser
+## Automatic steps (triage phase 2)
 
-The adviser reads open reports the rules couldn't settle and gives its own verdict beside the rules'. It never acts. Setup is in `packages/triage` ([triage.config.example.json](../packages/triage/triage.config.example.json)); the default is Claude Code on the operator's own subscription, with all tools off.
+Since 2026-10-21 triage acts on its own, with private, reversible steps only. The **Queue** tab shows them first, under **Automatic steps**:
+
+| Step | When | Undo gives back |
+| --- | --- | --- |
+| Close the report | A confident "likely invalid" verdict (any reason); or a confident "likely valid" stalling report, since the game's marks already count | The report, open again |
+| Pause chat for 7 days | Confident "likely valid" abusive chat, first time | Chat at once |
+| Hide the username | Confident "likely valid" offensive username, first time | The old name, unless the player has already chosen a new one (the old name stays reserved until then) |
+
+- **Who acts:** the rules, at once and hourly; the AI assistant, once a day, only when it is confident (0.8+) and the rules don't say the opposite.
+- **Never automatic:** engine findings (quiet matching already applies), "other" reports found valid, second offences (an earlier step of the same kind that was kept, or a sanction in the last 180 days), anything public, appeals.
+- **Your part:** on your daily round, look at each step waiting. **Keep** decides its report (upheld for "likely valid", which tells the reporter action was taken; dismissed for "likely invalid"). **Undo** reverses it and reopens the report for a normal decision. Both count in the agreement table.
+- **Self switch-off:** when more than 1 in 10 of a category's last 20 reviewed steps were undone (and at least 2), that category stops acting and the log shows `auto-off`. Fix the cause (the rule's numbers, the word list), then turn it back on in **Automatic steps by category**, with a reason.
+- Reports closed automatically don't count for or against the reporter until you keep the step.
+
+## The daily summary and the AI assistant
+
+Once a day the AI assistant, which runs on the owner's PC, gives open reports its verdict, which may take a step as above. It then writes the **daily summary** shown at the top of the Queue tab:
+- the day's figures (steps taken, steps waiting, open reports, categories switched off, new feedback)
+- the feedback grouped into themes
+- anything unusual
+
+If the summary is more than two days old, the page says so: check the timer on the PC.
+
+```
+packages/triage/scripts/install-timer.sh               # install the daily timer (07:30, and at log-in if missed)
+systemctl --user start xiangqi-triage                  # run once now
+journalctl --user -u xiangqi-triage                    # what it did
+packages/triage/scripts/install-timer.sh --uninstall   # remove it
+```
+
+To run it by hand, without saving anything first:
 
 ```
 cd ~/Projects/OOPolaris/ChessWebsite
-SUPABASE_ACCESS_TOKEN=$(tr -d '\n' < ~/.config/xiangqi-supabase-token) ~/.local/node/bin/node packages/triage/scripts/triage.mjs --dry-run   # look first: prints, saves nothing
-SUPABASE_ACCESS_TOKEN=$(tr -d '\n' < ~/.config/xiangqi-supabase-token) ~/.local/node/bin/node packages/triage/scripts/triage.mjs             # saves verdicts as "ai:claude-code"
+SUPABASE_ACCESS_TOKEN=$(tr -d '\n' < ~/.config/xiangqi-supabase-token) ~/.local/node/bin/node packages/triage/scripts/triage.mjs --dry-run   # prints verdicts and the summary, saves nothing
+packages/triage/scripts/run-daily.sh                                                                                                    # the real run, as the timer does it
 ```
 
-- Each run takes up to 20 reports (`--limit N` to change), only those it hasn't seen since they last changed, and skips any answer it can't read (they're tried again next run).
-- To use another AI, copy the example config to `~/.config/xiangqi-triage.json` and set `"adviser"` to `anthropic`, `openai-compatible` (OpenAI, OpenRouter, Ollama, LM Studio…) or `command`. API keys go in environment variables named by `apiKeyEnv`, never in the file.
-- What it's sent: usernames, the report's reason and note, the game's result, chat and fair-play figures, and the rules' verdict. Never email addresses. The privacy policy says so.
-- Treat its verdict like a colleague's first opinion: useful for sorting, never a reason on its own.
-
-## Triage settings (phase 2)
-
-Today every verdict is shadow-only. The queue page's **Triage agreement** table shows, per source and report reason over 90 days, how often the verdicts matched your decisions, overall and for confident ones (0.8+).
-
-When a category's confident verdicts agree about 95 % of the time over 20 or more decisions, it could be allowed to act on its own. The switches exist (`auto_stalling`, `auto_chat`, `auto_engine`, `auto_username` in `triage_config`, all 0) but the automatic actions themselves are phase 2 and not built yet. They will only ever be private and reversible: closing a likely-invalid report, muting a chat spammer for 7 days.
+- Each run takes up to 20 reports (`--limit N`), only those it hasn't seen since they last changed, and skips any answer it can't read.
+- To use another AI, copy the example config to `~/.config/xiangqi-triage.json` and set `"adviser"` ([triage.config.example.json](../packages/triage/triage.config.example.json)). API keys go in environment variables named by `apiKeyEnv`, never in the file.
+- What it's sent: usernames, the report's reason and note, the game's result, chat and fair-play figures, the rules' verdict, and for the summary the day's figures and feedback text. Never email addresses. The privacy policy says so.
+- When the Supabase access token expires, the run fails (see the journal): save a new token as below.
 
 ## Feedback
 
@@ -195,7 +222,7 @@ These live in the database, not the repository (the repository is public, so the
 | --- | --- | --- |
 | `username_blocklist` | Words that make a username offensive (3+ letters, lower case, matched inside names). Empty at first. | `insert into public.username_blocklist (word) values ('…')` |
 | `fairplay_config` | Fair-play thresholds: `likely_z` (5), `watch_z` (3), `far_z` (2.5), `far_games` (3), `min_games` (10), `min_games_lightning` (15), `always_check_rating` (1800), baselines and flags | `update public.fairplay_config set value = 5.5 where key = 'likely_z'` |
-| `triage_config` | The rules' numbers (`chat_spam_count` 5, `chat_repeat` 3, `engine_min_checked` 10) and the phase 2 switches | `update public.triage_config set value = 4 where key = 'chat_spam_count'` |
+| `triage_config` | The rules' numbers (`chat_spam_count` 5, `chat_repeat` 3, `engine_min_checked` 10), the steps' numbers (`auto_min_confidence` 0.8, `mute_days` 7) and the switches (`auto_chat`, `auto_engine`, `auto_other`, `auto_stalling`, `auto_username`; use the review page for these) | `update public.triage_config set value = 4 where key = 'chat_spam_count'` |
 
 Change fair-play thresholds rarely and note why in a log-like place (an email to yourself is fine): they decide who is matched with whom.
 
@@ -229,7 +256,9 @@ The Supabase access token expires; when a command says "Invalid access token", c
 | `process-game-reports` | every 5 s | Moves browsers' reports into the game log; ends games nobody reports on for 10 minutes |
 | `clear-seeks` | every minute | Clears abandoned quick-pairing searches |
 | `mark-unchecked-games` | hourly (:17) | Strong players' and leaderboard players' rated games that nobody checked within a day join the queue |
-| `retriage-open-reports` | hourly (:41) | The rules look at open reports again as evidence arrives |
+| `retriage-open-reports` | hourly (:41) | The rules look at open reports again as evidence arrives, and act when confident |
+| Daily triage (owner's PC) | 07:30, or at log-in if missed | The AI assistant's verdicts and steps, then the daily summary |
+| `purge-old-digests` | daily (03:39 UTC) | Deletes summaries older than 12 months |
 | `purge-old-game-records` | daily (03:23 UTC) | Deletes detailed game records older than 12 months, except where a report, an undecided case or an appeal involves a player |
 | `purge-old-feedback` | daily (03:35 UTC) | Deletes feedback 12 months after it was done or declined, 24 months after it was sent |
 | `purge-deleted-accounts` | daily (03:17 UTC) | Finishes account deletions after their 10-day wait |
