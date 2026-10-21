@@ -555,7 +555,7 @@ function ResultPanel({
         <p className="muted small">{settling ? tt("Recording the result…", "正在记录结果…") : tt("The result will be recorded when the server is reachable.", "服务器恢复后将记录结果。")}</p>
       )}
       <div className="buttons">
-        <a className="button primary" href={nav.href(`/analysis${moves.length ? `?moves=${moves.join(",")}` : ""}`)}>
+        <a className="button primary" href={nav.href(`/analysis${moves.length ? `?moves=${moves.join(",")}${me === "black" ? "&side=black" : ""}` : ""}`)}>
           {tt("Analyse", "分析棋局")}
         </a>
       </div>

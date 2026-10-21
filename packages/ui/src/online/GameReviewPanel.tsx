@@ -67,6 +67,8 @@ export default function GameReviewPanel({
   const { tt } = useT();
   const notation = useSettings().settings.notation;
   const [focus, setFocus] = useState<number | null>(null);
+  /** Whose moves the review looks at: the player's own by default, the opponent's on request. */
+  const [side, setSide] = useState<"red" | "black">(me ?? "red");
   const account = useAccount();
   const { engine, status } = useEngineInstance(moves.length > 0);
   const [progress, setProgress] = useState(0);
@@ -129,7 +131,7 @@ export default function GameReviewPanel({
     );
   }
   const review = reviewFromEvals(fens, [...moves], evals, { isBook: (i) => isBookMove(moves, i) });
-  const keys = keyMoments(review, me ?? "both");
+  const keys = keyMoments(review, side);
   const notate = (fen: string, iccs: string | null) => {
     if (!iccs) return null;
     const rec = new Game(fen).move(iccs);
@@ -146,7 +148,7 @@ export default function GameReviewPanel({
   const sel = focus === null ? null : review[focus]!;
   const mine = accuracy(review, (me ?? "red") === "red");
   const theirs = accuracy(review, (me ?? "red") !== "red");
-  const counts = gradeCounts(review, (me ?? "red") === "red");
+  const counts = gradeCounts(review, side === "red");
   return (
     <section className="game-review" aria-label={tt("Game Review", "复盘")}>
       <h3>{tt("Game Review", "复盘")}</h3>
@@ -154,7 +156,23 @@ export default function GameReviewPanel({
         {tt("Accuracy", "准确度")}: <strong>{mine === null ? "–" : Math.round(mine)}</strong> {me ? tt("you", "你") : tt("Red", "红方")} · {theirs === null ? "–" : Math.round(theirs)}{" "}
         {me ? tt("opponent", "对手") : tt("Black", "黑方")}
       </p>
-      {me && (
+      <div className="segmented small" role="radiogroup" aria-label={tt("Review whose moves", "复盘哪一方")}>
+        {(["red", "black"] as const).map((c) => (
+          <button
+            key={c}
+            type="button"
+            role="radio"
+            aria-checked={side === c}
+            className={side === c ? "selected" : ""}
+            onClick={() => {
+              setSide(c);
+              pick(null);
+            }}
+          >
+            {me ? (c === me ? tt("You", "你") : tt("Opponent", "对手")) : c === "red" ? tt("Red", "红方") : tt("Black", "黑方")}
+          </button>
+        ))}
+      </div>
       <ul className="grade-counts">
         {GRADES.map((g) => (
           <li key={g.grade} className={`grade-${g.grade}`}>
@@ -162,17 +180,24 @@ export default function GameReviewPanel({
           </li>
         ))}
       </ul>
-      )}
       <EvalGraph
         reviewed={review}
-        perspective={me ?? "red"}
+        perspective={side}
         keys={keys}
         focusIndex={focus}
         onSelect={pick}
-        label={me ? tt("Your winning chances over the game", "你在整盘棋中的胜率变化") : tt("Red's winning chances over the game", "红方在整盘棋中的胜率变化")}
+        label={
+          me
+            ? side === me
+              ? tt("Your winning chances over the game", "你在整盘棋中的胜率变化")
+              : tt("Your opponent's winning chances over the game", "对手在整盘棋中的胜率变化")
+            : side === "red"
+              ? tt("Red's winning chances over the game", "红方在整盘棋中的胜率变化")
+              : tt("Black's winning chances over the game", "黑方在整盘棋中的胜率变化")
+        }
       />
       {keys.length === 0 ? (
-        <p className="muted small">{me ? tt("No inaccuracies, mistakes or blunders. Well played!", "没有欠准、失误或败着。下得好！") : tt("No inaccuracies, mistakes or blunders.", "没有欠准、失误或败着。")}</p>
+        <p className="muted small">{me && side === me ? tt("No inaccuracies, mistakes or blunders. Well played!", "没有欠准、失误或败着。下得好！") : tt("No inaccuracies, mistakes or blunders.", "没有欠准、失误或败着。")}</p>
       ) : (
         <ol className="key-list">
           {keys.map((k) => (

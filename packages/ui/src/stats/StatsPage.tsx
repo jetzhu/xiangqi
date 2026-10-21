@@ -416,7 +416,7 @@ function GameList({ games, filter, onFilter }: { games: GameRecord[]; filter: Ga
                   <td>{Math.ceil(g.moves.length / 2)}</td>
                   <td>{g.accuracy === null ? "–" : g.accuracy.toFixed(1)}</td>
                   <td>
-                    <a href={nav.href(`/analysis?moves=${g.moves.join(",")}`)}>{tt("Review", "复盘")}</a>
+                    <a href={nav.href(`/analysis?moves=${g.moves.join(",")}${g.playerColor === "black" ? "&side=black" : ""}`)}>{tt("Review", "复盘")}</a>
                   </td>
                 </tr>
               );
@@ -514,7 +514,7 @@ function AllGames({ bots, online, more }: { bots: GameRecord[]; online: OnlineGa
           detail: reason(g.reason),
           delta: g.rated && g.ratingAfter !== null && g.ratingBefore !== null ? g.ratingAfter - g.ratingBefore : null,
           rated: g.rated,
-          href: nav.href(`/analysis?moves=${g.moves.join(",")}`),
+          href: nav.href(`/analysis?moves=${g.moves.join(",")}${g.playerColor === "black" ? "&side=black" : ""}`),
           link: tt("Review", "复盘"),
         };
       }),

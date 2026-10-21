@@ -453,7 +453,7 @@ export function BotGame({ bot, playerColor, settings, lang, onExit, onRematch }:
     return out;
   };
 
-  const analyseLink = nav.href(`/analysis${moves.length ? `?moves=${moves.join(",")}` : ""}`);
+  const analyseLink = nav.href(`/analysis${moves.length ? `?moves=${moves.join(",")}${playerColor === "black" ? "&side=black" : ""}` : ""}`);
   const status =
     botEng.status === "error"
       ? tt(`Engine unavailable: ${botEng.error}`, `引擎不可用：${botEng.error}`)

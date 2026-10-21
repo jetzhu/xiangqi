@@ -149,7 +149,7 @@ export function HomePage() {
                   <span className="muted">
                     {!g.rated ? tt("casual", "不计分") : change === null ? tt("rated", "计分") : `${change >= 0 ? "+" : ""}${change}`}
                   </span>
-                  <a href={nav.href(`/analysis?moves=${g.moves.join(",")}`)}>{tt("Review", "复盘")}</a>
+                  <a href={nav.href(`/analysis?moves=${g.moves.join(",")}${g.playerColor === "black" ? "&side=black" : ""}`)}>{tt("Review", "复盘")}</a>
                 </li>
               );
             })}

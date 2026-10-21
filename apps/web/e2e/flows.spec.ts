@@ -90,3 +90,17 @@ test("analysis board: review the game shows the graph, and a key moment's dot ju
   await dots.first().click({ force: true });
   await expect.poll(() => page.url()).not.toBe(before);
 });
+
+test("analysis board: a game opened as Black turns the board and reviews Black's moves, with a switch to Red's", async ({ page }) => {
+  await page.goto(at("/en/analysis/?moves=h2e2,h9g7,e2e6,g7e6&side=black"));
+  await expect(page.getByRole("application").first()).toHaveAttribute("data-orientation", "black");
+  await page.getByRole("button", { name: "Review the game" }).click();
+  await expect(page.getByRole("img", { name: "Black's winning chances over the main line" })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("radio", { name: "Black" })).toHaveAttribute("aria-checked", "true");
+  await expect(page).toHaveURL(/side=black/);
+  await page.getByRole("radio", { name: "Red" }).click();
+  await expect(page.getByRole("img", { name: "Red's winning chances over the main line" })).toBeVisible();
+  // Red's cannon blunder is now marked.
+  await expect(page.getByRole("img", { name: "Red's winning chances over the main line" }).locator("circle").first()).toBeVisible();
+  await expect(page).not.toHaveURL(/side=black/);
+});

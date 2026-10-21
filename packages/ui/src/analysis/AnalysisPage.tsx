@@ -33,12 +33,13 @@ function fromUrl(nav: Nav): { tree: GameTree; node: TreeNode } {
   return { tree, node };
 }
 
-/** App path for a position: "/analysis?fen=…&moves=…". */
-function sharePath(tree: GameTree, node: TreeNode): string {
+/** App path for a position: "/analysis?fen=…&moves=…&side=black". */
+function sharePath(tree: GameTree, node: TreeNode, side: "red" | "black"): string {
   const q = new URLSearchParams();
   if (tree.startFen !== new GameTree().startFen) q.set("fen", tree.startFen);
   const moves = tree.path(node).map((n) => n.move!.iccs);
   if (moves.length) q.set("moves", moves.join(","));
+  if (side === "black") q.set("side", "black");
   return `/analysis${q.size ? `?${q}` : ""}`;
 }
 
@@ -56,7 +57,10 @@ export function AnalysisPage() {
   const [{ tree, node: initial }] = useState(() => fromUrl(nav));
   const [treeState, setTreeState] = useState({ tree, current: initial, version: 0 });
   const { current } = treeState;
-  const [orientation, setOrientation] = useState<"red" | "black">("red");
+  // The side the player played, from a game's Analyse/Review link: the board turns to it and the
+  // game review starts with its moves.
+  const [side, setSide] = useState<"red" | "black">(() => (nav.params().get("side") === "black" ? "black" : "red"));
+  const [orientation, setOrientation] = useState<"red" | "black">(side);
   const [engineOn, setEngineOn] = useState(true);
   const [multipv, setMultipv] = useState(3);
   const [editing, setEditing] = useState(false);
@@ -87,8 +91,8 @@ export function AnalysisPage() {
 
   // Keep the share link in the address bar.
   useEffect(() => {
-    nav.replace(sharePath(t, current));
-  }, [t, current, treeState.version]); // eslint-disable-line react-hooks/exhaustive-deps
+    nav.replace(sharePath(t, current, side));
+  }, [t, current, treeState.version, side]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keyboard: ← → step, Home/End jump (not while typing or using the board's own cursor).
   useEffect(() => {
@@ -229,7 +233,7 @@ export function AnalysisPage() {
         </div>
 
         <MoveTreeView tree={t} current={current} style={style} onSelect={go} />
-        <GameGraph tree={t} current={current} onSelect={go} disabled={liveGame} />
+        <GameGraph tree={t} current={current} onSelect={go} disabled={liveGame} side={side} onSide={setSide} />
 
         <div className="buttons">
           <button
@@ -285,7 +289,7 @@ export function AnalysisPage() {
           <button type="button" onClick={load}>{tt("Load", "载入")}</button>
           <button type="button" onClick={() => copy(current.fen, "FEN")}>{tt("Copy FEN", "复制 FEN")}</button>
           <button type="button" onClick={() => copy(t.toPgn(), "PGN")}>{tt("Copy PGN", "复制 PGN")}</button>
-          <button type="button" onClick={() => copy(new URL(nav.href(sharePath(t, current)), location.href).href, tt("Link", "链接"))}>{tt("Copy link", "复制链接")}</button>
+          <button type="button" onClick={() => copy(new URL(nav.href(sharePath(t, current, side)), location.href).href, tt("Link", "链接"))}>{tt("Copy link", "复制链接")}</button>
         </div>
 
         <h2 id="saved">{tt("Saved analyses", "已保存的分析")}</h2>
