@@ -65,8 +65,8 @@ export function useReasonText() {
     "";
 }
 
-/** A table of online games from one player's side. */
-export function OnlineGameTable({ rows }: { rows: OnlineGameRow[] }) {
+/** A table of online games from one player's side; `coach`: a coach's view of a student's games (M23). */
+export function OnlineGameTable({ rows, coach = false }: { rows: (OnlineGameRow & { opponent_under16?: boolean })[]; coach?: boolean }) {
   const { tt, t, lang } = useT();
   const nav = useNav();
   const reason = useReasonText();
@@ -92,7 +92,11 @@ export function OnlineGameTable({ rows }: { rows: OnlineGameRow[] }) {
             <tr key={g.id} className={`r-${g.result}`}>
               <td>{fmtDay(g.ended_at, lang)}</td>
               <td className="opponent">
-                {g.opponent ? <a href={nav.href(`/player?u=${encodeURIComponent(g.opponent)}`)}>{g.opponent}</a> : <span className="muted">{tt("deleted account", "已删除的账号")}</span>}
+                {g.opponent ? (
+                  <a href={nav.href(`/player?u=${encodeURIComponent(g.opponent)}`)}>{g.opponent}</a>
+                ) : (
+                  <span className="muted">{g.opponent_under16 ? tt("an opponent under 16", "一位 16 岁以下的对手") : tt("deleted account", "已删除的账号")}</span>
+                )}
                 <span className="muted small"> · {g.color === "red" ? tt("as Red", "执红") : tt("as Black", "执黑")}</span>
               </td>
               <td>
@@ -105,7 +109,7 @@ export function OnlineGameTable({ rows }: { rows: OnlineGameRow[] }) {
               <td>{g.rated ? d === null ? "–" : <span className={d >= 0 ? "up" : "down"}>{d >= 0 ? `+${d}` : d}</span> : <span className="muted small">{tt("casual", "休闲")}</span>}</td>
               <td>{Math.ceil(g.plies / 2)}</td>
               <td>
-                <a href={nav.href(`/game?id=${g.id}`)}>{tt("Open", "打开")}</a>
+                <a href={nav.href(`/game?id=${g.id}${coach ? "&coach=1" : ""}`)}>{tt("Open", "打开")}</a>
               </td>
             </tr>
           );
@@ -116,7 +120,7 @@ export function OnlineGameTable({ rows }: { rows: OnlineGameRow[] }) {
 }
 
 /** The paged list with its "Show more" button and empty and error states. */
-export function OnlineGameList({ pages, empty }: { pages: ReturnType<typeof useGamePages>; empty: string }) {
+export function OnlineGameList({ pages, empty, coach = false }: { pages: ReturnType<typeof useGamePages>; empty: string; coach?: boolean }) {
   const { tt } = useT();
   const { rows, done, busy, more } = pages;
   if (rows === null) return <p className="muted">…</p>;
@@ -125,7 +129,7 @@ export function OnlineGameList({ pages, empty }: { pages: ReturnType<typeof useG
   if (rows.length === 0) return <p className="muted">{empty}</p>;
   return (
     <>
-      <OnlineGameTable rows={rows} />
+      <OnlineGameTable rows={rows} coach={coach} />
       {!done && (
         <p>
           <button type="button" disabled={busy} onClick={more}>

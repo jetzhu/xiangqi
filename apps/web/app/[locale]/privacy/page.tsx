@@ -89,6 +89,17 @@ function En() {
         requirements. It is not shared with anyone, not used for advertising, and not used to train AI models.
       </p>
 
+      <h2>Coaching</h2>
+      <p>
+        On the <a href="../coach/">coaching page</a> a player can link a coach. A linked coach can see the player's finished online games, their Game
+        Reviews and ratings: not chat, not games in progress, nothing else, and there are no messages between them on the site. In those games an
+        opponent under 16 who isn't also the coach's student is shown only as "an opponent under 16". We keep the links (who, when, how they ended),
+        a list of every game a coach opened, which the player can see on the coaching page, and reports about coaches. A player under 16 gives a
+        parent's or guardian's email: we send it one fixed email asking them to confirm, keep the address only until they answer (then a one-way
+        hash of it, to recognise them again), and their choice to let the child link coaches without asking each time. Emails are sent through
+        Gmail. Either side, or the guardian, can end a link at any time; ended links are kept with the account. Coaches must be 18 or over.
+      </p>
+
       <h2>Feedback and donations</h2>
       <p>
         The <a href="../feedback/">feedback page</a> keeps what you write, its kind, the page you came from, the site version and your language, and,
@@ -168,6 +179,11 @@ function Zh() {
       <p>
         从 Google 获得的信息只用于让你登录象棋学堂。我们对这些信息的使用和传输遵守{" "}
         <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API 服务用户数据政策</a>，包括其中的“有限使用”要求：不与任何人分享，不用于广告，也不用于训练 AI 模型。
+      </p>
+
+      <h2>教练</h2>
+      <p>
+        在<a href="../coach/">教练</a>页面，棋手可以关联教练。教练可以看到该棋手已结束的在线对局、复盘和等级分：看不到聊天、进行中的对局或其他内容，网站上双方之间也没有私信。在这些对局中，16 岁以下且不是该教练学生的对手只显示为"一位 16 岁以下的对手"。我们保存关联记录（双方、时间、如何解除）、教练查看过的每盘对局的列表（棋手可在教练页面查看）以及关于教练的举报。16 岁以下的棋手需填写家长或监护人的邮箱：我们只发送一封固定内容的确认邮件，邮箱地址只保存到对方回复为止（之后只保留其单向哈希值，以便再次识别），并保存其是否允许孩子以后关联教练无需每次确认的选择。邮件通过 Gmail 发送。任何一方或监护人都可以随时解除关联；已解除的关联随账号保存。教练须年满 18 岁。
       </p>
 
       <h2>反馈与捐助</h2>

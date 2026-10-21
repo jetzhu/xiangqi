@@ -49,6 +49,9 @@ function world(relay: boolean) {
     switches: [] as { category: string; on: boolean; pending: number; reviewed: number; undone: number }[],
     digest: null as null | { id: number; at: string; source: string; summary: string },
     blackMutedUntil: null as string | null,
+    /** M23: each player's coaching page, and what a request answers (an error hint, or a status). */
+    coaching: {} as Record<string, object>,
+    requestAnswer: { status: "guardian" } as { status?: string; hint?: string },
     contact: { name: "Xiangqi School 象棋学堂", address: "P.O. Box 10000, Cupertino, CA 95014, USA", phone: null as string | null, email: "jianjetzhu@gmail.com" },
     /** Fair-play analyses each browser sent after the game (M18). */
     analyses: [] as { by: "red" | "black"; analysis: { v: number; depth: number; positions: { b: string | null; s: number[] }[] } }[],
@@ -118,6 +121,29 @@ async function player(page: Page, w: World, who: { id: string; username: string;
         w.donations = { stripe: body!.p_stripe as string | null, github: body!.p_github as string | null };
         w.calls.push(`donations:${body!.p_note}`);
         return json(route, null);
+      case "/rest/v1/rpc/my_coaching":
+        return json(route, w.coaching[who.username] ?? { needs_guardian: false, coach_problem: null, as_student: [], visits: [], requests: [], students: [], codes: [] });
+      case "/rest/v1/rpc/request_coach":
+        w.calls.push(`request:${body!.p_coach}:${body!.p_code}:${body!.p_family}:${body!.p_guardian_email}`);
+        if (w.requestAnswer.hint) return json(route, { code: "P0001", message: "no", hint: w.requestAnswer.hint }, 400);
+        return json(route, { id: 1, status: w.requestAnswer.status, coach: body!.p_coach });
+      case "/rest/v1/rpc/coach_answer":
+        w.calls.push(`answer:${body!.p_link}:${body!.p_accept}`);
+        return json(route, "active");
+      case "/rest/v1/rpc/create_coach_code":
+        w.calls.push("code");
+        return json(route, { code: "K7Q2MXAB", expires_at: "2026-10-22T10:00:00Z" });
+      case "/rest/v1/rpc/coach_student_games":
+        return json(route, [
+          { id: GAME, ended_at: "2026-10-20T10:00:00Z", speed: "blitz", base: 300, inc: 3, rated: true, color: "red", opponent: null, opponent_under16: true, result: "win", reason: "resign", plies: 40, rating_before: 1150, rating_after: 1158 },
+        ]);
+      case "/rest/v1/rpc/coach_game_info":
+        w.calls.push(`coach-open:${body!.p_game}`);
+        return json(route, {
+          id: GAME, me: null, coach_of: "red", red: { username: "bob_xq", avatar: null, rating: 1158, rd: 80 }, black: { username: null, avatar: null, rating: null, rd: null, under16: true },
+          base: 300, inc: 3, speed: "blitz", rated: true, relay: true, status: "over", result: "red", reason: "resign", moves: ["h2e2", "h9g7"],
+          red_rating_before: 1150, red_rating_after: 1158, black_rating_before: null, black_rating_after: null, ended_at: "2026-10-20T10:00:00Z",
+        });
       case "/rest/v1/rpc/mod_latest_digest":
         return json(route, w.digest);
       case "/rest/v1/rpc/mod_auto_actions":
@@ -514,6 +540,42 @@ test("a player whose chat is paused sees until when, and has no phrases to send"
   await expect(bob.getByText(/Your chat is paused until/)).toBeVisible();
   await expect(bob.getByRole("button", { name: "Good luck" })).toHaveCount(0);
   await expect(alice.getByRole("button", { name: "Good luck" })).toBeVisible();
+});
+
+test("coaching: a player under 16 asks a coach through their guardian; the coach accepts and sees their games, other children unnamed", async ({ context }) => {
+  const { w, alice, bob } = await twoPlayers(context, false);
+  const empty = { needs_guardian: false, coach_problem: null, as_student: [], visits: [], requests: [], students: [], codes: [] };
+  w.coaching.bob_xq = { ...empty, needs_guardian: true, coach_problem: "age" };
+  await bob.goto(at("/en/coach/"));
+  await expect(bob.getByText("No coach linked.")).toBeVisible();
+  await expect(bob.getByText("Coaches must be 18 or over.")).toBeVisible();
+  await bob.getByLabel("Coach's username").fill("alice_xq");
+  await bob.getByLabel("Your parent's or guardian's email (they confirm first)").fill("mum@example.com");
+  w.requestAnswer = { hint: "guardian-self" };
+  await bob.getByRole("button", { name: "Send request" }).click();
+  await expect(bob.locator(".coach-page").getByRole("alert")).toHaveText("That's your own email. Enter your parent's or guardian's.");
+  w.requestAnswer = { status: "guardian" };
+  await bob.getByRole("button", { name: "Send request" }).click();
+  await expect(bob.getByText("We've emailed your parent or guardian; alice_xq sees your request once they confirm.")).toBeVisible();
+  expect(w.calls).toContain("request:alice_xq:null:false:mum@example.com");
+
+  w.coaching.alice_xq = { ...empty, requests: [{ id: 7, student: "bob_xq", kind: "coach", status: "coach", under16: true, created_at: "2026-10-21T10:00:00Z" }] };
+  await alice.goto(at("/en/coach/"));
+  await expect(alice.getByText("under 16, guardian confirmed")).toBeVisible();
+  w.coaching.alice_xq = { ...empty, students: [{ id: 7, student: "bob_xq", kind: "coach", since: "2026-10-21T10:00:00Z", ratings: { blitz: 1158 }, games_30d: 1 }] };
+  await alice.getByRole("button", { name: "Accept" }).click();
+  expect(w.calls).toContain("answer:7:true");
+  await expect(alice.getByRole("cell", { name: "Blitz 1158" })).toBeVisible();
+  await alice.getByRole("button", { name: "Games", exact: true }).click();
+  await expect(alice.getByText("an opponent under 16")).toBeVisible();
+  await expect(alice.getByRole("link", { name: "Open", exact: true })).toHaveAttribute("href", new RegExp(`/en/game/\\?id=${GAME}&coach=1$`));
+  await alice.getByRole("button", { name: "New code" }).click();
+  expect(w.calls).toContain("code");
+
+  await alice.goto(at(`/en/game/?id=${GAME}&coach=1`));
+  await expect(alice.getByText("An opponent under 16")).toBeVisible();
+  await expect(alice.getByRole("link", { name: "bob_xq" })).toBeVisible();
+  expect(w.calls).toContain(`coach-open:${GAME}`);
 });
 
 test("the Support page shows the donation links the moderators set", async ({ context }) => {

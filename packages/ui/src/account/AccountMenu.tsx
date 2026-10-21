@@ -78,6 +78,9 @@ export function AccountMenu() {
             <a href={nav.href("/analysis#saved")}>{tt("My analyses", "我的分析")}</a>
           </li>
           <li>
+            <a href={nav.href("/coach")}>{tt("Coaching", "教练")}</a>
+          </li>
+          <li>
             <a href={nav.href("/settings")}>{tt("Settings", "设置")}</a>
           </li>
           <li>

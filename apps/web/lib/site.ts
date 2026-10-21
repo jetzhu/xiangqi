@@ -28,7 +28,7 @@ export const ACCOUNTS =
     : null;
 export const SITE_NAME = { zh: "象棋学堂", en: "Xiangqi School" } as const;
 
-type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "profile" | "signup" | "login" | "resetPassword" | "authCallback" | "privacy" | "terms" | "player" | "online" | "fairPlay" | "sportsmanship" | "friend" | "challenge" | "game" | "leaderboard" | "moderate" | "feedback" | "support";
+type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "profile" | "signup" | "login" | "resetPassword" | "authCallback" | "privacy" | "terms" | "player" | "online" | "fairPlay" | "sportsmanship" | "friend" | "challenge" | "game" | "leaderboard" | "moderate" | "feedback" | "support" | "coach" | "guardian";
 const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; description: Record<Locale, string> }> = {
   home: {
     path: "/",
@@ -120,6 +120,16 @@ const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; desc
     path: "/support",
     title: { zh: "支持我们", en: "Support us" },
     description: { zh: "象棋学堂永久免费、没有广告。你可以帮助承担运行费用。", en: "Xiangqi School is free with no ads, forever. You can help pay for running it." },
+  },
+  coach: {
+    path: "/coach",
+    title: { zh: "教练", en: "Coaching" },
+    description: { zh: "关联教练，或担任教练查看学生的对局。", en: "Link a coach, or coach students and see their games." },
+  },
+  guardian: {
+    path: "/guardian",
+    title: { zh: "教练确认", en: "Coach confirmation" },
+    description: { zh: "家长或监护人确认孩子的教练请求。", en: "A parent or guardian confirms their child's request for a coach." },
   },
   fairPlay: {
     path: "/fair-play",

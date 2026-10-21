@@ -1585,6 +1585,146 @@ describe("feedback and donation links (M21)", () => {
   });
 });
 
+describe("coaching (M23)", () => {
+  const [COACH, KID, TEEN, KID2, YOUNG, MOD3, PARENT] = ["01", "02", "03", "04", "05", "06", "07"].map((x) => `00000000-0000-4000-8000-0000000003${x}`) as [string, string, string, string, string, string, string];
+  const run = <T>(user: string | null, sql: string, params: unknown[] = []) =>
+    db.transaction(async (tx) => {
+      await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [user ?? ""]);
+      await tx.exec(`set local role ${user ? "authenticated" : "anon"}`);
+      return (await tx.query<{ j: T }>(`select ${sql} as j`, params)).rows[0]!.j;
+    });
+  const hint = (user: string | null, sql: string, params: unknown[] = []) =>
+    db
+      .transaction(async (tx) => {
+        await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [user ?? ""]);
+        await tx.exec(`set local role ${user ? "authenticated" : "anon"}`);
+        await tx.query(`select ${sql}`, params);
+      })
+      .then(() => "no error", (e: { hint?: string; message: string }) => e.hint ?? e.message);
+  /** Born `years` ago (by month); accounts made a month ago. */
+  const born = async (user: string, years: number) => {
+    await db.query(`alter table public.profiles disable trigger profiles_before_update`);
+    await db.query(`update public.profiles set birth_month = date_trunc('month', now() - make_interval(years => $2) - interval '2 months')::date, created_at = now() - interval '30 days' where user_id = $1`, [user, years]);
+    await db.query(`alter table public.profiles enable trigger profiles_before_update`);
+  };
+  const lastMail = () => q2<{ to_email: string; template: string; data: { token: string; student: string; coach: string } }>(`(select to_jsonb(m) from public.mail_outbox m order by id desc limit 1)`);
+  const finished = async (red: string, black: string) =>
+    (await db.query<{ id: string }>(
+      `insert into public.games (red, black, base, inc, speed, rated, relay, status, result, reason, moves, started_at, ended_at)
+       values ($1, $2, 300, 3, 'blitz', true, false, 'over', 'red', 'resign', array_fill('h2e2'::text, array[30]), now(), now()) returning id`, [red, black])).rows[0]!.id;
+
+  beforeAll(async () => {
+    for (const [u, name] of [[COACH, "coach_lin"], [KID, "kid_wei"], [TEEN, "teen_li"], [KID2, "kid_two"], [YOUNG, "young_coach"], [MOD3, "mod_three"], [PARENT, "parent_wu"]] as const) await signUp(u, { username: name });
+    await born(COACH, 40);
+    await born(PARENT, 38);
+    await born(KID, 14);
+    await born(KID2, 13);
+    await born(TEEN, 17);
+    await born(YOUNG, 17);
+    await db.query(`insert into public.moderators (user_id) values ($1)`, [MOD3]);
+  });
+
+  it("asks a guardian by email for a player under 16; the guardian confirms, and may lower the line", async () => {
+    expect(await hint(KID, `public.request_coach('young_coach')`)).toBe("coach-age");
+    expect(await hint(KID, `public.request_coach('coach_lin')`)).toBe("guardian-email");
+    expect(await hint(KID, `public.request_coach('coach_lin', null, false, '2@example.com')`)).toBe("guardian-self");
+    expect(await run(KID, `public.request_coach('coach_lin', null, false, 'Mum@Example.com')`)).toMatchObject({ status: "guardian", coach: "coach_lin" });
+    const mail = await lastMail();
+    expect(mail).toMatchObject({ to_email: "mum@example.com", template: "guardian-confirm", data: { student: "kid_wei", coach: "coach_lin" } });
+    expect(mail.data.token).toMatch(/^[0-9a-f]{64}$/);
+    expect(await q2(`(select count(*)::int from public.coach_links where token_hash = $1)`, [mail.data.token])).toBe(0); // only its hash is kept
+    // The coach doesn't see it until the guardian confirms.
+    expect((await run<{ requests: object[] }>(COACH, `public.my_coaching()`)).requests).toEqual([]);
+    expect(await run(null, `public.guardian_view($1)`, ["not-a-token"])).toBeNull();
+    expect(await run(null, `public.guardian_view($1)`, [mail.data.token])).toMatchObject({ student: "kid_wei", coach: "coach_lin", status: "guardian", line_lowered: false });
+    await run(null, `public.guardian_answer($1, true, true)`, [mail.data.token]);
+    expect(await q2(`(select guardian_email from public.coach_links where student = $1)`, [KID])).toBeNull();
+    expect(await run(null, `public.guardian_view($1)`, [mail.data.token])).toMatchObject({ status: "coach", line_lowered: true });
+    expect(await q2<{ action: string }>(`(select to_jsonb(l) from public.mod_log l where action = 'guardian-line' order by id desc limit 1)`)).toMatchObject({ action: "guardian-line" });
+    // With the line lowered, the next request needs no confirmation.
+    expect(await run(KID, `public.request_coach('parent_wu', null, true)`)).toMatchObject({ status: "coach" });
+  });
+
+  it("the coach accepts; a player 16 or over links by a one-time code without a guardian", async () => {
+    const coaching = await run<{ requests: { id: number; student: string }[] }>(COACH, `public.my_coaching()`);
+    const req = coaching.requests.find((r) => r.student === "kid_wei")!;
+    expect(await hint(TEEN, `public.coach_answer(${req.id}, true)`)).toBe("no such request");
+    expect(await run(COACH, `public.coach_answer(${req.id}, true)`)).toBe("active");
+    expect(await hint(YOUNG, `public.create_coach_code()`)).toBe("coach-age");
+    const { code } = await run<{ code: string }>(COACH, `public.create_coach_code()`);
+    expect(code).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
+    expect(await run(TEEN, `public.request_coach(null, $1)`, [code.toLowerCase()])).toMatchObject({ status: "coach", coach: "coach_lin" });
+    expect(await hint(KID2, `public.request_coach(null, $1, false, 'dad@example.com')`, [code])).toBe("code"); // used once
+    const teen = (await run<{ requests: { id: number; student: string }[] }>(COACH, `public.my_coaching()`)).requests.find((r) => r.student === "teen_li")!;
+    await run(COACH, `public.coach_answer(${teen.id}, true)`);
+    expect((await run<{ students: { student: string }[] }>(COACH, `public.my_coaching()`)).students.map((x) => x.student)).toEqual(["kid_wei", "teen_li"]);
+  });
+
+  it("shows a coach their students' finished games, with other children hidden, and logs every game opened", async () => {
+    const vsChild = await finished(KID, KID2);
+    const vsTeen = await finished(TEEN, KID);
+    const games = await run<{ id: string; opponent: string | null; opponent_under16: boolean }[]>(COACH, `public.coach_student_games('kid_wei')`);
+    expect(games.find((g) => g.id === vsChild)).toMatchObject({ opponent: null, opponent_under16: true });
+    expect(games.find((g) => g.id === vsTeen)).toMatchObject({ opponent: "teen_li", opponent_under16: false });
+    expect(await hint(YOUNG, `public.coach_student_games('kid_wei')`)).toBe("not your student");
+    const g = await run<{ red: { username: string | null }; black: { username: string | null; under16?: boolean }; coach_of: string }>(COACH, `public.coach_game_info($1)`, [vsChild]);
+    expect(g).toMatchObject({ coach_of: "red", red: { username: "kid_wei" }, black: { username: null, under16: true } });
+    expect(await run(YOUNG, `public.coach_game_info($1)`, [vsChild])).toBeNull();
+    expect((await run<{ visits: { coach: string; game: string }[] }>(KID, `public.my_coaching()`)).visits).toEqual([expect.objectContaining({ coach: "coach_lin", game: vsChild })]);
+  });
+
+  it("holds a coach's 16th student under 16 for a moderator, and caps a parent at 3 children", async () => {
+    await db.query(`update public.triage_config set value = 1 where key = 'coach_under16_cap'`);
+    await db.query(`insert into public.guardian_settings (student, line_lowered) values ($1, true)`, [KID2]);
+    await run(KID2, `public.request_coach('coach_lin')`);
+    const req = (await run<{ requests: { id: number; student: string }[] }>(COACH, `public.my_coaching()`)).requests.find((r) => r.student === "kid_two")!;
+    expect(await run(COACH, `public.coach_answer(${req.id}, true)`)).toBe("review");
+    expect(await hint(COACH, `public.mod_coaching()`)).toBe("moderators only");
+    expect((await run<{ review: { id: number; student: string }[] }>(MOD3, `public.mod_coaching()`)).review).toEqual([expect.objectContaining({ id: req.id, student: "kid_two", students_under16: 1 })]);
+    await run(MOD3, `public.mod_link(${req.id}, 'approve', 'school club')`);
+    expect(await q2(`(select status from public.coach_links where id = $1)`, [req.id])).toBe("active");
+    await db.query(`update public.triage_config set value = 15 where key = 'coach_under16_cap'`);
+    await db.query(`update public.triage_config set value = 1 where key = 'family_cap'`);
+    expect(await hint(KID2, `public.request_coach('parent_wu', null, true)`)).toBe("family-cap");
+    await db.query(`update public.triage_config set value = 3 where key = 'family_cap'`);
+  });
+
+  it("lets either side or the guardian end a link, and moderators bar a coach after a report", async () => {
+    // A guardian ends a link from the email's page (its link stays good for 90 days after answering).
+    await run(null, `public.guardian_end($1)`, [(await lastMail()).data.token]);
+    expect(await q2(`(select ended_by from public.coach_links where coach = $1 and student = $2)`, [COACH, KID])).toBe("guardian");
+    const link = await q2<number>(`(select id from public.coach_links where coach = $1 and student = $2 and status = 'active')`, [COACH, TEEN]);
+    await run(TEEN, `public.report_coach(${link}, 'asked for my phone number')`);
+    expect(await hint(TEEN, `public.report_coach(${link}, 'again')`)).toBe("once");
+    await run(TEEN, `public.end_coach_link(${link})`);
+    expect(await hint(COACH, `public.coach_student_games('teen_li')`)).toBe("not your student");
+    const mod = await run<{ reports: { id: number; coach: string; note: string }[] }>(MOD3, `public.mod_coaching()`);
+    expect(mod.reports).toEqual([expect.objectContaining({ coach: "coach_lin", note: "asked for my phone number" })]);
+    await run(MOD3, `public.mod_bar_coach('coach_lin', true, 'asked a child for contact details')`);
+    await run(MOD3, `public.mod_close_coach_report(${mod.reports[0]!.id}, 'barred')`);
+    expect(await q2(`(select count(*)::int from public.coach_links where coach = $1 and status = 'active')`, [COACH])).toBe(0);
+    expect(await hint(KID, `public.request_coach('coach_lin')`)).toBe("coach-barred");
+    expect((await run<{ links: object[]; barred: boolean }>(MOD3, `public.mod_coach_links('coach_lin')`)).barred).toBe(true);
+  });
+
+  it("sends mail through the outbox: claimed once, cleared when sent, retried on error, within the hourly limit", async () => {
+    await db.query(`delete from public.mail_outbox`);
+    for (let i = 0; i < 3; i++) await db.query(`select public.queue_mail($1, 'test', 'zh', '{"token": "secret"}', null)`, [`p${i}@example.com`]);
+    const batch = await q2<{ id: number; to: string; lang: string }[]>(`public.mail_claim(2)`);
+    expect(batch.map((m) => m.to)).toEqual(["p0@example.com", "p1@example.com"]);
+    expect((await q2<object[]>(`public.mail_claim(5)`)).length).toBe(1); // the claimed two aren't handed out again
+    await db.query(`select public.mail_done($1)`, [batch[0]!.id]);
+    await db.query(`select public.mail_done($1, 'smtp 421')`, [batch[1]!.id]);
+    expect(await q2(`(select data from public.mail_outbox where id = $1)`, [batch[0]!.id])).toEqual({});
+    expect(await q2(`(select last_error from public.mail_outbox where id = $1)`, [batch[1]!.id])).toBe("smtp 421");
+    await db.query(`update public.mail_outbox set sent_at = now() where sent_at is null`);
+    for (let i = 0; i < 99; i++) await db.query(`insert into public.mail_outbox (to_email, template, sent_at) values ('x@example.com', 'test', now())`);
+    await db.query(`select public.queue_mail('late@example.com', 'test', 'en', '{}', null)`);
+    expect(await q2(`public.mail_claim(5)`)).toEqual([]);
+    expect(await failsAs(KID, `select public.mail_claim(5)`)).toMatch(/permission denied/);
+  });
+});
+
 /** Runs a query as the database owner and returns its one value. */
 const q2 = <T>(sql: string, params: unknown[] = []) => db.query<{ j: T }>(`select ${sql} as j`, params).then((r) => r.rows[0]!.j);
 

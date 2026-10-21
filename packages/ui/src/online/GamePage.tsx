@@ -20,7 +20,7 @@ import { UserAvatar } from "../account/UserAvatar.js";
 import { useAccount } from "../account/session.js";
 import { useNav } from "../nav.js";
 import { announceMove, useOrientation, useSettings, useSound, useT } from "../settings.js";
-import { type GameInfo, type GamePlayer, type GameVerdict, gameInfo, settleGame } from "./api.js";
+import { type GameInfo, type GamePlayer, type GameVerdict, coachGameInfo, gameInfo, settleGame } from "./api.js";
 import { ReportGame } from "./ReportGame.js";
 
 // The review loads the engine, so it comes in its own chunk once a game is over.
@@ -39,6 +39,8 @@ export function GamePage() {
   const nav = useNav();
   const account = useAccount();
   const id = nav.params().get("id") ?? "";
+  // A coach opening a student's game (from the coach page): the coach's view, which is logged.
+  const asCoach = nav.params().get("coach") === "1";
   const [info, setInfo] = useState<GameInfo | null | "loading" | "error">("loading");
 
   useEffect(() => {
@@ -47,9 +49,9 @@ export function GamePage() {
     if (!id) return setInfo(null);
     void account
       .client()
-      .then((sb) => gameInfo(sb, id))
+      .then((sb) => (asCoach ? coachGameInfo(sb, id) : gameInfo(sb, id)))
       .then(setInfo, () => setInfo("error"));
-  }, [id, account]);
+  }, [id, account, asCoach]);
 
   if (info === "loading") return <p className="muted" style={{ padding: 24 }}>…</p>;
   if (info === "error") return <p className="form-error" style={{ padding: 24 }}>{tt("Couldn't load the game. Check your connection and try again.", "无法载入对局，请检查网络后重试。")}</p>;
@@ -421,7 +423,7 @@ function PlayerBar({ player, color, game, conn, chat }: { player: GamePlayer; co
   const { tt, t } = useT();
   const nav = useNav();
   const now = useNow(1_000);
-  const name = player.username ?? tt("(deleted account)", "（已注销）");
+  const name = player.username ?? (player.under16 ? tt("An opponent under 16", "一位 16 岁以下的对手") : tt("(deleted account)", "（已注销）"));
   return (
     <div className="player-bar">
       <UserAvatar user={{ username: name, avatar: player.avatar }} size={40} />
@@ -610,8 +612,8 @@ function MoveList({ history }: { history: readonly MoveRecord[] }) {
 /** A finished game, for its players or (a public game) anyone: the board, result, review and moves. */
 function FinishedGame({ info }: { info: GameInfo }) {
   const { tt } = useT();
-  // A viewer who didn't play sees it from Red's side.
-  const side = info.me ?? "red";
+  // A coach sees it from their student's side; anyone else who didn't play, from Red's.
+  const side = info.me ?? info.coach_of ?? "red";
   const [reviewFocus, setReviewFocus] = useState<ReviewFocusView | null>(null);
   const orientation = useOrientation(side);
   const game = useMemo(() => {

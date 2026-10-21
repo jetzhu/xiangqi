@@ -6,7 +6,7 @@ import { ACCOUNTS, BASE_PATH } from "../lib/site";
 import { UpdateBanner } from "./UpdateBanner";
 
 type Section = "home" | "learn" | "puzzles" | "bots" | "online" | "analysis" | "play" | "settings" | "help" | "stats" | "account" | "privacy" | "terms";
-const ACCOUNT_PAGES = ["signup", "login", "reset-password", "auth", "profile"];
+const ACCOUNT_PAGES = ["signup", "login", "reset-password", "auth", "profile", "coach", "guardian"];
 /** The online-play pages all sit under "Play online" in the menu. */
 const ONLINE_PAGES = ["online", "friend", "challenge", "game", "player", "leaderboard", "moderate"];
 

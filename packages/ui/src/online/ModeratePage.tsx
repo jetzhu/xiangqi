@@ -6,6 +6,7 @@
 // unchecked can be analysed in the moderator's own browser, which settles them.
 import { type FormEvent, type ReactNode, Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { useAccount } from "../account/session.js";
+import { type ModCoachLinks, type ModCoaching, modBarCoach, modCloseCoachReport, modCoachLinks, modCoaching, modLink } from "../coach/api.js";
 import { useNav } from "../nav.js";
 import { PHRASES, type Phrase } from "@xq/online";
 import { useT } from "../settings.js";
@@ -81,12 +82,17 @@ export function ModeratePage() {
         <a href={nav.href("/moderate?tab=feedback")} aria-current={tab === "feedback" ? "page" : undefined}>
           {tt("Feedback", "意见反馈")}
         </a>
+        <a href={nav.href("/moderate?tab=coaching")} aria-current={tab === "coaching" ? "page" : undefined}>
+          {tt("Coaching", "教练")}
+        </a>
         <a href={nav.href("/moderate?tab=settings")} aria-current={tab === "settings" ? "page" : undefined}>
           {tt("Site settings", "网站设置")}
         </a>
       </nav>
       {tab === "feedback" ? (
         <FeedbackTab />
+      ) : tab === "coaching" ? (
+        <CoachingTab />
       ) : tab === "settings" ? (
         <>
           <DonationSettings />
@@ -1017,6 +1023,161 @@ function TriageSwitches() {
         </tbody>
       </table>
       {message && <p role="alert">{message}</p>}
+    </section>
+  );
+}
+
+/** Coach reports, links over a coach's cap, and any coach's links, with end, approve and bar. */
+function CoachingTab() {
+  const { tt } = useT();
+  const account = useAccount();
+  const [data, setData] = useState<ModCoaching | null>(null);
+  const [name, setName] = useState("");
+  const [coach, setCoach] = useState<ModCoachLinks | null | undefined>(undefined);
+  const [note, setNote] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const load = useCallback(() => {
+    void account
+      .client()
+      .then(modCoaching)
+      .then(setData, () => {});
+  }, [account]);
+  useEffect(load, [load]);
+  const openCoach = async (u: string) => setCoach(await modCoachLinks(await account.client(), u));
+  const act = async (f: () => Promise<unknown>, done: string) => {
+    setMessage(null);
+    try {
+      await f();
+      setMessage(done);
+      setNote("");
+      load();
+      if (coach) await openCoach(coach.coach);
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : String(e));
+    }
+  };
+  const sb = () => account.client();
+  const needNote = !note.trim();
+  return (
+    <section aria-labelledby="h-coaching">
+      <h1 id="h-coaching">{tt("Coaching", "教练")}</h1>
+      <label>
+        {tt("Reason (kept in the log)", "理由（记入日志）")} <input value={note} onChange={(e) => setNote(e.target.value)} />
+      </label>
+      {message && <p role="status">{message}</p>}
+      <h2>{tt("Reports about coaches", "关于教练的举报")}</h2>
+      {!data || data.reports.length === 0 ? (
+        <p className="muted">{tt("None open.", "暂无未处理的举报。")}</p>
+      ) : (
+        <ul className="feedback-list">
+          {data.reports.map((r) => (
+            <li key={r.id}>
+              <div className="small muted">
+                {new Date(r.at).toLocaleString()} · {tt("from", "举报人")} {r.reporter ?? "–"} · {tt("link", "关联")} {r.link_status ?? "–"}
+                {r.barred && ` · ${tt("barred", "已禁止")}`}
+              </div>
+              <p>
+                <button type="button" className="link" onClick={() => void openCoach(r.coach)}>
+                  {r.coach}
+                </button>
+              </p>
+              <p className="message">{r.note}</p>
+              <button type="button" disabled={needNote} onClick={() => void act(async () => modCloseCoachReport(await sb(), r.id, note), tt("Report closed.", "举报已关闭。"))}>
+                {tt("Close report", "关闭举报")}
+              </button>{" "}
+              {r.link && r.link_status === "active" && (
+                <button type="button" disabled={needNote} onClick={() => void act(async () => modLink(await sb(), r.link!, "end", note), tt("Link ended.", "关联已解除。"))}>
+                  {tt("End this link", "解除此关联")}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <h2>{tt("Links waiting for a moderator", "等待审核的关联")}</h2>
+      <p className="muted small">{tt("A coach's students under 16 past 15: check the coach before approving.", "教练的 16 岁以下学生超过 15 名：请先核查教练再批准。")}</p>
+      {!data || data.review.length === 0 ? (
+        <p className="muted">{tt("None.", "暂无。")}</p>
+      ) : (
+        <ul>
+          {data.review.map((l) => (
+            <li key={l.id}>
+              <button type="button" className="link" onClick={() => void openCoach(l.coach)}>
+                {l.coach}
+              </button>{" "}
+              → {l.student} ({tt(`${l.students_under16} students under 16`, `${l.students_under16} 名 16 岁以下学生`)}){" "}
+              <button type="button" disabled={needNote} onClick={() => void act(async () => modLink(await sb(), l.id, "approve", note), tt("Approved.", "已批准。"))}>
+                {tt("Approve", "批准")}
+              </button>{" "}
+              <button type="button" disabled={needNote} onClick={() => void act(async () => modLink(await sb(), l.id, "end", note), tt("Declined.", "已拒绝。"))}>
+                {tt("Decline", "拒绝")}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <h2>{tt("A coach's links", "教练的关联")}</h2>
+      <form
+        className="find-player"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void openCoach(name.trim());
+        }}
+      >
+        <label>
+          {tt("Coach's username", "教练的用户名")} <input value={name} onChange={(e) => setName(e.target.value)} />
+        </label>{" "}
+        <button type="submit">{tt("Open", "打开")}</button>
+      </form>
+      {coach === null && <p className="muted">{tt("No such player.", "没有这个棋手。")}</p>}
+      {coach && (
+        <div className="coach-case">
+          <p>
+            <strong>{coach.coach}</strong> · {coach.barred ? tt("barred from coaching", "已禁止担任教练") : coach.problem ? tt(`can't coach yet (${coach.problem})`, `暂不能担任教练（${coach.problem}）`) : tt("can coach", "可以担任教练")}{" "}
+            <button
+              type="button"
+              disabled={needNote}
+              onClick={() => void act(async () => modBarCoach(await sb(), coach.coach, !coach.barred, note), coach.barred ? tt("Bar lifted.", "已解除禁止。") : tt("Barred; every link ended.", "已禁止，所有关联已解除。"))}
+            >
+              {coach.barred ? tt("Lift the bar", "解除禁止") : tt("Bar from coaching", "禁止担任教练")}
+            </button>
+          </p>
+          <table className="mod-table">
+            <thead>
+              <tr>
+                <th scope="col">{tt("Student", "学生")}</th>
+                <th scope="col">{tt("Kind", "类型")}</th>
+                <th scope="col">{tt("State", "状态")}</th>
+                <th scope="col">{tt("Games opened", "查看对局数")}</th>
+                <th scope="col" />
+              </tr>
+            </thead>
+            <tbody>
+              {coach.links.map((l) => (
+                <tr key={l.id}>
+                  <td>
+                    {l.student}
+                    {l.under16 && <span className="muted small"> · {tt("under 16", "16 岁以下")}</span>}
+                  </td>
+                  <td>{l.kind}</td>
+                  <td>
+                    {l.status}
+                    {l.ended_by && ` (${l.ended_by})`}
+                  </td>
+                  <td>{l.visits}</td>
+                  <td>
+                    {["guardian", "coach", "review", "active"].includes(l.status) && (
+                      <button type="button" disabled={needNote} onClick={() => void act(async () => modLink(await sb(), l.id, "end", note), tt("Link ended.", "关联已解除。"))}>
+                        {tt("End", "解除")}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }

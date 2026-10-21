@@ -240,6 +240,30 @@ The **Feedback** tab on the review page lists what people sent from the Feedback
 - Never quote feedback publicly with a username. A bug worth tracking publicly goes to GitHub in your own words.
 - Done and declined items are deleted after 12 months, the rest after 24 (daily job `purge-old-feedback`).
 
+## Coaching
+
+The **Coaching** tab on the review page shows:
+
+- **Reports about coaches**, from students' Coaching pages. Read the note, open the coach (their links, and how many games they opened per student), then close the report, end that link, or **bar** the account from coaching. A bar ends every link at once and stops new ones. Lifting it doesn't restore links.
+- **Links waiting for a moderator**: a coach's 16th student under 16 or more. Check the coach (account age, who they coach, any reports) before approving. A school or club with a real teacher is the usual case.
+- **A coach's links**, by username, with End on each.
+
+Every action needs a reason, which is kept in the log. Things to know when judging a report:
+- A coach sees only finished games, reviews and ratings, and there is no messaging on the site. So a report that a coach asked for contact details, or tried to move a child elsewhere, is serious: bar first, then look.
+- A guardian's choice to let a child link coaches without asking each time is logged as `guardian-line`.
+
+The caps live in `triage_config`: `coach_under16_cap` (15), `family_cap` (3), `coach_requests_open` (5), `guardian_mails_day` (3).
+
+## Email from the site
+
+Guardian confirmations, and later the notices to parents, go through the **mail outbox**. The `mailer` function sends them over the Gmail account sign-in uses (port 465), at most 100 an hour. The database asks it every minute while mail is due.
+
+- Set up, or after changing the Gmail app password (saved in `~/.config/xiangqi-gmail-app-password`):
+  ```
+  SUPABASE_ACCESS_TOKEN=$(tr -d '\n' < ~/.config/xiangqi-supabase-token) ~/.local/node/bin/node packages/db/scripts/mail-setup.mjs --test you@example.com
+  ```
+- Stuck mail: `select id, template, attempts, last_error from public.mail_outbox where sent_at is null`. Each email is tried 5 times, 10 minutes apart. Sent mail is deleted after 30 days.
+
 ## Site settings
 
 The **Site settings** tab keeps things the site shows that change without a release, each change logged with its reason:
@@ -293,6 +317,8 @@ The Supabase access token expires; when a command says "Invalid access token", c
 | Daily triage (owner's PC) | 07:30, or at log-in if missed | The AI assistant's verdicts and steps, then the daily summary |
 | `purge-old-digests` | daily (03:39 UTC) | Deletes summaries older than 12 months |
 | `purge-old-game-records` | daily (03:23 UTC) | Deletes detailed game records older than 12 months, except where a report, an undecided case or an appeal involves a player |
+| `poke-mailer` | every minute | Asks the mailer to send due emails (only when there are some) |
+| `purge-old-mail` | daily (03:43 UTC) | Deletes sent mail after 30 days and ends coach requests nobody answered (14 days for a guardian, 30 for a coach) |
 | `purge-old-feedback` | daily (03:35 UTC) | Deletes feedback 12 months after it was done or declined, 24 months after it was sent |
 | `purge-deleted-accounts` | daily (03:17 UTC) | Finishes account deletions after their 10-day wait |
 | `pack-game-logs` | daily (03:29 UTC) | Packs the per-move log of games over for more than 8 days into one value per game (a sixth of the size) |

@@ -96,6 +96,8 @@ export interface GamePlayer {
   rd: number | null;
   /** Until when triage paused this player's chat (M22); both browsers hold their phrases back. */
   chat_muted_until?: string | null;
+  /** A coach's view (M23): this player is under 16 and not the coach's student, so not named. */
+  under16?: boolean;
 }
 
 export interface GameInfo {
@@ -118,6 +120,8 @@ export interface GameInfo {
   black_rating_before: number | null;
   black_rating_after: number | null;
   ended_at?: string | null;
+  /** A coach's view (M23): which side their student played. */
+  coach_of?: "red" | "black";
 }
 
 /** What the `game` server function says about a game. */
@@ -481,3 +485,4 @@ export const modReviewAuto = (sb: SupabaseClient, id: number, keep: boolean, not
 export const modTriageSwitches = (sb: SupabaseClient) => rpc<TriageSwitch[]>(sb, "mod_triage_switches");
 export const modSetAuto = (sb: SupabaseClient, category: ReportReason, on: boolean, note: string) => rpc<null>(sb, "mod_set_auto", { p_category: category, p_on: on, p_note: note });
 export const modLatestDigest = (sb: SupabaseClient) => rpc<TriageDigest | null>(sb, "mod_latest_digest");
+export const coachGameInfo = (sb: SupabaseClient, id: string) => rpc<GameInfo | null>(sb, "coach_game_info", { p_game: id });
