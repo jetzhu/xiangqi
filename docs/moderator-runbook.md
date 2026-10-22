@@ -32,7 +32,7 @@ flowchart LR
 
 - The review page: **https://jetzhu.github.io/xiangqi/en/moderate/** (or `/zh/moderate/`). It isn't in the menu; bookmark it. Signed in as a moderator you see the queue; anyone else sees "This page is for moderators."
 - Moderators are listed in the database table `moderators`, never in the repository. Current: **jetzhu** and **JianJetZhu**.
-- **Two-factor sign-in is required** (since M23b): turn it on in Settings → Account with an authenticator app, then sign out and in again with your code. Without a two-factor session the review page says so and every moderator function refuses. Losing the phone: the other moderator can't remove it for you; ask the owner to delete the factor with a database command (`delete from auth.mfa_factors where user_id = …`), after checking it's really you.
+- **Two-factor is required** (since M23b): add a passkey or an authenticator app in Settings → Account → Account protection. The review page asks for it once per session; signing in doesn't. A code by email doesn't count. Losing the phone: the other moderator can't remove it for you. Ask the owner to delete the factor with a database command (`delete from auth.mfa_factors where user_id = …`), after checking it's really you.
 - Appeals arrive by email at the contact address on the fair-play and privacy pages: **jianjetzhu@gmail.com**.
 
 Adding or removing a moderator (see [Database commands](#database-commands)):
@@ -333,6 +333,7 @@ The Supabase access token expires; when a command says "Invalid access token", c
 | `purge-old-game-records` | daily (03:23 UTC) | Deletes detailed game records older than 12 months, except where a report, an undecided case or an appeal involves a player |
 | `poke-mailer` | every minute | Asks the mailer to send due emails (only when there are some) |
 | `complete-email-changes` | hourly (:23) | Completes email changes whose 10 days are up; unconfirmed ones lapse after 7 days |
+| `purge-session-checks` | daily (03:47 UTC) | Deletes the record of emailed codes given, once their sessions end |
 | `purge-old-mail` | daily (03:43 UTC) | Deletes sent mail after 30 days and ends coach requests nobody answered (14 days for a guardian, 30 for a coach) |
 | `purge-old-feedback` | daily (03:35 UTC) | Deletes feedback 12 months after it was done or declined, 24 months after it was sent |
 | `purge-deleted-accounts` | daily (03:17 UTC) | Finishes account deletions after their 10-day wait |

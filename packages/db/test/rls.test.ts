@@ -1840,6 +1840,30 @@ describe("account security (M23b)", () => {
     expect(await q2(`(select frozen from public.email_change_locks where user_id = $1)`, [ACC])).toBe(false);
     await db.query(`drop table auth.mfa_factors`);
   });
+
+  it("asks for an emailed code after signing in, when the player turned it on", async () => {
+    const S1 = "00000000-0000-4000-8000-00000000a001";
+    const S2 = "00000000-0000-4000-8000-00000000a002";
+    const claims = (sid: string, aal = "aal1") => ({ aal, session_id: sid, amr: [{ method: "password", timestamp: now() }] });
+    expect(await hint(ACC, `public.set_email_code_sign_in(true)`, [], { aal: "aal1", session_id: S1, amr: [{ method: "password", timestamp: now() - 3600 }] })).toBe("reauth");
+    await run(ACC, `public.set_email_code_sign_in(true)`, [], claims(S1));
+    expect(await run(ACC, `public.my_sign_in_check()`, [], claims(S1))).toEqual({ email_code: true, needed: false }); // the session that turned it on
+    // A new session owes its code, and can't "confirm it's you" until then.
+    expect(await run(ACC, `public.my_sign_in_check()`, [], claims(S2))).toEqual({ email_code: true, needed: true });
+    expect(await hint(ACC, `public.start_email_change('later@example.com')`, [], claims(S2))).toBe("reauth");
+    expect(await run(ACC, `public.send_sign_in_code()`, [], claims(S2))).toMatchObject({ needed: true, to: "n***@example.com" });
+    expect(await hint(ACC, `public.send_sign_in_code()`, [], claims(S2))).toBe("wait");
+    const code = (await q2<{ code: string }>(`(select data from public.mail_outbox where template = 'sign-in-code' order by id desc limit 1)`)).code;
+    expect(code).toMatch(/^\d{6}$/);
+    expect(await q2(`(select count(*)::int from public.sign_in_codes where code_hash like '%' || $1 || '%')`, [code])).toBe(0); // only a hash is kept
+    const wrong = code === "000000" ? "111111" : "000000";
+    expect(await run(ACC, `public.verify_sign_in_code($1)`, [wrong], claims(S2))).toBe(false);
+    expect(await run(ACC, `public.verify_sign_in_code($1)`, [code], claims(S2))).toBe(true);
+    expect(await run(ACC, `public.my_sign_in_check()`, [], claims(S2))).toEqual({ email_code: true, needed: false });
+    // Two-factor sessions never owe the code.
+    expect(await run(ACC, `public.my_sign_in_check()`, [], claims("00000000-0000-4000-8000-00000000a003", "aal2"))).toMatchObject({ needed: false });
+    await run(ACC, `public.set_email_code_sign_in(false)`, [], claims(S2));
+  });
 });
 
 /** Runs a query as the database owner and returns its one value. */

@@ -102,6 +102,10 @@ interface FakeOptions {
   /** M23b: how long ago the session signed in (seconds), and whether two-factor is on. */
   signedInAgo?: number;
   mfa?: boolean;
+  /** A passkey instead of an authenticator app. */
+  passkey?: boolean;
+  /** The emailed sign-in code is on, and this session hasn't given it. */
+  emailCode?: boolean;
 }
 
 /** Under 16 on a YYYY-MM birth month: 16 from the first day of the month after. */
@@ -143,6 +147,8 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
   const auth = { signedInAt: Math.floor(Date.now() / 1000) - (opts.signedInAgo ?? 0), aal: "aal1", recovery: false };
   const verifiedFactor = { id: "f1", factor_type: "totp", status: "verified", friendly_name: "Authenticator", created_at: "2026-10-21T00:00:00Z", updated_at: "2026-10-21T00:00:00Z" };
   if (opts.mfa) user.factors = [verifiedFactor];
+  if (opts.passkey) user.factors = [{ ...verifiedFactor, id: "p1", factor_type: "webauthn", friendly_name: "Passkey" }];
+  const signInCheck = { email_code: !!opts.emailCode, needed: !!opts.emailCode };
   let emailChange: { status: string; new: string; due_at: string | null; fast: boolean } | null = null;
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, json: body, headers: { "access-control-allow-origin": "*" } });
   await page.route(`${SUPABASE}/**`, async (route) => {
@@ -321,6 +327,21 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
         auth.aal = "aal2";
         auth.signedInAt = Math.floor(Date.now() / 1000);
         return json(route, session(auth, user));
+      // The emailed sign-in code (M23b).
+      case "/rest/v1/rpc/my_sign_in_check":
+        return json(route, signInCheck);
+      case "/rest/v1/rpc/set_email_code_sign_in":
+        calls.rpc.push(`set_email_code:${body?.p_on}`);
+        signInCheck.email_code = !!body?.p_on;
+        return json(route, null);
+      case "/rest/v1/rpc/send_sign_in_code":
+        calls.rpc.push("send_code");
+        return json(route, { needed: signInCheck.needed, to: "a***@example.com" });
+      case "/rest/v1/rpc/verify_sign_in_code":
+        calls.rpc.push(`code:${body?.p_code}`);
+        if (body?.p_code !== "424242") return json(route, false);
+        signInCheck.needed = false;
+        return json(route, true);
       // The email change (M23b).
       case "/rest/v1/rpc/my_email_change":
         return json(route, { change: emailChange, locked_until: null, frozen: false, mfa: !!user.factors?.length });
@@ -904,10 +925,10 @@ test("settings → account: an email change first confirms it's you, then waits 
   expect(calls.rpc).toContain("cancel_email_change");
 });
 
-test("settings → account: turning on two-factor sign-in, and the code asked at the next sign-in", async ({ page }) => {
+test("settings → account: setting up an authenticator app", async ({ page }) => {
   const calls = await fakeSupabase(page);
   await signedInSettings(page, calls);
-  await page.getByRole("button", { name: "Turn on two-factor sign-in" }).click();
+  await page.getByRole("button", { name: "Set up an authenticator app" }).click();
   await expect(page.getByRole("img", { name: "QR code for your authenticator app" })).toBeVisible();
   await expect(page.getByText("JBSWY3DPEHPK3PXP")).toBeVisible();
   await page.getByLabel("6-digit code from your authenticator app").fill("000000");
@@ -915,19 +936,55 @@ test("settings → account: turning on two-factor sign-in, and the code asked at
   await expect(page.getByText("That code didn't work. Check the app and try again.")).toBeVisible();
   await page.getByLabel("6-digit code from your authenticator app").fill("123456");
   await page.getByRole("button", { name: "Verify" }).click();
-  await expect(page.getByText(/Two-factor sign-in is on\./)).toBeVisible();
+  await expect(page.getByText(/Two-factor is on\./)).toBeVisible();
   expect(calls.rpc).toEqual(expect.arrayContaining(["enroll", "verify:000000", "verify:123456"]));
 });
 
-test("an account with two-factor on is asked for its code after signing in", async ({ page }) => {
+test("signing in never asks for two-factor; changing the email asks for the code first", async ({ page }) => {
   const calls = await fakeSupabase(page, { mfa: true });
-  await page.goto(at("/en/auth/callback/?token_hash=abc123&type=signup"));
-  const gate = page.getByRole("dialog", { name: "Two-factor sign-in" });
-  await expect(gate).toBeVisible();
-  await gate.getByLabel("6-digit code from your authenticator app").fill("123456");
-  await gate.getByRole("button", { name: "Verify" }).click();
-  await expect(gate).toHaveCount(0);
-  expect(calls.rpc).toContain("verify:123456");
+  await signedInSettings(page, calls);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByLabel("New email").fill("new@example.com");
+  await page.getByRole("button", { name: "Change email" }).click();
+  await expect(page.getByText("Confirm it's you with your passkey or code.")).toBeVisible();
+  expect(calls.rpc).not.toContain("start_email_change:new@example.com");
+  await page.getByLabel("6-digit code from your authenticator app").fill("123456");
+  await page.getByRole("button", { name: "Verify" }).click();
+  await expect(page.getByText(/Your email changes to n\*\*\*@example\.com on/)).toBeVisible();
+  expect(calls.rpc).toEqual(expect.arrayContaining(["verify:123456", "start_email_change:new@example.com"]));
+});
+
+test("the emailed code: turned on in Settings", async ({ page }) => {
+  const calls = await fakeSupabase(page);
+  await signedInSettings(page, calls);
+  await page.getByRole("checkbox", { name: "Email me a code before sensitive changes" }).check();
+  await expect(page.getByText("From now on, sensitive changes also ask for a code we email you.")).toBeVisible();
+  expect(calls.rpc).toContain("set_email_code:true");
+});
+
+test("an account that asked for emailed codes gives one before changing its email, not to sign in", async ({ page }) => {
+  const calls = await fakeSupabase(page, { emailCode: true });
+  await signedInSettings(page, calls);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByLabel("New email").fill("new@example.com");
+  await page.getByRole("button", { name: "Change email" }).click();
+  await expect(page.getByText("We've emailed a code to a***@example.com.")).toBeVisible();
+  await page.getByLabel("6-digit code from the email").fill("111111");
+  await page.getByRole("button", { name: "Verify" }).click();
+  await expect(page.getByText("That code isn't right.")).toBeVisible();
+  await page.getByLabel("6-digit code from the email").fill("424242");
+  await page.getByRole("button", { name: "Verify" }).click();
+  await expect(page.getByText(/Your email changes to n\*\*\*@example\.com on/)).toBeVisible();
+  expect(calls.rpc).toEqual(expect.arrayContaining(["send_code", "code:111111", "code:424242", "start_email_change:new@example.com"]));
+});
+
+test("an account with a passkey is offered it before a sensitive change", async ({ page }) => {
+  const calls = await fakeSupabase(page, { passkey: true });
+  await signedInSettings(page, calls);
+  await page.getByLabel("New email").fill("new@example.com");
+  await page.getByRole("button", { name: "Change email" }).click();
+  await expect(page.getByRole("button", { name: "Use my passkey" })).toBeVisible();
+  await expect(page.getByLabel("6-digit code from your authenticator app")).toHaveCount(0);
 });
 
 test("deleting the account: username and password, then 10 days; signing in cancels it", async ({ page }) => {

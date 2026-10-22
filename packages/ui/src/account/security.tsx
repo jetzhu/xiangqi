@@ -1,6 +1,7 @@
 "use client";
-// Account security (M23b, docs/v0.4-design.md): two-factor sign-in with an authenticator app,
-// the code asked after signing in, "Confirm it's you" before sensitive changes, and the site's
+// Account security (M23b, docs/v0.4-design.md): a second step (a passkey, an authenticator app,
+// or a code by email) asked only before sensitive changes and for moderator work, never to sign
+// in or play; "Confirm it's you" before those changes; and the site's
 // own email change (the old address approves or denies; silence approves after 10 days; two-
 // factor skips the wait; the old address can undo it for 30 days).
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -60,6 +61,13 @@ export async function assurance(sb: SupabaseClient) {
   return { current: data?.currentLevel ?? null, next: data?.nextLevel ?? null, lastSignIn: last };
 }
 
+type Factor = { id: string; factor_type: string; status: string; friendly_name?: string | undefined; created_at?: string };
+/** The account's verified second factors: authenticator apps ("totp") and passkeys ("webauthn"). */
+async function verifiedFactors(sb: SupabaseClient): Promise<Factor[]> {
+  const { data } = await sb.auth.mfa.listFactors();
+  return ((data?.all ?? []) as Factor[]).filter((f) => f.status === "verified" && (f.factor_type === "totp" || f.factor_type === "webauthn"));
+}
+
 /** Asks for a code from the authenticator app and raises the session to two-factor. */
 export function CodePrompt({ onDone, children, factorId }: { onDone: () => void; children?: ReactNode; factorId?: string }) {
   const { tt } = useT();
@@ -73,7 +81,7 @@ export function CodePrompt({ onDone, children, factorId }: { onDone: () => void;
     setError(null);
     const sb = await account.client();
     // While turning it on, the new (not yet verified) authenticator; otherwise the account's.
-    const id = factorId ?? (await sb.auth.mfa.listFactors()).data?.totp.find((f) => f.status === "verified")?.id;
+    const id = factorId ?? (await verifiedFactors(sb)).find((f) => f.factor_type === "totp")?.id;
     if (!id) {
       setBusy(false);
       return setError(tt("No authenticator app is set up.", "尚未设置身份验证器应用。"));
@@ -96,63 +104,145 @@ export function CodePrompt({ onDone, children, factorId }: { onDone: () => void;
   );
 }
 
-/** After signing in, an account with two-factor on is asked for its code before anything else. */
-export function MfaGate() {
+/** Uses a passkey (fingerprint, face or security key) and raises the session to two-factor. */
+function PasskeyButton({ factorId, onDone }: { factorId: string; onDone: () => void }) {
   const { tt } = useT();
   const account = useAccount();
-  const [needed, setNeeded] = useState(false);
-  const signedIn = account.state.status === "signedIn";
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const use = async () => {
+    setBusy(true);
+    setError(null);
+    const sb = await account.client();
+    const { error } = await sb.auth.mfa.webauthn.authenticate({ factorId });
+    setBusy(false);
+    if (error) return setError(tt("The passkey didn't work. Try again, or use another way.", "通行密钥验证失败。请重试，或改用其他方式。"));
+    onDone();
+  };
+  return (
+    <p>
+      <button type="button" className="primary" disabled={busy} onClick={() => void use()}>
+        {busy ? "…" : tt("Use my passkey", "使用通行密钥")}
+      </button>
+      <FormError text={error} />
+    </p>
+  );
+}
+
+/** The second step with whatever the account has: a passkey button, an authenticator code, or both. */
+export function SecondStep({ onDone, intro }: { onDone: () => void; intro: ReactNode }) {
+  const { tt } = useT();
+  const account = useAccount();
+  const [factors, setFactors] = useState<Factor[] | null>(null);
   useEffect(() => {
-    if (!signedIn) return setNeeded(false);
     void account
       .client()
-      .then(assurance)
-      .then((a) => setNeeded(a.next === "aal2" && a.current !== "aal2"), () => {});
-  }, [signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!needed) return null;
+      .then(verifiedFactors)
+      .then(setFactors, () => setFactors([]));
+  }, [account]);
+  if (factors === null) return <p className="muted">…</p>;
+  const passkey = factors.find((f) => f.factor_type === "webauthn");
+  const app = factors.find((f) => f.factor_type === "totp");
   return (
-    <div className="mfa-gate" role="dialog" aria-modal="true" aria-labelledby="h-mfa-gate">
-      <div className="mfa-gate-box">
-        <h2 id="h-mfa-gate">{tt("Two-factor sign-in", "两步验证")}</h2>
-        <CodePrompt
-          onDone={() => {
-            setNeeded(false);
-            void account.refresh();
-          }}
-        >
-          <p>{tt("Your account has two-factor sign-in on. Enter the code from your authenticator app.", "你的账号已开启两步验证。请输入身份验证器应用中的验证码。")}</p>
-        </CodePrompt>
-        <p>
-          <button type="button" className="link" onClick={() => void account.signOut()}>
-            {tt("Sign out instead", "改为退出登录")}
-          </button>
-        </p>
-      </div>
+    <div className="second-step">
+      {intro}
+      {passkey && <PasskeyButton factorId={passkey.id} onDone={onDone} />}
+      {passkey && app && <p className="muted small">{tt("Or:", "或者：")}</p>}
+      {app && <CodePrompt onDone={onDone} />}
     </div>
   );
 }
 
-/** Settings → Account: turn two-factor sign-in on (scan a QR code, enter a code) or off. */
-export function TwoFactorSection() {
+/** The emailed code (sent on opening), for players who asked for one at sign-in. */
+export function EmailCodePrompt({ onDone, intro }: { onDone: () => void; intro?: ReactNode }) {
   const { tt } = useT();
   const account = useAccount();
-  const [factors, setFactors] = useState<{ id: string; status: string; friendly_name?: string | undefined }[] | null>(null);
+  const [to, setTo] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const send = useCallback(async () => {
+    setError(null);
+    try {
+      const r = await rpc<{ needed: boolean; to?: string }>(await account.client(), "send_sign_in_code");
+      if (!r.needed) return onDone();
+      setTo(r.to ?? null);
+    } catch (e) {
+      const hint = e instanceof HintError ? e.hint : null;
+      setError(
+        hint === "wait"
+          ? tt("A code was sent less than a minute ago: check your inbox (and junk folder).", "不到一分钟前已发送验证码：请查看收件箱（及垃圾邮件）。")
+          : hint === "code-limit"
+            ? tt("That's 10 codes today. Try again tomorrow, or use the Feedback page.", "今天已发送 10 个验证码。请明天再试，或通过“意见反馈”联系我们。")
+            : e instanceof Error
+              ? e.message
+              : String(e),
+      );
+    }
+  }, [account, onDone, tt]);
+  useEffect(() => {
+    void send();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const ok = await rpc<boolean>(await account.client(), "verify_sign_in_code", { p_code: code.trim() });
+      if (!ok) return setError(tt("That code isn't right.", "验证码不正确。"));
+      onDone();
+    } catch {
+      setError(tt("That code has expired: send a new one.", "验证码已过期：请重新发送。"));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <form className="account-form code-prompt" onSubmit={(e) => void submit(e)}>
+      {intro}
+      <p>{to ? tt(`We've emailed a code to ${to}.`, `我们已向 ${to} 发送验证码。`) : tt("Sending a code to your email…", "正在向你的邮箱发送验证码…")}</p>
+      <Field label={tt("6-digit code from the email", "邮件中的 6 位验证码")} type="text" value={code} onChange={setCode} autoComplete="one-time-code" maxLength={6} autoFocus />
+      <FormError text={error} />
+      <button type="submit" className="primary" disabled={busy || code.trim().length !== 6}>
+        {busy ? "…" : tt("Verify", "验证")}
+      </button>{" "}
+      <button type="button" className="link" onClick={() => void send()}>
+        {tt("Send a new code", "重新发送")}
+      </button>
+    </form>
+  );
+}
+
+/**
+ * Settings → Account → Account protection: passkeys, an authenticator app, and the emailed code,
+ * each asked only before sensitive changes. The first two are two-factor (moderators need one).
+ */
+export function TwoFactorSection({ hasPassword, provider }: { hasPassword: boolean; provider: Provider | undefined }) {
+  const { tt } = useT();
+  const nav = useNav();
+  const account = useAccount();
+  const [factors, setFactors] = useState<Factor[] | null>(null);
   const [enrolling, setEnrolling] = useState<{ id: string; qr: string; secret: string } | null>(null);
+  const [emailCode, setEmailCode] = useState<boolean | null>(null);
+  const [confirming, setConfirming] = useState<boolean | null>(nav.params().get("signin") === "on" ? true : nav.params().get("signin") === "off" ? false : null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [level, setLevel] = useState<string | null>(null);
   const load = useCallback(async () => {
     const sb = await account.client();
     const { data } = await sb.auth.mfa.listFactors();
-    setFactors(data?.all.filter((f) => f.factor_type === "totp") ?? []);
+    setFactors(((data?.all ?? []) as Factor[]).filter((f) => f.factor_type === "totp" || f.factor_type === "webauthn"));
     setLevel((await assurance(sb)).current);
+    setEmailCode((await rpc<{ email_code: boolean }>(sb, "my_sign_in_check").catch(() => ({ email_code: false }))).email_code);
   }, [account]);
   useEffect(() => {
     void load();
   }, [load]);
   const verified = factors?.filter((f) => f.status === "verified") ?? [];
+  const app = verified.find((f) => f.factor_type === "totp");
+  const passkeys = verified.filter((f) => f.factor_type === "webauthn");
 
-  const start = async () => {
+  const startApp = async () => {
     setError(null);
     const sb = await account.client();
     // An earlier, unfinished attempt is removed first.
@@ -161,60 +251,127 @@ export function TwoFactorSection() {
     if (error || !data) return setError(error ? authErrorText(error, tt) : null);
     setEnrolling({ id: data.id, qr: data.totp.qr_code, secret: data.totp.secret });
   };
+  const addPasskey = async () => {
+    setError(null);
+    setMessage(null);
+    const sb = await account.client();
+    const { error } = await sb.auth.mfa.webauthn.register({ friendlyName: `Passkey ${new Date().toISOString().slice(0, 10)}` });
+    if (error) return setError(tt("The passkey wasn't added. Try again, or use an authenticator app.", "未能添加通行密钥。请重试，或改用身份验证器应用。"));
+    setMessage(tt("Passkey added: two-factor is on.", "已添加通行密钥：两步验证已开启。"));
+    await load();
+  };
   const remove = async (id: string) => {
     setError(null);
     const sb = await account.client();
     const { error } = await sb.auth.mfa.unenroll({ factorId: id });
-    if (error) return setError(tt("To turn it off, sign in with your code first (sign out and in again).", "关闭前需先用验证码登录（请退出后重新登录）。"));
-    setMessage(tt("Two-factor sign-in is off.", "两步验证已关闭。"));
+    if (error) return setError(tt("Confirm with your passkey or code first.", "请先用通行密钥或验证码确认。"));
+    setMessage(tt("Removed.", "已移除。"));
     await load();
   };
+  const setEmail = useCallback(
+    async (on: boolean) => {
+      setError(null);
+      try {
+        await rpc(await account.client(), "set_email_code_sign_in", { p_on: on });
+        setConfirming(null);
+        setMessage(on ? tt("From now on, sensitive changes also ask for a code we email you.", "今后进行敏感更改时还需输入我们邮件发送的验证码。") : tt("Emailed codes are off.", "已关闭邮件验证码。"));
+        await load();
+      } catch (e) {
+        setConfirming(null);
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    },
+    [account, load, tt],
+  );
+  // Removing one needs a two-factor session: ask for the passkey or code first.
+  const [stepUp, setStepUp] = useState<string | null>(null);
+  const removeButton = (f: Factor) => (
+    <button type="button" onClick={() => (level === "aal2" ? void remove(f.id) : setStepUp(f.id))}>
+      {tt("Remove", "移除")}
+    </button>
+  );
 
   return (
     <section aria-labelledby="h-2fa">
-      <h2 id="h-2fa">{tt("Two-factor sign-in", "两步验证")}</h2>
+      <h2 id="h-2fa">{tt("Account protection", "账号保护")}</h2>
       <p className="muted">
         {tt(
-          "With an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password…), signing in also needs a 6-digit code from your phone. Moderators must have it on. It also lets an email change happen at once.",
-          "使用身份验证器应用（Google Authenticator、Microsoft Authenticator、1Password 等）后，登录还需输入手机上的 6 位验证码。管理员必须开启。开启后更改邮箱可以立即生效。",
+          "Signing in and playing need only your password (or Google, GitHub, Microsoft). Before a sensitive change, such as your email or these settings, we also ask for your phone: a passkey (fingerprint or face, nothing to install) or an authenticator app. Moderators must have one. It also lets an email change happen at once.",
+          "登录和下棋只需密码（或 Google、GitHub、Microsoft）。进行敏感更改（如邮箱或这些设置）前，我们还会要求验证你的手机：通行密钥（指纹或面容，无需安装）或身份验证器应用。管理员必须开启。开启后更改邮箱可以立即生效。",
         )}
       </p>
       {factors === null ? (
         <p className="muted">…</p>
-      ) : verified.length > 0 ? (
-        <>
-          <p>
-            <strong>{tt("On.", "已开启。")}</strong>{" "}
-            {verified.map((f) => (
-              <button key={f.id} type="button" disabled={level !== "aal2"} onClick={() => void remove(f.id)}>
-                {tt("Turn off", "关闭")}
-              </button>
-            ))}
-          </p>
-          {level !== "aal2" && <p className="muted small">{tt("This session didn't use a code; sign in with your code to turn it off.", "本次登录未使用验证码；需用验证码登录后才能关闭。")}</p>}
-        </>
-      ) : enrolling ? (
-        <div className="enroll-2fa">
-          <p>{tt("1. Scan this with your authenticator app (or enter the key by hand).", "1. 用身份验证器应用扫描二维码（或手动输入密钥）。")}</p>
-          <img src={enrolling.qr} alt={tt("QR code for your authenticator app", "身份验证器应用的二维码")} width={180} height={180} />
-          <p className="small">
-            {tt("Key:", "密钥：")} <code>{enrolling.secret}</code>
-          </p>
-          <CodePrompt
-            factorId={enrolling.id}
-            onDone={() => {
-              setEnrolling(null);
-              setMessage(tt("Two-factor sign-in is on. Keep your phone safe: without it you'll need the moderators' help to get back in.", "两步验证已开启。请保管好手机：没有它需要管理员协助才能登录。"));
-              void load();
-            }}
-          >
-            <p>{tt("2. Enter the code it shows.", "2. 输入应用显示的验证码。")}</p>
-          </CodePrompt>
-        </div>
       ) : (
-        <button type="button" onClick={() => void start()}>
-          {tt("Turn on two-factor sign-in", "开启两步验证")}
-        </button>
+        <>
+          <h3>{tt("Passkeys", "通行密钥")}</h3>
+          {passkeys.length > 0 && (
+            <ul>
+              {passkeys.map((f) => (
+                <li key={f.id}>
+                  {f.friendly_name ?? tt("Passkey", "通行密钥")} {removeButton(f)}
+                </li>
+              ))}
+            </ul>
+          )}
+          <button type="button" onClick={() => void addPasskey()}>
+            {tt("Add a passkey", "添加通行密钥")}
+          </button>
+
+          <h3>{tt("Authenticator app", "身份验证器应用")}</h3>
+          {app ? (
+            <p>
+              <strong>{tt("On.", "已开启。")}</strong> {removeButton(app)}
+            </p>
+          ) : enrolling ? (
+            <div className="enroll-2fa">
+              <p>{tt("1. Scan this with your authenticator app (or enter the key by hand).", "1. 用身份验证器应用扫描二维码（或手动输入密钥）。")}</p>
+              <img src={enrolling.qr} alt={tt("QR code for your authenticator app", "身份验证器应用的二维码")} width={180} height={180} />
+              <p className="small">
+                {tt("Key:", "密钥：")} <code>{enrolling.secret}</code>
+              </p>
+              <CodePrompt
+                factorId={enrolling.id}
+                onDone={() => {
+                  setEnrolling(null);
+                  setMessage(tt("Two-factor is on. Keep your phone safe: without it, sensitive changes need the moderators' help.", "两步验证已开启。请保管好手机：没有它，敏感更改需要管理员协助。"));
+                  void load();
+                }}
+              >
+                <p>{tt("2. Enter the code it shows.", "2. 输入应用显示的验证码。")}</p>
+              </CodePrompt>
+            </div>
+          ) : (
+            <button type="button" onClick={() => void startApp()}>
+              {tt("Set up an authenticator app", "设置身份验证器应用")}
+            </button>
+          )}
+          {stepUp && (
+            <SecondStep
+              intro={<p>{tt("To remove it, confirm with your passkey or code.", "移除前请用通行密钥或验证码确认。")}</p>}
+              onDone={() => {
+                const id = stepUp;
+                setStepUp(null);
+                void remove(id);
+              }}
+            />
+          )}
+
+          <h3>{tt("Code by email", "邮件验证码")}</h3>
+          <p className="muted small">
+            {tt(
+              "A simpler step: before a sensitive change we also email you a code. It stops someone who learned your password, but not someone who has your email too, so it doesn't count as two-factor.",
+              "更简单的一步：进行敏感更改前，我们还会通过邮件发送验证码。它能阻止知道你密码的人，但不能阻止同时掌握你邮箱的人，因此不算两步验证。",
+            )}
+          </p>
+          {confirming !== null ? (
+            <ConfirmItsYou hasPassword={hasPassword} provider={provider} returnTo={`/settings?tab=account&signin=${confirming ? "on" : "off"}`} onConfirmed={() => void setEmail(confirming)} />
+          ) : (
+            <label className="inline">
+              <input type="checkbox" checked={!!emailCode} onChange={(e) => setConfirming(e.target.checked)} /> {tt("Email me a code before sensitive changes", "敏感更改前通过邮件发送验证码")}
+            </label>
+          )}
+        </>
       )}
       <FormError text={error} />
       {message && <p role="status">{message}</p>}
@@ -229,23 +386,27 @@ const RECENT = 10 * 60;
 
 /**
  * Before a sensitive change: re-enter the password, or sign in again with Google, GitHub or
- * Microsoft (coming back to `returnTo`), plus a code with two-factor on. Already recent: at once.
+ * Microsoft (coming back to `returnTo`), then the passkey or code with two-factor on, or the
+ * emailed code when asked for. Already recent and complete: at once.
  */
 export function ConfirmItsYou({ hasPassword, provider, returnTo, onConfirmed }: { hasPassword: boolean; provider: Provider | undefined; returnTo: string; onConfirmed: () => void }) {
   const { tt } = useT();
   const nav = useNav();
   const account = useAccount();
-  const [step, setStep] = useState<"check" | "sign-in" | "code">("check");
+  const [step, setStep] = useState<"check" | "sign-in" | "factor" | "email">("check");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const email = account.state.status === "signedIn" ? account.state.user.email : "";
 
   const check = useCallback(async () => {
-    const a = await assurance(await account.client());
+    const sb = await account.client();
+    const a = await assurance(sb);
     const recent = Date.now() / 1000 - a.lastSignIn < RECENT;
     if (!recent) return setStep("sign-in");
-    if (a.next === "aal2" && a.current !== "aal2") return setStep("code");
+    if (a.next === "aal2" && a.current !== "aal2") return setStep("factor");
+    const c = await rpc<{ needed: boolean }>(sb, "my_sign_in_check").catch(() => ({ needed: false }));
+    if (c.needed) return setStep("email");
     onConfirmed();
   }, [account, onConfirmed]);
   useEffect(() => {
@@ -270,9 +431,11 @@ export function ConfirmItsYou({ hasPassword, provider, returnTo, onConfirmed }: 
     await sb.auth.signInWithOAuth({ provider, options: { redirectTo: callbackUrl(nav.href), ...(provider === "azure" ? { scopes: "email" } : {}) } });
   };
   const providerName = PROVIDERS.find((p) => p.id === provider)?.name ?? "";
+  const next = () => void check();
 
   if (step === "check") return <p className="muted">…</p>;
-  if (step === "code") return <CodePrompt onDone={onConfirmed}>{<p>{tt("Confirm it's you: enter the code from your authenticator app.", "确认是你本人：请输入身份验证器应用中的验证码。")}</p>}</CodePrompt>;
+  if (step === "factor") return <SecondStep onDone={next} intro={<p>{tt("Confirm it's you with your passkey or code.", "请用通行密钥或验证码确认是你本人。")}</p>} />;
+  if (step === "email") return <EmailCodePrompt onDone={onConfirmed} intro={<p>{tt("Confirm it's you with the code we email you.", "请用我们邮件发送的验证码确认是你本人。")}</p>} />;
   return (
     <div className="confirm-its-you">
       <p>

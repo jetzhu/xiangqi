@@ -78,5 +78,6 @@ describe("the mailer's templates", () => {
     expect(render("email-changed", "en", { token: "t3", new: "n***@example.com" }, "https://x.test").text).toContain("within 30 days");
     expect(render("email-change-denied", "en", { days: 20 }, "https://x.test").text).toContain("for 20 days");
     expect(render("coach-request", "zh", {}, "https://x.test").text).toContain("https://x.test/zh/coach/");
+    expect(render("sign-in-code", "en", { code: "042137" }, "https://x.test").subject).toBe("Your Xiangqi School sign-in code: 042137");
   });
 });

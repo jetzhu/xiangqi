@@ -102,7 +102,9 @@ function En() {
 
       <h2>Account security</h2>
       <p>
-        If you turn on two-factor sign-in, Supabase keeps the secret your authenticator app uses, and we're emailed nothing about your codes. When
+        Signing in and playing never need more than your password or sign-in service. If you add a passkey or an authenticator app, Supabase keeps
+        its public key or the app's secret. If you ask for codes by email before sensitive changes, we keep only a hash of each code for 10 minutes,
+        and which sessions gave one. When
         you change your email we keep both addresses, the dates, and how the change ended (approved, denied, or after the 10-day wait) with the
         account, so a disputed change can be checked; links in those emails are stored only as one-way hashes. A request to link a coach by email
         keeps only a masked form of the address you typed (like "j***@example.com").
@@ -196,7 +198,7 @@ function Zh() {
 
       <h2>账号安全</h2>
       <p>
-        如果你开启两步验证，身份验证器应用使用的密钥由 Supabase 保存，我们不会收到任何关于验证码的信息。更改邮箱时，我们随账号保存新旧两个邮箱、日期以及更改的结果（批准、拒绝或 10 天后自动生效），以便核查有争议的更改；这些邮件中的链接只以单向哈希值保存。通过邮箱请求关联教练时，只保存你所填邮箱的部分隐藏形式（如"j***@example.com"）。
+        登录和下棋只需密码或第三方登录。如果你添加通行密钥或身份验证器应用，其公钥或应用密钥由 Supabase 保存。如果你选择在敏感更改前通过邮件接收验证码，我们只保存每个验证码的哈希值 10 分钟，以及哪些登录会话已完成验证。更改邮箱时，我们随账号保存新旧两个邮箱、日期以及更改的结果（批准、拒绝或 10 天后自动生效），以便核查有争议的更改；这些邮件中的链接只以单向哈希值保存。通过邮箱请求关联教练时，只保存你所填邮箱的部分隐藏形式（如"j***@example.com"）。
       </p>
 
       <h2>反馈与捐助</h2>

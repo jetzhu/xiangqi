@@ -115,6 +115,14 @@ const TEMPLATES: Record<string, (lang: Lang, d: Data, site: string) => Rendered>
       `您好：\n\n此邮箱现在是您象棋学堂账号的邮箱。今后请用它登录。\n\n${SIGN.zh}`,
     ),
   }),
+  "sign-in-code": (lang, d) => ({
+    subject: lang === "zh" ? `象棋学堂登录验证码：${String(d.code)}` : `Your Xiangqi School sign-in code: ${String(d.code)}`,
+    text: both(
+      lang,
+      `Your sign-in code is ${String(d.code)}. It works for 10 minutes.\n\nIf you didn't just sign in, someone may know your password: sign in and change it in Settings → Account.\n\n${SIGN.en}`,
+      `你的登录验证码是 ${String(d.code)}，10 分钟内有效。\n\n如果你刚才没有登录，可能有人知道你的密码：请登录后在"设置 → 账号"中修改密码。\n\n${SIGN.zh}`,
+    ),
+  }),
   test: (lang) => ({
     subject: lang === "zh" ? "象棋学堂测试邮件" : "Xiangqi School test email",
     text: both(lang, "This is a test of the site's mailer. Nothing to do.\n\nXiangqi School", "这是网站发信功能的测试邮件，无需处理。\n\n象棋学堂"),

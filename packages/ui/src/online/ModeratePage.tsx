@@ -6,7 +6,7 @@
 // unchecked can be analysed in the moderator's own browser, which settles them.
 import { type FormEvent, type ReactNode, Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { useAccount } from "../account/session.js";
-import { assurance } from "../account/security.js";
+import { SecondStep, assurance } from "../account/security.js";
 import { type ModCoachLinks, type ModCoaching, modBarCoach, modCloseCoachReport, modCoachLinks, modCoaching, modLink } from "../coach/api.js";
 import { useNav } from "../nav.js";
 import { PHRASES, type Phrase } from "@xq/online";
@@ -78,12 +78,13 @@ export function ModeratePage() {
   if (twoFactor === false) {
     return (
       <div className="online-page moderate-page">
-        <h1>{tt("Two-factor sign-in needed", "需要两步验证")}</h1>
-        <p>
-          {tt("Moderator work needs two-factor sign-in. Turn it on in ", "管理员操作需要两步验证。请在")}
+        <h1>{tt("Confirm it's you", "确认是你本人")}</h1>
+        <p className="muted">
+          {tt("Moderator work needs two-factor: a passkey or an authenticator app. Without one, set it up in ", "管理员操作需要两步验证：通行密钥或身份验证器应用。如尚未设置，请在")}
           <a href={nav.href("/settings?tab=account")}>{tt("Settings → Account", "设置 → 账号")}</a>
-          {tt(", then sign out and sign in again with your code.", "中开启，然后退出并用验证码重新登录。")}
+          {tt(".", "中设置。")}
         </p>
+        <SecondStep intro={null} onDone={() => setTwoFactor(true)} />
       </div>
     );
   }
