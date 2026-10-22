@@ -46,9 +46,9 @@ export function AccountSettings() {
 
   return (
     <div className="account-settings">
-      <EmailSection email={account.state.user.email} hasPassword={hasPassword} provider={provider} />
+      <EmailSection email={account.state.user.email} />
       <PasswordSection hasPassword={hasPassword} />
-      <TwoFactorSection hasPassword={hasPassword} provider={provider} />
+      <TwoFactorSection />
       <LinkedSignIns />
       <SessionsSection />
       <DataSection />

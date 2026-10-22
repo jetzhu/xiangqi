@@ -108,6 +108,8 @@ interface FakeOptions {
   emailCode?: boolean;
   /** M24: the signed-in account is a child profile (managed by a parent). */
   child?: boolean;
+  /** How the account signs in (default: email and password). */
+  identities?: { id: string; provider: string }[];
 }
 
 /** Under 16 on a YYYY-MM birth month: 16 from the first day of the month after. */
@@ -148,6 +150,7 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
   // M23b: the session's sign-in time and two-factor level; the account's authenticator; an email change.
   const auth = { signedInAt: Math.floor(Date.now() / 1000) - (opts.signedInAgo ?? 0), aal: "aal1", recovery: false };
   const verifiedFactor = { id: "f1", factor_type: "totp", status: "verified", friendly_name: "Authenticator", created_at: "2026-10-21T00:00:00Z", updated_at: "2026-10-21T00:00:00Z" };
+  if (opts.identities) user.identities = opts.identities;
   if (opts.mfa) user.factors = [verifiedFactor];
   if (opts.passkey) user.factors = [{ ...verifiedFactor, id: "p1", factor_type: "webauthn", friendly_name: "Passkey" }];
   const signInCheck = { email_code: !!opts.emailCode, needed: !!opts.emailCode };
@@ -283,6 +286,7 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
         // The browser leaves for the provider, which sends it straight back with a code.
         calls.authorize.push(url.searchParams.get("provider") ?? "");
         if (opts.oauthUser) user = opts.oauthUser;
+        auth.signedInAt = Math.floor(Date.now() / 1000);
         return route.fulfill({ status: 302, headers: { location: `${url.searchParams.get("redirect_to")}?code=oauth1` } });
       }
       case "/auth/v1/user/identities/authorize": {
@@ -972,7 +976,7 @@ test("signing in never asks for two-factor; changing the email asks for the code
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByLabel("New email").fill("new@example.com");
   await page.getByRole("button", { name: "Change email" }).click();
-  await expect(page.getByText("Confirm it's you with your passkey or code.")).toBeVisible();
+  await expect(page.getByText("Confirm it's you with the code from your authenticator app.")).toBeVisible();
   expect(calls.rpc).not.toContain("start_email_change:new@example.com");
   await page.getByLabel("6-digit code from your authenticator app").fill("123456");
   await page.getByRole("button", { name: "Verify" }).click();
@@ -1059,6 +1063,51 @@ test("a child profile: a banner for the child, no online play, no donations, set
   await expect(page.getByText("This profile is looked after by your parent", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Grown-ups: back to your account (sign out)" }).click();
   await expect(page.locator(".child-banner")).toHaveCount(0);
+});
+
+test("confirm it's you: with an authenticator app, its code alone, even long after signing in", async ({ page }) => {
+  const calls = await fakeSupabase(page, { mfa: true, signedInAgo: 3600 });
+  await signedInSettings(page, calls);
+  await page.getByLabel("New email").fill("new@example.com");
+  await page.getByRole("button", { name: "Change email" }).click();
+  await expect(page.getByText("Confirm it's you with the code from your authenticator app.")).toBeVisible();
+  await expect(page.getByLabel("Your password")).toHaveCount(0);
+  await page.getByLabel("6-digit code from your authenticator app").fill("123456");
+  await page.getByRole("button", { name: "Verify" }).click();
+  await expect(page.getByText(/Your email changes to n\*\*\*@example\.com on/)).toBeVisible();
+});
+
+test("confirm it's you: a wrong password says so, and another try works", async ({ page }) => {
+  const calls = await fakeSupabase(page, { signedInAgo: 3600, providers: ["github"], identities: [{ id: "i1", provider: "email" }, { id: "i2", provider: "github" }] });
+  await signedInSettings(page, calls);
+  await page.getByLabel("New email").fill("new@example.com");
+  await page.getByRole("button", { name: "Change email" }).click();
+  await expect(page.getByRole("button", { name: "Sign in again with GitHub" })).toBeVisible();
+  await page.getByLabel("Your password").fill("123456");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByText("That password isn't right. Try again, or use the button below.")).toBeVisible();
+  await page.getByLabel("Your password").fill("correct-horse");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByText(/Your email changes to n\*\*\*@example\.com on/)).toBeVisible();
+});
+
+test("confirm it's you with a provider: the child's form survives the round trip and the profile is made", async ({ page }) => {
+  const github = { ...USER, identities: [{ id: "i2", provider: "github" }] };
+  const calls = await fakeSupabase(page, { signedInAgo: 3600, providers: ["github"], identities: github.identities, oauthUser: github });
+  await page.goto(at("/en/auth/callback/?token_hash=abc123&type=signup"));
+  await expect(page.getByText(/signed in as Alice_1/)).toBeVisible();
+  await page.goto(at("/en/children/"));
+  await page.getByRole("button", { name: "Add a child profile" }).click();
+  await page.getByLabel("Nickname (not their full name; only you and your child see it)").fill("Mei");
+  await page.getByLabel("Year of birth").selectOption(String(new Date().getFullYear() - 8));
+  await page.getByLabel("Country or region").selectOption("US");
+  await page.getByRole("checkbox", { name: /I'm this child's parent or legal guardian/ }).check();
+  await page.getByRole("button", { name: "Create the profile" }).click();
+  await expect(page.getByLabel("Your password")).toHaveCount(0);
+  await page.getByRole("button", { name: "Sign in again with GitHub" }).click();
+  await expect(page.getByText("Almost done: we've emailed you a link.", { exact: false })).toBeVisible();
+  expect(calls.authorize).toContain("github");
+  expect(calls.rpc).toContain("child:create:Mei");
 });
 
 test("deleting the account: username and password, then 10 days; signing in cancels it", async ({ page }) => {

@@ -5,7 +5,7 @@
 // own email change (the old address approves or denies; silence approves after 10 days; two-
 // factor skips the wait; the old address can undo it for 30 days).
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useNav } from "../nav.js";
 import { useT } from "../settings.js";
 import { Field, FormError, authErrorText, callbackUrl, rememberNext } from "./AuthPages.js";
@@ -224,7 +224,7 @@ export function EmailCodePrompt({ onDone, intro }: { onDone: () => void; intro?:
  * Settings → Account → Account protection: passkeys, an authenticator app, and the emailed code,
  * each asked only before sensitive changes. The first two are two-factor (moderators need one).
  */
-export function TwoFactorSection({ hasPassword, provider }: { hasPassword: boolean; provider: Provider | undefined }) {
+export function TwoFactorSection() {
   const { tt } = useT();
   const nav = useNav();
   const account = useAccount();
@@ -374,7 +374,7 @@ export function TwoFactorSection({ hasPassword, provider }: { hasPassword: boole
             )}
           </p>
           {confirming !== null ? (
-            <ConfirmItsYou hasPassword={hasPassword} provider={provider} returnTo={`/settings?tab=account&signin=${confirming ? "on" : "off"}`} onConfirmed={() => void setEmail(confirming)} />
+            <ConfirmItsYou returnTo={`/settings?tab=account&signin=${confirming ? "on" : "off"}`} onConfirmed={() => void setEmail(confirming)} />
           ) : (
             <label className="inline">
               <input type="checkbox" checked={!!emailCode} onChange={(e) => setConfirming(e.target.checked)} /> {tt("Email me a code before sensitive changes", "敏感更改前通过邮件发送验证码")}
@@ -388,36 +388,76 @@ export function TwoFactorSection({ hasPassword, provider }: { hasPassword: boole
   );
 }
 
+/** What was typed, kept across a Google/GitHub/Microsoft sign-in round trip ("Confirm it's you"). */
+export const EMAIL_DRAFT = "xq:email-change-draft";
+export function keep(key: string, value: unknown) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}
+const takenOnLoad = new Map<string, unknown>();
+/**
+ * The kept value, for this page load: read and removed from storage the first time, then the
+ * same value however often the page mounts, until `used`.
+ */
+export function taken<T>(key: string): T | null {
+  if (!takenOnLoad.has(key)) {
+    let v: T | null = null;
+    try {
+      const raw = sessionStorage.getItem(key);
+      sessionStorage.removeItem(key);
+      v = raw === null ? null : (JSON.parse(raw) as T);
+    } catch {}
+    takenOnLoad.set(key, v);
+  }
+  return takenOnLoad.get(key) as T | null;
+}
+/** The kept value has done its job. */
+export const used = (key: string) => void takenOnLoad.set(key, null);
+
 // "Confirm it's you" ---------------------------------------------------------------------------------
 
 /** How recent a sign-in counts, in seconds (the database checks 10 minutes too). */
 const RECENT = 10 * 60;
 
 /**
- * Before a sensitive change: re-enter the password, or sign in again with Google, GitHub or
- * Microsoft (coming back to `returnTo`), then the passkey or code with two-factor on, or the
- * emailed code when asked for. Already recent and complete: at once.
+ * Before a sensitive change, the player shows it's them:
+ * - with an authenticator app: a fresh code from it, nothing else (a code is the strongest proof);
+ * - otherwise any way the account signs in: its password, or signing in again with Google,
+ *   GitHub or Microsoft (coming back to `returnTo`; `onLeave` keeps what was typed);
+ * - then the emailed code, if the player asked for one.
+ * Already done in the last 10 minutes: at once.
  */
-export function ConfirmItsYou({ hasPassword, provider, returnTo, onConfirmed }: { hasPassword: boolean; provider: Provider | undefined; returnTo: string; onConfirmed: () => void }) {
+export function ConfirmItsYou({ returnTo, onConfirmed, onLeave }: { returnTo: string; onConfirmed: () => void; onLeave?: () => void }) {
   const { tt } = useT();
   const nav = useNav();
   const account = useAccount();
   const [step, setStep] = useState<"check" | "sign-in" | "factor" | "email">("check");
+  const [ways, setWays] = useState<{ password: boolean; providers: Provider[] }>({ password: false, providers: [] });
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const email = account.state.status === "signedIn" ? account.state.user.email : "";
+  // The caller's latest callback, without re-running the check on every render.
+  const confirmed = useRef(onConfirmed);
+  confirmed.current = onConfirmed;
 
   const check = useCallback(async () => {
     const sb = await account.client();
-    const a = await assurance(sb);
+    const [a, factors, ids] = await Promise.all([assurance(sb), verifiedFactors(sb), sb.auth.getUserIdentities()]);
     const recent = Date.now() / 1000 - a.lastSignIn < RECENT;
-    if (!recent) return setStep("sign-in");
-    if (a.next === "aal2" && a.current !== "aal2") return setStep("factor");
+    if (factors.length > 0) {
+      // Two-factor on: the code confirms it, however long ago the sign-in was.
+      if (!(recent && a.current === "aal2")) return setStep("factor");
+    } else if (!recent) {
+      const list = ids.data?.identities ?? [];
+      setWays({ password: list.some((i) => i.provider === "email"), providers: PROVIDERS.map((p) => p.id).filter((id) => list.some((i) => i.provider === id)) });
+      return setStep("sign-in");
+    }
     const c = await rpc<{ needed: boolean }>(sb, "my_sign_in_check").catch(() => ({ needed: false }));
     if (c.needed) return setStep("email");
-    onConfirmed();
-  }, [account, onConfirmed]);
+    confirmed.current();
+  }, [account]);
   useEffect(() => {
     void check();
   }, [check]);
@@ -429,28 +469,36 @@ export function ConfirmItsYou({ hasPassword, provider, returnTo, onConfirmed }: 
     const sb = await account.client();
     const { error } = await sb.auth.signInWithPassword({ email, password });
     setBusy(false);
-    if (error) return setError(authErrorText(error, tt));
+    if (error) {
+      return setError(
+        error.code === "invalid_credentials"
+          ? tt(
+              `That password isn't right. Try again${ways.providers.length ? ", or use the button below" : ""}.`,
+              `密码不正确。请重试${ways.providers.length ? "，或使用下面的按钮" : ""}。`,
+            )
+          : authErrorText(error, tt),
+      );
+    }
     setPassword("");
     await check();
   };
-  const withProvider = async () => {
-    if (!provider) return;
+  const withProvider = async (provider: Provider) => {
+    onLeave?.();
     rememberNext(returnTo);
     const sb = await account.client();
     await sb.auth.signInWithOAuth({ provider, options: { redirectTo: callbackUrl(nav.href), ...(provider === "azure" ? { scopes: "email" } : {}) } });
   };
-  const providerName = PROVIDERS.find((p) => p.id === provider)?.name ?? "";
   const next = () => void check();
 
   if (step === "check") return <p className="muted">…</p>;
-  if (step === "factor") return <SecondStep onDone={next} intro={<p>{tt("Confirm it's you with your passkey or code.", "请用通行密钥或验证码确认是你本人。")}</p>} />;
-  if (step === "email") return <EmailCodePrompt onDone={onConfirmed} intro={<p>{tt("Confirm it's you with the code we email you.", "请用我们邮件发送的验证码确认是你本人。")}</p>} />;
+  if (step === "factor") return <SecondStep onDone={next} intro={<p>{tt("Confirm it's you with the code from your authenticator app.", "请用身份验证器应用中的验证码确认是你本人。")}</p>} />;
+  if (step === "email") return <EmailCodePrompt onDone={() => confirmed.current()} intro={<p>{tt("Confirm it's you with the code we email you.", "请用我们邮件发送的验证码确认是你本人。")}</p>} />;
   return (
     <div className="confirm-its-you">
       <p>
         <strong>{tt("Confirm it's you", "确认是你本人")}</strong>
       </p>
-      {hasPassword ? (
+      {ways.password && (
         <form className="account-form" onSubmit={(e) => void withPassword(e)}>
           <Field label={tt("Your password", "你的密码")} type="password" value={password} onChange={setPassword} autoComplete="current-password" autoFocus />
           <FormError text={error} />
@@ -458,13 +506,19 @@ export function ConfirmItsYou({ hasPassword, provider, returnTo, onConfirmed }: 
             {busy ? "…" : tt("Continue", "继续")}
           </button>
         </form>
-      ) : provider ? (
-        <button type="button" className="primary" onClick={() => void withProvider()}>
-          {tt(`Sign in again with ${providerName}`, `重新使用 ${providerName} 登录`)}
-        </button>
-      ) : (
-        <p className="muted">{tt("Sign out and sign in again, then come back here.", "请退出后重新登录，再回到这里。")}</p>
       )}
+      {ways.password && ways.providers.length > 0 && <p className="muted small">{tt("Or:", "或者：")}</p>}
+      {ways.providers.map((id) => {
+        const name = PROVIDERS.find((p) => p.id === id)?.name ?? id;
+        return (
+          <p key={id}>
+            <button type="button" className={ways.password ? "" : "primary"} onClick={() => void withProvider(id)}>
+              {tt(`Sign in again with ${name}`, `重新使用 ${name} 登录`)}
+            </button>
+          </p>
+        );
+      })}
+      {!ways.password && ways.providers.length === 0 && <p className="muted">{tt("Sign out and sign in again, then come back here.", "请退出后重新登录，再回到这里。")}</p>}
     </div>
   );
 }
@@ -500,14 +554,15 @@ function useEmailHint() {
 const fmtDate = (iso: string, lang: string) => new Date(iso).toLocaleDateString(lang === "zh" ? "zh-CN" : "en", { year: "numeric", month: "long", day: "numeric" });
 
 /** Settings → Account → Email: the open change (or a lock), or a new change after "Confirm it's you". */
-export function EmailSection({ email, hasPassword, provider }: { email: string; hasPassword: boolean; provider: Provider | undefined }) {
+export function EmailSection({ email }: { email: string }) {
   const { tt, lang } = useT();
   const nav = useNav();
   const account = useAccount();
   const hintText = useEmailHint();
   const [state, setState] = useState<MyEmailChange | null>(null);
-  const [next, setNext] = useState("");
-  const [confirming, setConfirming] = useState(nav.params().get("email") === "1");
+  // Back from signing in again elsewhere: the address typed before, and on with the change.
+  const [next, setNext] = useState(() => (nav.params().get("email") === "1" ? (taken<string>(EMAIL_DRAFT) ?? "") : ""));
+  const [confirming, setConfirming] = useState(nav.params().get("email") === "1" && next !== "");
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(() => {
     void account
@@ -521,6 +576,7 @@ export function EmailSection({ email, hasPassword, provider }: { email: string; 
     setError(null);
     try {
       await startEmailChange(await account.client(), next);
+      used(EMAIL_DRAFT);
       setConfirming(false);
       setNext("");
       load();
@@ -560,7 +616,7 @@ export function EmailSection({ email, hasPassword, provider }: { email: string; 
       ) : state?.locked_until ? (
         <p>{tt(`A change was denied from your old address. Email changes are locked until ${fmtDate(state.locked_until, lang)}.`, `一次更改已被旧邮箱拒绝。邮箱更改锁定至 ${fmtDate(state.locked_until, lang)}。`)}</p>
       ) : confirming ? (
-        <ConfirmItsYou hasPassword={hasPassword} provider={provider} returnTo={`/settings?tab=account&email=1`} onConfirmed={() => void start()} />
+        <ConfirmItsYou returnTo={`/settings?tab=account&email=1`} onConfirmed={() => void start()} onLeave={() => keep(EMAIL_DRAFT, next)} />
       ) : (
         <form
           className="account-form"

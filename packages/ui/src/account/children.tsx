@@ -9,8 +9,18 @@ import { useNav } from "../nav.js";
 import { useT } from "../settings.js";
 import { COUNTRIES } from "./avatar.js";
 import { download } from "./exportData.js";
-import { ConfirmItsYou, HintError } from "./security.js";
-import { type Provider, useAccount } from "./session.js";
+import { ConfirmItsYou, HintError, keep, taken, used } from "./security.js";
+import { useAccount } from "./session.js";
+
+/** The new child's form, kept across a Google/GitHub/Microsoft sign-in ("Confirm it's you"). */
+const CHILD_DRAFT = "xq:child-draft";
+interface Draft {
+  nickname: string;
+  birthYear: string;
+  country: string;
+  agree: boolean;
+  statement: string;
+}
 
 /** The notice a parent agrees to; the database knows the same version (child_notice_version). */
 export const NOTICE_VERSION = "v1-2026-10-22";
@@ -130,15 +140,13 @@ export function ChildrenPage() {
   const nav = useNav();
   const account = useAccount();
   const [children, setChildren] = useState<Child[] | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [identities, setIdentities] = useState<{ hasPassword: boolean; provider: Provider | undefined }>({ hasPassword: false, provider: undefined });
+  // Back from signing in again: the form as it was, and on with creating the profile.
+  const [draft] = useState(() => taken<Draft>(CHILD_DRAFT));
+  const [adding, setAdding] = useState(draft !== null);
   const signedIn = account.state.status === "signedIn";
   const load = useCallback(() => {
     void account.client().then(async (sb) => {
       setChildren(await rpc<Child[]>(sb, "my_children").catch(() => []));
-      const { data } = await sb.auth.getUserIdentities();
-      const ids = data?.identities ?? [];
-      setIdentities({ hasPassword: ids.some((i) => i.provider === "email"), provider: ids.find((i) => i.provider !== "email")?.provider as Provider | undefined });
     });
   }, [account]);
   useEffect(() => {
@@ -171,11 +179,11 @@ export function ChildrenPage() {
       ) : (
         <ul className="children-list">
           {children.map((c) => (
-            <ChildCard key={c.id} c={c} identities={identities} reload={load} />
+            <ChildCard key={c.id} c={c} reload={load} />
           ))}
         </ul>
       )}
-      {children && children.length < 3 && (adding ? <AddChild identities={identities} onDone={() => (setAdding(false), load())} /> : <button type="button" className="primary" onClick={() => setAdding(true)}>{tt("Add a child profile", "添加孩子档案")}</button>)}
+      {children && children.length < 3 && (adding ? <AddChild draft={draft} onDone={() => (setAdding(false), load())} /> : <button type="button" className="primary" onClick={() => setAdding(true)}>{tt("Add a child profile", "添加孩子档案")}</button>)}
       {children && children.length >= 3 && <p className="muted">{tt("You have 3 child profiles, the most there can be.", "您已有 3 个孩子档案，已达上限。")}</p>}
       <p className="muted small">
         <a href={nav.href("/privacy")}>{tt("Privacy policy: children", "隐私政策：儿童")}</a>
@@ -184,7 +192,7 @@ export function ChildrenPage() {
   );
 }
 
-function ChildCard({ c, identities, reload }: { c: Child; identities: { hasPassword: boolean; provider: Provider | undefined }; reload: () => void }) {
+function ChildCard({ c, reload }: { c: Child; reload: () => void }) {
   const { tt, lang } = useT();
   const nav = useNav();
   const account = useAccount();
@@ -279,7 +287,7 @@ function ChildCard({ c, identities, reload }: { c: Child; identities: { hasPassw
       {confirming && (confirming === "delete" || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) && (
         <>
           {confirming === "delete" && <p className="form-error">{tt(`Delete ${c.nickname}'s profile and everything in it, now? This can't be undone.`, `立即删除 ${c.nickname} 的档案及其全部内容？此操作无法撤销。`)}</p>}
-          <ConfirmItsYou hasPassword={identities.hasPassword} provider={identities.provider} returnTo="/children" onConfirmed={() => void act()} />
+          <ConfirmItsYou returnTo="/children" onConfirmed={() => void act()} />
         </>
       )}
       {message && <p role="status">{message}</p>}
@@ -287,17 +295,17 @@ function ChildCard({ c, identities, reload }: { c: Child; identities: { hasPassw
   );
 }
 
-function AddChild({ identities, onDone }: { identities: { hasPassword: boolean; provider: Provider | undefined }; onDone: () => void }) {
+function AddChild({ draft, onDone }: { draft: Draft | null; onDone: () => void }) {
   const { tt, lang } = useT();
   const account = useAccount();
   const hintText = useChildHint();
   const year = new Date().getFullYear();
-  const [nickname, setNickname] = useState("");
-  const [birthYear, setBirthYear] = useState("");
-  const [country, setCountry] = useState("");
-  const [agree, setAgree] = useState(false);
-  const [statement, setStatement] = useState("");
-  const [confirming, setConfirming] = useState(false);
+  const [nickname, setNickname] = useState(draft?.nickname ?? "");
+  const [birthYear, setBirthYear] = useState(draft?.birthYear ?? "");
+  const [country, setCountry] = useState(draft?.country ?? "");
+  const [agree, setAgree] = useState(draft?.agree ?? false);
+  const [statement, setStatement] = useState(draft?.statement ?? "");
+  const [confirming, setConfirming] = useState(draft !== null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const names = useMemo(() => {
@@ -315,6 +323,7 @@ function AddChild({ identities, onDone }: { identities: { hasPassword: boolean; 
     setError(null);
     try {
       await childFunction(await account.client(), { action: "create", nickname: nickname.trim(), birthYear: Number(birthYear), country, notice: NOTICE_VERSION, statement: country === "KR" ? statement.trim() : null });
+      used(CHILD_DRAFT);
       setDone(true);
     } catch (e) {
       setConfirming(false);
@@ -383,7 +392,11 @@ function AddChild({ identities, onDone }: { identities: { hasPassword: boolean; 
         </label>
       )}
       {confirming ? (
-        <ConfirmItsYou hasPassword={identities.hasPassword} provider={identities.provider} returnTo="/children" onConfirmed={() => void create()} />
+        <ConfirmItsYou
+          returnTo="/children"
+          onConfirmed={() => void create()}
+          onLeave={() => keep(CHILD_DRAFT, { nickname, birthYear, country, agree, statement } satisfies Draft)}
+        />
       ) : (
         <button type="submit" className="primary" disabled={!ready}>
           {tt("Create the profile", "建立档案")}
