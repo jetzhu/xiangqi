@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+<body style="font-family: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; color: #222; line-height: 1.5; max-width: 520px; margin: 0 auto; padding: 24px;">
+<p style="font-size: 20px; margin: 0 0 16px;"><strong>象棋学堂 · Xiangqi School</strong></p>
+{{ if eq (printf "%v" .Data.lang) "en" }}
+<p>Two-factor sign-in was turned on for your Xiangqi School account (an authenticator app was added).</p>
+<p>If this wasn't you, sign in, set a new password in Settings → Account, and tell us from the Feedback page.</p>
+{{ else }}
+<p>你的象棋学堂账号已开启两步验证（添加了身份验证器应用）。</p>
+<p>如果不是你本人操作，请登录后在"设置 → 账号"中设置新密码，并通过"意见反馈"页面告诉我们。</p>
+{{ end }}
+<p style="color: #777; font-size: 13px; margin-top: 32px;">{{ if eq (printf "%v" .Data.lang) "en" }}Xiangqi School — learn and play Chinese chess.{{ else }}象棋学堂——学象棋，下象棋。{{ end }}</p>
+</body>
+</html>

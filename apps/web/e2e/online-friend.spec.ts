@@ -18,7 +18,7 @@ function session(id: string, username: string) {
     id, aud: "authenticated", role: "authenticated", email: `${username}@example.com`, email_confirmed_at: "2026-10-07T00:00:00Z",
     user_metadata: { username }, app_metadata: { provider: "email", providers: ["email"] }, identities: [{ id: "i1", provider: "email" }], created_at: "2026-10-07T00:00:00Z",
   };
-  return { access_token: `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ sub: id, exp, role: "authenticated", aud: "authenticated" })}.sig`, token_type: "bearer", expires_in: 3600, expires_at: exp, refresh_token: "r", user };
+  return { access_token: `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ sub: id, exp, role: "authenticated", aud: "authenticated", aal: "aal2", amr: [{ method: "password", timestamp: exp - 3600 }] })}.sig`, token_type: "bearer", expires_in: 3600, expires_at: exp, refresh_token: "r", user };
 }
 
 /** The server both tabs talk to: one challenge, one game, the reports each browser sent. */
@@ -127,6 +127,9 @@ async function player(page: Page, w: World, who: { id: string; username: string;
         w.calls.push(`request:${body!.p_coach}:${body!.p_code}:${body!.p_family}:${body!.p_guardian_email}`);
         if (w.requestAnswer.hint) return json(route, { code: "P0001", message: "no", hint: w.requestAnswer.hint }, 400);
         return json(route, { id: 1, status: w.requestAnswer.status, coach: body!.p_coach });
+      case "/rest/v1/rpc/request_coach_by_email":
+        w.calls.push(`request-email:${body!.p_email}:${body!.p_guardian_email}`);
+        return json(route, { masked: "c***@example.com" });
       case "/rest/v1/rpc/coach_answer":
         w.calls.push(`answer:${body!.p_link}:${body!.p_accept}`);
         return json(route, "active");
@@ -558,6 +561,14 @@ test("coaching: a player under 16 asks a coach through their guardian; the coach
   await bob.getByRole("button", { name: "Send request" }).click();
   await expect(bob.getByText("We've emailed your parent or guardian; alice_xq sees your request once they confirm.")).toBeVisible();
   expect(w.calls).toContain("request:alice_xq:null:false:mum@example.com");
+
+  // By email: the same answer whether or not the address has an account.
+  await bob.getByRole("button", { name: "Email", exact: true }).click();
+  await bob.getByLabel("Coach's email").fill("coach@example.com");
+  await bob.getByLabel("Your parent's or guardian's email (they confirm first)").fill("mum@example.com");
+  await bob.getByRole("button", { name: "Send request" }).click();
+  await expect(bob.getByText("Sent. If c***@example.com belongs to someone who can coach here, they'll get your request once your parent or guardian confirms.")).toBeVisible();
+  expect(w.calls).toContain("request-email:coach@example.com:mum@example.com");
 
   w.coaching.alice_xq = { ...empty, requests: [{ id: 7, student: "bob_xq", kind: "coach", status: "coach", under16: true, created_at: "2026-10-21T10:00:00Z" }] };
   await alice.goto(at("/en/coach/"));

@@ -19,7 +19,7 @@ const SUPABASE_STANDIN = `
   create function auth.uid() returns uuid language sql stable as
     $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create function auth.jwt() returns jsonb language sql stable as
-    $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
+    $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{"aal": "aal2"}')::jsonb $$;
   -- Supabase Queues (pgmq), as far as the migrations use it: one queue, read in order.
   create schema pgmq;
   create table pgmq.q (msg_id bigserial primary key, message jsonb not null, archived boolean not null default false);
@@ -1607,7 +1607,7 @@ describe("coaching (M23)", () => {
     await db.query(`update public.profiles set birth_month = date_trunc('month', now() - make_interval(years => $2) - interval '2 months')::date, created_at = now() - interval '30 days' where user_id = $1`, [user, years]);
     await db.query(`alter table public.profiles enable trigger profiles_before_update`);
   };
-  const lastMail = () => q2<{ to_email: string; template: string; data: { token: string; student: string; coach: string } }>(`(select to_jsonb(m) from public.mail_outbox m order by id desc limit 1)`);
+  const lastMail = () => q2<{ to_email: string; template: string; data: { token: string; student: string; coach: string } }>(`(select to_jsonb(m) from public.mail_outbox m where template = 'guardian-confirm' order by id desc limit 1)`);
   const finished = async (red: string, black: string) =>
     (await db.query<{ id: string }>(
       `insert into public.games (red, black, base, inc, speed, rated, relay, status, result, reason, moves, started_at, ended_at)
@@ -1712,7 +1712,7 @@ describe("coaching (M23)", () => {
     await db.query(`delete from public.mail_outbox`);
     for (let i = 0; i < 3; i++) await db.query(`select public.queue_mail($1, 'test', 'zh', '{"token": "secret"}', null)`, [`p${i}@example.com`]);
     const batch = await q2<{ id: number; to: string; lang: string }[]>(`public.mail_claim(2)`);
-    expect(batch.map((m) => m.to)).toEqual(["p0@example.com", "p1@example.com"]);
+    expect(batch.map((m) => m.to).sort()).toEqual(["p0@example.com", "p1@example.com"]);
     expect((await q2<object[]>(`public.mail_claim(5)`)).length).toBe(1); // the claimed two aren't handed out again
     await db.query(`select public.mail_done($1)`, [batch[0]!.id]);
     await db.query(`select public.mail_done($1, 'smtp 421')`, [batch[1]!.id]);
@@ -1723,6 +1723,122 @@ describe("coaching (M23)", () => {
     await db.query(`select public.queue_mail('late@example.com', 'test', 'en', '{}', null)`);
     expect(await q2(`public.mail_claim(5)`)).toEqual([]);
     expect(await failsAs(KID, `select public.mail_claim(5)`)).toMatch(/permission denied/);
+  });
+});
+
+describe("account security (M23b)", () => {
+  const [ACC, CO, MODX] = ["01", "02", "03"].map((x) => `00000000-0000-4000-8000-0000000004${x}`) as [string, string, string];
+  const now = () => Math.floor(Date.now() / 1000);
+  /** Runs as a user with these session claims (sign-in times, two-factor level). */
+  const run = <T>(user: string | null, sql: string, params: unknown[] = [], claims: object = { aal: "aal1", amr: [{ method: "password", timestamp: now() }] }) =>
+    db.transaction(async (tx) => {
+      await tx.query(`select set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claims', $2, true)`, [user ?? "", JSON.stringify(claims)]);
+      await tx.exec(`set local role ${user ? "authenticated" : "anon"}`);
+      return (await tx.query<{ j: T }>(`select ${sql} as j`, params)).rows[0]!.j;
+    });
+  const hint = (user: string | null, sql: string, params: unknown[] = [], claims?: object) =>
+    run(user, sql, params, claims).then(() => "no error", (e: { hint?: string; message: string }) => e.hint ?? e.message);
+  const mail = (template: string) => q2<{ to_email: string; data: { token: string; reminder?: boolean }; send_after: string } | null>(`(select to_jsonb(m) from public.mail_outbox m where template = $1 order by id desc limit 1)`, [template]);
+  const email = (u: string) => q2<string>(`(select email from auth.users where id = $1)`, [u]);
+
+  beforeAll(async () => {
+    for (const [u, name] of [[ACC, "acc_owner"], [CO, "coach_by_mail"], [MODX, "mod_x"]] as const) await signUp(u, { username: name });
+    await db.query(`alter table public.profiles disable trigger profiles_before_update`);
+    await db.query(`update public.profiles set birth_month = '1980-01-01', created_at = now() - interval '30 days' where user_id in ($1, $2)`, [ACC, CO]);
+    await db.query(`alter table public.profiles enable trigger profiles_before_update`);
+    await db.query(`update auth.users set email = 'coach.lin@example.com' where id = $1`, [CO]);
+    await db.query(`insert into public.moderators (user_id) values ($1)`, [MODX]);
+  });
+
+  it("links a coach by email without showing whether the address has an account", async () => {
+    const real = await run<{ masked: string }>(ACC, `public.request_coach_by_email('Coach.Lin@example.com')`);
+    const none = await run<{ masked: string }>(ACC, `public.request_coach_by_email('nobody@example.com')`);
+    expect(real).toEqual({ masked: "c***@example.com" });
+    expect(none).toEqual({ masked: "n***@example.com" });
+    const mine = await run<{ as_student: object[]; email_requests: { masked: string }[] }>(ACC, `public.my_coaching()`);
+    expect(mine.as_student).toEqual([]); // the coach's username isn't shown before they accept
+    expect(mine.email_requests.map((r) => r.masked).sort()).toEqual(["c***@example.com", "n***@example.com"]);
+    // The coach sees the request, and got an email about it.
+    const req = (await run<{ requests: { id: number; student: string }[] }>(CO, `public.my_coaching()`)).requests[0]!;
+    expect(req.student).toBe("acc_owner");
+    expect(await mail("coach-request")).toMatchObject({ to_email: "coach.lin@example.com" });
+    await run(CO, `public.coach_answer(${req.id}, true)`);
+    const after = await run<{ as_student: { coach: string }[]; email_requests: { masked: string }[] }>(ACC, `public.my_coaching()`);
+    expect(after.as_student.map((l) => l.coach)).toEqual(["coach_by_mail"]);
+    expect(after.email_requests.map((r) => r.masked)).toEqual(["n***@example.com"]);
+    for (let i = 0; i < 3; i++) await run(ACC, `public.request_coach_by_email('x${i}@example.com')`);
+    expect(await hint(ACC, `public.request_coach_by_email('x9@example.com')`)).toBe("email-limit");
+  });
+
+  it("needs two-factor sign-in for moderator work", async () => {
+    expect(await hint(MODX, `public.mod_queue()`, [], { aal: "aal1" })).toBe("mfa");
+    expect(await hint(MODX, `public.mod_feedback()`, [], { aal: "aal2" })).toBe("no error");
+  });
+
+  it("changes the email after the old address approves, after a check that it's you", async () => {
+    expect(await hint(ACC, `public.start_email_change('new1@example.com')`, [], { aal: "aal1", amr: [{ method: "password", timestamp: now() - 3600 }] })).toBe("reauth");
+    expect(await hint(ACC, `public.start_email_change('coach.lin@example.com')`)).toBe("taken");
+    await run(ACC, `public.start_email_change('New1@Example.com')`);
+    expect(await hint(ACC, `public.start_email_change('other@example.com')`)).toBe("pending");
+    const toNew = await mail("email-change-new");
+    expect(toNew!.to_email).toBe("new1@example.com");
+    expect(await run(null, `public.email_change_view($1)`, [toNew!.data.token])).toMatchObject({ kind: "new", status: "confirm-new", new: "n***@example.com" });
+    expect(await run(null, `public.confirm_new_email($1)`, [toNew!.data.token])).toBe("waiting");
+    expect(await run<{ change: { status: string } }>(ACC, `public.my_email_change()`)).toMatchObject({ change: { status: "waiting" } });
+    const toOld = await q2<{ to_email: string; data: { token: string }; cancel_key: string }[]>(`(select jsonb_agg(to_jsonb(m) order by send_after) from public.mail_outbox m where template = 'email-change-old')`);
+    expect(toOld.map((m) => m.to_email)).toEqual(Array(4).fill("1@example.com")); // now, and reminders on days 1, 5, 9
+    expect(await run(null, `public.answer_old_email($1, true)`, [toOld[0]!.data.token])).toBe("done");
+    expect(await email(ACC)).toBe("new1@example.com");
+    expect(await q2(`(select count(*)::int from public.mail_outbox where template = 'email-change-old' and sent_at is null)`)).toBe(0); // reminders withdrawn
+    expect((await mail("email-changed"))!.to_email).toBe("1@example.com");
+  });
+
+  it("completes by itself after 10 days without an answer; a deny locks changes for longer each time", async () => {
+    const start = async (to: string) => {
+      await run(ACC, `public.start_email_change($1)`, [to]);
+      await run(null, `public.confirm_new_email($1)`, [(await mail("email-change-new"))!.data.token]);
+      return (await mail("email-change-old"))!.data.token; // the newest: a reminder carries the same link
+    };
+    await start("new2@example.com");
+    await db.query(`update public.email_changes set due_at = now() - interval '1 minute' where status = 'waiting'`);
+    expect(await q2(`public.complete_due_email_changes()`)).toBe(1);
+    expect(await email(ACC)).toBe("new2@example.com");
+
+    const deny1 = await start("thief@example.com");
+    expect(await run(null, `public.answer_old_email($1, false)`, [deny1])).toBe("denied");
+    expect(await email(ACC)).toBe("new2@example.com");
+    const lock = () => q2<{ denies: number; days: number }>(`(select jsonb_build_object('denies', denies, 'days', round(extract(epoch from locked_until - now()) / 86400)) from public.email_change_locks where user_id = $1)`, [ACC]);
+    expect(await lock()).toEqual({ denies: 1, days: 10 });
+    expect(await hint(ACC, `public.start_email_change('thief2@example.com')`)).toBe("locked");
+    for (const [denies, days] of [[2, 20], [3, 40], [4, 80], [5, 160], [6, 160]] as const) {
+      await db.query(`update public.email_change_locks set locked_until = null where user_id = $1`, [ACC]);
+      await run(null, `public.answer_old_email($1, false)`, [await start(`try${denies}@example.com`)]);
+      expect(await lock()).toEqual({ denies, days });
+    }
+  });
+
+  it("skips the wait with two-factor, and lets the old address undo a change for 30 days", async () => {
+    await db.query(`update public.email_change_locks set locked_until = null where user_id = $1`, [ACC]);
+    // With two-factor on, has_mfa reads auth.mfa_factors, which the stand-in lacks: fake it.
+    await db.query(`create table if not exists auth.mfa_factors (user_id uuid, status text)`);
+    await db.query(`insert into auth.mfa_factors values ($1, 'verified')`, [ACC]);
+    expect(await hint(ACC, `public.start_email_change('fast@example.com')`)).toBe("reauth"); // two-factor on, but this session is aal1
+    await run(ACC, `public.start_email_change('fast@example.com')`, [], { aal: "aal2", amr: [{ method: "totp", timestamp: now() }] });
+    expect(await run(null, `public.confirm_new_email($1)`, [(await mail("email-change-new"))!.data.token])).toBe("done");
+    expect(await email(ACC)).toBe("fast@example.com");
+    expect(await q2(`(select denies from public.email_change_locks where user_id = $1)`, [ACC])).toBe(0);
+
+    const undo = (await mail("email-changed"))!.data.token;
+    expect(await run(null, `public.email_change_view($1)`, [undo])).toMatchObject({ kind: "undo", status: "done" });
+    await run(null, `public.undo_email_change($1)`, [undo]);
+    expect(await hint(ACC, `public.start_email_change('again@example.com')`, [], { aal: "aal2", amr: [{ method: "totp", timestamp: now() }] })).toBe("frozen");
+    const mfa = { aal: "aal2", amr: [{ method: "totp", timestamp: now() }] };
+    const disputed = (await run<{ disputed: { id: number; username: string }[] }>(MODX, `public.mod_email_changes()`, [], mfa)).disputed;
+    expect(disputed).toEqual([expect.objectContaining({ username: "acc_owner" })]);
+    await run(MODX, `public.mod_settle_email_change(${disputed[0]!.id}, true, 'owner proved it')`, [], mfa);
+    expect(await email(ACC)).toBe("new2@example.com");
+    expect(await q2(`(select frozen from public.email_change_locks where user_id = $1)`, [ACC])).toBe(false);
+    await db.query(`drop table auth.mfa_factors`);
   });
 });
 

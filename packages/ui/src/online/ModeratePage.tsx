@@ -6,6 +6,7 @@
 // unchecked can be analysed in the moderator's own browser, which settles them.
 import { type FormEvent, type ReactNode, Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { useAccount } from "../account/session.js";
+import { assurance } from "../account/security.js";
 import { type ModCoachLinks, type ModCoaching, modBarCoach, modCloseCoachReport, modCoachLinks, modCoaching, modLink } from "../coach/api.js";
 import { useNav } from "../nav.js";
 import { PHRASES, type Phrase } from "@xq/online";
@@ -59,19 +60,33 @@ export function ModeratePage() {
   const nav = useNav();
   const account = useAccount();
   const [allowed, setAllowed] = useState<boolean | null>(null);
+  // M23b: moderator work needs a two-factor session.
+  const [twoFactor, setTwoFactor] = useState<boolean | null>(null);
   const username = nav.params().get("u");
   const tab = nav.params().get("tab");
 
   useEffect(() => {
     if (account.state.status !== "signedIn") return setAllowed(account.state.status === "loading" ? null : false);
-    void account
-      .client()
-      .then(isModerator)
-      .then(setAllowed, () => setAllowed(false));
+    void account.client().then(async (sb) => {
+      setAllowed(await isModerator(sb).catch(() => false));
+      setTwoFactor((await assurance(sb)).current === "aal2");
+    });
   }, [account]);
 
   if (allowed === null) return <p className="muted" style={{ padding: 24 }}>…</p>;
   if (!allowed) return <p style={{ padding: 24 }}>{tt("This page is for moderators.", "此页面仅供管理员使用。")}</p>;
+  if (twoFactor === false) {
+    return (
+      <div className="online-page moderate-page">
+        <h1>{tt("Two-factor sign-in needed", "需要两步验证")}</h1>
+        <p>
+          {tt("Moderator work needs two-factor sign-in. Turn it on in ", "管理员操作需要两步验证。请在")}
+          <a href={nav.href("/settings?tab=account")}>{tt("Settings → Account", "设置 → 账号")}</a>
+          {tt(", then sign out and sign in again with your code.", "中开启，然后退出并用验证码重新登录。")}
+        </p>
+      </div>
+    );
+  }
   if (username) return <div className="online-page moderate-page"><Case username={username} /></div>;
   return (
     <div className="online-page moderate-page">
@@ -85,6 +100,9 @@ export function ModeratePage() {
         <a href={nav.href("/moderate?tab=coaching")} aria-current={tab === "coaching" ? "page" : undefined}>
           {tt("Coaching", "教练")}
         </a>
+        <a href={nav.href("/moderate?tab=accounts")} aria-current={tab === "accounts" ? "page" : undefined}>
+          {tt("Accounts", "账号")}
+        </a>
         <a href={nav.href("/moderate?tab=settings")} aria-current={tab === "settings" ? "page" : undefined}>
           {tt("Site settings", "网站设置")}
         </a>
@@ -93,6 +111,8 @@ export function ModeratePage() {
         <FeedbackTab />
       ) : tab === "coaching" ? (
         <CoachingTab />
+      ) : tab === "accounts" ? (
+        <AccountsTab />
       ) : tab === "settings" ? (
         <>
           <DonationSettings />
@@ -1177,6 +1197,85 @@ function CoachingTab() {
             </tbody>
           </table>
         </div>
+      )}
+    </section>
+  );
+}
+
+interface ModEmailChanges {
+  disputed: { id: number; username: string; old: string; new: string; done_at: string }[];
+  locks: { username: string; denies: number; locked_until: string | null; frozen: boolean }[];
+}
+
+/** Email changes undone from the old address ("Wasn't you?"), and locked or frozen accounts. */
+function AccountsTab() {
+  const { tt } = useT();
+  const account = useAccount();
+  const [data, setData] = useState<ModEmailChanges | null>(null);
+  const [note, setNote] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const load = useCallback(() => {
+    void account.client().then(async (sb) => {
+      const { data: d, error } = await sb.rpc("mod_email_changes");
+      if (!error) setData(d as ModEmailChanges);
+    });
+  }, [account]);
+  useEffect(load, [load]);
+  const act = async (fn: string, args: object, done: string) => {
+    setMessage(null);
+    const { error } = await (await account.client()).rpc(fn, args);
+    setMessage(error ? error.message : done);
+    if (!error) {
+      setNote("");
+      load();
+    }
+  };
+  return (
+    <section aria-labelledby="h-accounts">
+      <h1 id="h-accounts">{tt("Accounts", "账号")}</h1>
+      <p className="muted small">
+        {tt(
+          "Before restoring an email or lifting a lock, ask the owner to show the account is theirs (when it was made, its games, the old address writing to us).",
+          "恢复邮箱或解除锁定前，请让账号所有者证明账号属于自己（注册时间、对局记录、用旧邮箱联系我们）。",
+        )}
+      </p>
+      <label>
+        {tt("Reason (kept in the log)", "理由（记入日志）")} <input value={note} onChange={(e) => setNote(e.target.value)} />
+      </label>
+      {message && <p role="status">{message}</p>}
+      <h2>{tt("Disputed email changes", "有争议的邮箱更改")}</h2>
+      {!data || data.disputed.length === 0 ? (
+        <p className="muted">{tt("None.", "暂无。")}</p>
+      ) : (
+        <ul>
+          {data.disputed.map((d) => (
+            <li key={d.id}>
+              <strong>{d.username}</strong>: {d.old} → {d.new} ({new Date(d.done_at).toLocaleString()}){" "}
+              <button type="button" disabled={!note.trim()} onClick={() => void act("mod_settle_email_change", { p_change: d.id, p_restore: true, p_note: note }, tt("Old email restored.", "已恢复旧邮箱。"))}>
+                {tt("Restore the old email", "恢复旧邮箱")}
+              </button>{" "}
+              <button type="button" disabled={!note.trim()} onClick={() => void act("mod_settle_email_change", { p_change: d.id, p_restore: false, p_note: note }, tt("Kept the new email.", "已保留新邮箱。"))}>
+                {tt("Keep the new email", "保留新邮箱")}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <h2>{tt("Locked or frozen", "已锁定或冻结")}</h2>
+      {!data || data.locks.length === 0 ? (
+        <p className="muted">{tt("None.", "暂无。")}</p>
+      ) : (
+        <ul>
+          {data.locks.map((l) => (
+            <li key={l.username}>
+              <strong>{l.username}</strong> · {l.frozen ? tt("frozen", "已冻结") : tt(`locked until ${new Date(l.locked_until!).toLocaleDateString()}`, `锁定至 ${new Date(l.locked_until!).toLocaleDateString()}`)} ·{" "}
+              {tt(`${l.denies} denies`, `${l.denies} 次拒绝`)}{" "}
+              <button type="button" disabled={!note.trim()} onClick={() => void act("mod_unlock_email", { p_username: l.username, p_note: note }, tt("Lifted.", "已解除。"))}>
+                {tt("Lift", "解除")}
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   );

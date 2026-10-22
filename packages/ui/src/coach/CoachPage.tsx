@@ -20,6 +20,8 @@ import {
   myCoaching,
   reportCoach,
   requestCoach,
+  requestCoachByEmail,
+  withdrawEmailRequest,
 } from "./api.js";
 
 /** What a database hint means, for the person who caused it. */
@@ -60,6 +62,10 @@ export function useHintText() {
         return tt("3 emails to guardians a day at most. Try again tomorrow.", "每天最多给监护人发送 3 封邮件。请明天再试。");
       case "once":
         return tt("You've already reported this today.", "你今天已举报过。");
+      case "email":
+        return tt("That isn't an email address.", "这不是有效的邮箱地址。");
+      case "email-limit":
+        return tt("5 requests by email a day at most. Try again tomorrow.", "每天最多通过邮箱发送 5 个请求。请明天再试。");
       default:
         return e instanceof Error ? e.message : String(e);
     }
@@ -124,7 +130,7 @@ function MyCoaches({ data, reload }: { data: MyCoaching; reload: () => void }) {
   const nav = useNav();
   const account = useAccount();
   const hintText = useHintText();
-  const [by, setBy] = useState<"username" | "code">("username");
+  const [by, setBy] = useState<"username" | "code" | "email">("username");
   const [who, setWho] = useState("");
   const [family, setFamily] = useState(false);
   const [guardian, setGuardian] = useState("");
@@ -136,6 +142,20 @@ function MyCoaches({ data, reload }: { data: MyCoaching; reload: () => void }) {
     e.preventDefault();
     setMessage(null);
     try {
+      if (by === "email") {
+        const r = await requestCoachByEmail(await account.client(), { email: who, family, guardianEmail: data.needs_guardian ? guardian : null });
+        setMessage({
+          ok: true,
+          text: tt(
+            `Sent. If ${r.masked} belongs to someone who can coach here, they'll get your request${data.needs_guardian ? " once your parent or guardian confirms" : ""}.`,
+            `已发送。如果 ${r.masked} 属于本站可以担任教练的人，对方将收到你的请求${data.needs_guardian ? "（需家长或监护人先确认）" : ""}。`,
+          ),
+        });
+        setWho("");
+        setGuardian("");
+        setFamily(false);
+        return reload();
+      }
       const r = await requestCoach(await account.client(), {
         coach: by === "username" ? who : null,
         code: by === "code" ? who : null,
@@ -178,9 +198,9 @@ function MyCoaches({ data, reload }: { data: MyCoaching; reload: () => void }) {
   return (
     <section aria-labelledby="h-my-coaches">
       <h2 id="h-my-coaches">{tt("My coaches", "我的教练")}</h2>
-      {open.length === 0 ? (
+      {open.length === 0 && (data.email_requests ?? []).length === 0 ? (
         <p className="muted">{tt("No coach linked.", "尚未关联教练。")}</p>
-      ) : (
+      ) : open.length === 0 ? null : (
         <ul className="coach-links">
           {open.map((l) => (
             <li key={l.id}>
@@ -210,6 +230,28 @@ function MyCoaches({ data, reload }: { data: MyCoaching; reload: () => void }) {
         </ul>
       )}
 
+      {(data.email_requests ?? []).length > 0 && (
+        <ul className="coach-links">
+          {data.email_requests!.map((r) => (
+            <li key={`e${r.id}`}>
+              {tt(`Request sent to ${r.masked}`, `已向 ${r.masked} 发送请求`)}{" "}
+              <button
+                type="button"
+                className="link"
+                onClick={() =>
+                  void (async () => {
+                    await withdrawEmailRequest(await account.client(), r.id).catch(() => {});
+                    reload();
+                  })()
+                }
+              >
+                {tt("Withdraw", "撤回")}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
       <h3>{tt("Ask a coach", "请求教练")}</h3>
       <form className="contact-form" onSubmit={(e) => void ask(e)}>
         <div className="segmented" role="group" aria-label={tt("Find the coach by", "查找方式")}>
@@ -219,10 +261,13 @@ function MyCoaches({ data, reload }: { data: MyCoaching; reload: () => void }) {
           <button type="button" aria-pressed={by === "code"} onClick={() => setBy("code")}>
             {tt("Code from the coach", "教练给的代码")}
           </button>
+          <button type="button" aria-pressed={by === "email"} onClick={() => setBy("email")}>
+            {tt("Email", "邮箱")}
+          </button>
         </div>
         <label>
-          {by === "username" ? tt("Coach's username", "教练的用户名") : tt("Code", "代码")}
-          <input value={who} onChange={(e) => setWho(e.target.value)} required autoCapitalize={by === "code" ? "characters" : "none"} />
+          {by === "username" ? tt("Coach's username", "教练的用户名") : by === "code" ? tt("Code", "代码") : tt("Coach's email", "教练的邮箱")}
+          <input type={by === "email" ? "email" : "text"} value={who} onChange={(e) => setWho(e.target.value)} required autoCapitalize={by === "code" ? "characters" : "none"} />
         </label>
         <label className="inline">
           <input type="checkbox" checked={family} onChange={(e) => setFamily(e.target.checked)} /> {tt("This is my parent or guardian", "这是我的家长或监护人")}

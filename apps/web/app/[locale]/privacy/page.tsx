@@ -100,6 +100,14 @@ function En() {
         Gmail. Either side, or the guardian, can end a link at any time; ended links are kept with the account. Coaches must be 18 or over.
       </p>
 
+      <h2>Account security</h2>
+      <p>
+        If you turn on two-factor sign-in, Supabase keeps the secret your authenticator app uses, and we're emailed nothing about your codes. When
+        you change your email we keep both addresses, the dates, and how the change ended (approved, denied, or after the 10-day wait) with the
+        account, so a disputed change can be checked; links in those emails are stored only as one-way hashes. A request to link a coach by email
+        keeps only a masked form of the address you typed (like "j***@example.com").
+      </p>
+
       <h2>Feedback and donations</h2>
       <p>
         The <a href="../feedback/">feedback page</a> keeps what you write, its kind, the page you came from, the site version and your language, and,
@@ -184,6 +192,11 @@ function Zh() {
       <h2>教练</h2>
       <p>
         在<a href="../coach/">教练</a>页面，棋手可以关联教练。教练可以看到该棋手已结束的在线对局、复盘和等级分：看不到聊天、进行中的对局或其他内容，网站上双方之间也没有私信。在这些对局中，16 岁以下且不是该教练学生的对手只显示为"一位 16 岁以下的对手"。我们保存关联记录（双方、时间、如何解除）、教练查看过的每盘对局的列表（棋手可在教练页面查看）以及关于教练的举报。16 岁以下的棋手需填写家长或监护人的邮箱：我们只发送一封固定内容的确认邮件，邮箱地址只保存到对方回复为止（之后只保留其单向哈希值，以便再次识别），并保存其是否允许孩子以后关联教练无需每次确认的选择。邮件通过 Gmail 发送。任何一方或监护人都可以随时解除关联；已解除的关联随账号保存。教练须年满 18 岁。
+      </p>
+
+      <h2>账号安全</h2>
+      <p>
+        如果你开启两步验证，身份验证器应用使用的密钥由 Supabase 保存，我们不会收到任何关于验证码的信息。更改邮箱时，我们随账号保存新旧两个邮箱、日期以及更改的结果（批准、拒绝或 10 天后自动生效），以便核查有争议的更改；这些邮件中的链接只以单向哈希值保存。通过邮箱请求关联教练时，只保存你所填邮箱的部分隐藏形式（如"j***@example.com"）。
       </p>
 
       <h2>反馈与捐助</h2>

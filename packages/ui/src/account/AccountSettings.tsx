@@ -8,6 +8,7 @@ import { useNav } from "../nav.js";
 import { useT } from "../settings.js";
 import { Field, FormError, MIN_PASSWORD, authErrorText, callbackUrl, rememberNext } from "./AuthPages.js";
 import { LinkedSignIns } from "./LinkedSignIns.js";
+import { EmailSection, TwoFactorSection } from "./security.js";
 import { download, exportAccount } from "./exportData.js";
 import { DELETING, PROVIDERS, type Provider, useAccount } from "./session.js";
 
@@ -32,8 +33,9 @@ export function AccountSettings() {
 
   return (
     <div className="account-settings">
-      <EmailSection email={account.state.user.email} />
+      <EmailSection email={account.state.user.email} hasPassword={hasPassword} provider={provider} />
       <PasswordSection hasPassword={hasPassword} />
+      <TwoFactorSection />
       <LinkedSignIns />
       <SessionsSection />
       <DataSection />
@@ -42,52 +44,12 @@ export function AccountSettings() {
   );
 }
 
-function EmailSection({ email }: { email: string }) {
-  const { tt } = useT();
-  const nav = useNav();
-  const account = useAccount();
-  const [next, setNext] = useState("");
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    const sb = await account.client();
-    const { error } = await sb.auth.updateUser({ email: next }, { emailRedirectTo: callbackUrl(nav.href) });
-    setBusy(false);
-    if (error) return setError(authErrorText(error, tt));
-    setSent(true);
-  };
-  return (
-    <section aria-labelledby="h-email">
-      <h2 id="h-email">{tt("Email", "邮箱")}</h2>
-      <p className="muted">{email}</p>
-      {sent ? (
-        <p role="status">
-          {tt(
-            `Check both inboxes: confirm the change from ${next} and from ${email}. Until then your email stays the same.`,
-            `请查收两个邮箱：分别在 ${next} 和 ${email} 中确认修改。确认前邮箱保持不变。`,
-          )}
-        </p>
-      ) : (
-        <form className="account-form" onSubmit={(e) => void submit(e)}>
-          <Field label={tt("New email", "新邮箱")} type="email" value={next} onChange={setNext} autoComplete="email" />
-          <FormError text={error} />
-          <button type="submit" disabled={busy || !next || next === email}>
-            {busy ? "…" : tt("Change email", "修改邮箱")}
-          </button>
-        </form>
-      )}
-    </section>
-  );
-}
-
 function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
   const { tt } = useT();
   const account = useAccount();
   const [password, setPassword] = useState("");
+  // M23b: a new password needs the current one (the server checks it).
+  const [current, setCurrent] = useState("");
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -97,7 +59,7 @@ function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
     setBusy(true);
     setError(null);
     const sb = await account.client();
-    const { error } = await sb.auth.updateUser({ password });
+    const { error } = await sb.auth.updateUser(hasPassword ? { password, current_password: current } : { password });
     if (error) {
       setBusy(false);
       return setError(authErrorText(error, tt));
@@ -106,6 +68,7 @@ function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
     await sb.auth.signOut({ scope: "others" });
     setBusy(false);
     setPassword("");
+    setCurrent("");
     setDone(true);
   };
   return (
@@ -115,6 +78,7 @@ function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
         <p className="muted">{tt("You sign in with Google, Microsoft or GitHub. Set a password to sign in with your email too.", "你目前通过 Google、Microsoft 或 GitHub 登录。设置密码后也可以用邮箱登录。")}</p>
       )}
       <form className="account-form" onSubmit={(e) => void submit(e)}>
+        {hasPassword && <Field label={tt("Current password", "当前密码")} type="password" value={current} onChange={setCurrent} autoComplete="current-password" />}
         <Field
           label={hasPassword ? tt("New password", "新密码") : tt("Password", "密码")}
           type="password"
@@ -129,7 +93,7 @@ function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
         />
         <FormError text={error} />
         {done && <p className="form-ok">{tt("Password saved. Other devices are signed out.", "密码已保存，其他设备已退出登录。")}</p>}
-        <button type="submit" disabled={busy || !password}>
+        <button type="submit" disabled={busy || !password || (hasPassword && !current)}>
           {busy ? "…" : hasPassword ? tt("Change password", "修改密码") : tt("Set password", "设置密码")}
         </button>
       </form>

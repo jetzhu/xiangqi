@@ -68,4 +68,15 @@ describe("the mailer's templates", () => {
     expect(en.text).toContain("as their parent or guardian");
     expect(() => render("nope", "en", {}, "https://x.test")).toThrow(/no template/);
   });
+
+  it("writes the email-change messages with their links and dates", () => {
+    const old = render("email-change-old", "en", { token: "t1", new: "n***@example.com", due: "2026-11-02T10:00:00Z", reminder: true }, "https://x.test");
+    expect(old.subject).toBe("Reminder: your Xiangqi School email is about to change");
+    expect(old.text).toContain("https://x.test/en/email-change/?t=t1");
+    expect(old.text).toContain("November 2, 2026");
+    expect(render("email-change-new", "zh", { token: "t2", username: "acc" }, "https://x.test").text).toContain("https://x.test/zh/email-change/?t=t2");
+    expect(render("email-changed", "en", { token: "t3", new: "n***@example.com" }, "https://x.test").text).toContain("within 30 days");
+    expect(render("email-change-denied", "en", { days: 20 }, "https://x.test").text).toContain("for 20 days");
+    expect(render("coach-request", "zh", {}, "https://x.test").text).toContain("https://x.test/zh/coach/");
+  });
 });

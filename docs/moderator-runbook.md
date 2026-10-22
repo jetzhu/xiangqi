@@ -32,6 +32,7 @@ flowchart LR
 
 - The review page: **https://jetzhu.github.io/xiangqi/en/moderate/** (or `/zh/moderate/`). It isn't in the menu; bookmark it. Signed in as a moderator you see the queue; anyone else sees "This page is for moderators."
 - Moderators are listed in the database table `moderators`, never in the repository. Current: **jetzhu** and **JianJetZhu**.
+- **Two-factor sign-in is required** (since M23b): turn it on in Settings → Account with an authenticator app, then sign out and in again with your code. Without a two-factor session the review page says so and every moderator function refuses. Losing the phone: the other moderator can't remove it for you; ask the owner to delete the factor with a database command (`delete from auth.mfa_factors where user_id = …`), after checking it's really you.
 - Appeals arrive by email at the contact address on the fair-play and privacy pages: **jianjetzhu@gmail.com**.
 
 Adding or removing a moderator (see [Database commands](#database-commands)):
@@ -254,6 +255,19 @@ Every action needs a reason, which is kept in the log. Things to know when judgi
 
 The caps live in `triage_config`: `coach_under16_cap` (15), `family_cap` (3), `coach_requests_open` (5), `guardian_mails_day` (3).
 
+## Accounts
+
+The **Accounts** tab shows email changes that someone undid from the old address ("Wasn't you?"), and accounts whose email changes are locked or frozen.
+
+- **A disputed change** means the old address says the change wasn't theirs. The account is frozen: no further email changes are possible, and every device was signed out. Ask the owner to show the account is theirs before deciding: when it was made, its games, writing from the old address. Then either **restore the old email**, which signs it out everywhere again, or **keep the new one**. Either choice lifts the freeze.
+- **A lock** follows denies from the old address: 10 days, doubling with each deny, at most 160. A successful change resets the count. Lift a lock only for an owner who proves it's them, for example someone whose old inbox was taken over.
+- How email changes work, for answering questions:
+  1. The player confirms it's them and enters the new address.
+  2. The new address confirms by a link.
+  3. The old address can approve (done at once) or deny. With no answer, the change happens after 10 days, with reminders on days 1, 5 and 9 and a banner on every signed-in device.
+  4. With two-factor on, the change happens as soon as the new address is confirmed.
+  5. The old address can undo a change for 30 days.
+
 ## Email from the site
 
 Guardian confirmations, and later the notices to parents, go through the **mail outbox**. The `mailer` function sends them over the Gmail account sign-in uses (port 465), at most 100 an hour. The database asks it every minute while mail is due.
@@ -318,6 +332,7 @@ The Supabase access token expires; when a command says "Invalid access token", c
 | `purge-old-digests` | daily (03:39 UTC) | Deletes summaries older than 12 months |
 | `purge-old-game-records` | daily (03:23 UTC) | Deletes detailed game records older than 12 months, except where a report, an undecided case or an appeal involves a player |
 | `poke-mailer` | every minute | Asks the mailer to send due emails (only when there are some) |
+| `complete-email-changes` | hourly (:23) | Completes email changes whose 10 days are up; unconfirmed ones lapse after 7 days |
 | `purge-old-mail` | daily (03:43 UTC) | Deletes sent mail after 30 days and ends coach requests nobody answered (14 days for a guardian, 30 for a coach) |
 | `purge-old-feedback` | daily (03:35 UTC) | Deletes feedback 12 months after it was done or declined, 24 months after it was sent |
 | `purge-deleted-accounts` | daily (03:17 UTC) | Finishes account deletions after their 10-day wait |

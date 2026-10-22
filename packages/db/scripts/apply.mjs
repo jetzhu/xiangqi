@@ -38,6 +38,14 @@ const AUTH = {
   mailer_templates_recovery_content: template("recovery"),
   mailer_subjects_email_change: "Confirm your new email · 确认新邮箱 — Xiangqi School 象棋学堂",
   mailer_templates_email_change_content: template("email_change"),
+  // M23b: a new password needs the current one; adding or removing an authenticator is emailed.
+  security_update_password_require_current_password: true,
+  mailer_notifications_mfa_factor_enrolled_enabled: true,
+  mailer_subjects_mfa_factor_enrolled_notification: "Two-factor sign-in turned on · 已开启两步验证 — Xiangqi School 象棋学堂",
+  mailer_templates_mfa_factor_enrolled_notification_content: template("mfa_enrolled"),
+  mailer_notifications_mfa_factor_unenrolled_enabled: true,
+  mailer_subjects_mfa_factor_unenrolled_notification: "Authenticator removed · 已移除身份验证器 — Xiangqi School 象棋学堂",
+  mailer_templates_mfa_factor_unenrolled_notification_content: template("mfa_unenrolled"),
 };
 
 const token = process.env.SUPABASE_ACCESS_TOKEN;

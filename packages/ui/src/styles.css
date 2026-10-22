@@ -530,3 +530,9 @@ button.danger { background: #b3261e; color: #fff; border-color: #b3261e; }
 .digest { border: 1px solid var(--border); border-radius: 8px; padding: 4px 14px 10px; margin: 12px 0 20px; }
 .digest h3 { margin: 8px 0 4px; font-size: 16px; }
 .digest h4 { margin: 12px 0 4px; font-size: 14px; }
+
+/* M23b: two-factor sign-in */
+.mfa-gate { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+.mfa-gate-box { background: var(--bg, #fff); color: var(--text); border-radius: 12px; padding: 20px 24px; max-width: 420px; width: 100%; }
+.enroll-2fa img { background: #fff; padding: 8px; border-radius: 8px; }
+.confirm-its-you { border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin: 8px 0; }

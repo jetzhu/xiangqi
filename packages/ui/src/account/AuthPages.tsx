@@ -38,6 +38,9 @@ export function authErrorText(e: { code?: string | undefined; message?: string; 
   switch (e.code) {
     case "invalid_credentials":
       return tt("Wrong email or password.", "邮箱或密码不正确。");
+    case "current_password_invalid":
+    case "current_password_required":
+      return tt("Your current password isn't right.", "当前密码不正确。");
     case "email_not_confirmed":
       return tt("Please confirm your email first: click the link we sent you.", "请先确认邮箱：点击我们发给你的邮件中的链接。");
     case "weak_password":

@@ -24,6 +24,8 @@ export interface MyCoaching {
   /** Why this player can't coach yet, or null. */
   coach_problem: "birth" | "age" | "email" | "new" | "barred" | null;
   as_student: { id: number; coach: string; kind: "coach" | "family"; status: LinkStatus; created_at: string; ended_at: string | null; ended_by: string | null }[];
+  /** Requests made by email: only the masked address until the coach accepts (M23b). */
+  email_requests?: { id: number; masked: string; created_at: string }[];
   visits: { coach: string; game: string | null; at: string }[];
   requests: { id: number; student: string; kind: "coach" | "family"; status: "coach" | "review"; under16: boolean; created_at: string }[];
   students: { id: number; student: string; kind: "coach" | "family"; since: string; ratings: Record<string, number>; games_30d: number }[];
@@ -34,6 +36,9 @@ export type CoachGameRow = OnlineGameRow & { opponent_under16: boolean };
 export const myCoaching = (sb: SupabaseClient) => rpc<MyCoaching | null>(sb, "my_coaching");
 export const requestCoach = (sb: SupabaseClient, r: { coach: string | null; code: string | null; family: boolean; guardianEmail: string | null }) =>
   rpc<{ id: number; status: LinkStatus; coach: string }>(sb, "request_coach", { p_coach: r.coach, p_code: r.code, p_family: r.family, p_guardian_email: r.guardianEmail });
+export const requestCoachByEmail = (sb: SupabaseClient, r: { email: string; family: boolean; guardianEmail: string | null }) =>
+  rpc<{ masked: string }>(sb, "request_coach_by_email", { p_email: r.email, p_family: r.family, p_guardian_email: r.guardianEmail });
+export const withdrawEmailRequest = (sb: SupabaseClient, id: number) => rpc<null>(sb, "withdraw_email_request", { p_id: id });
 export const createCoachCode = (sb: SupabaseClient) => rpc<{ code: string; expires_at: string }>(sb, "create_coach_code");
 export const coachAnswer = (sb: SupabaseClient, link: number, accept: boolean) => rpc<string>(sb, "coach_answer", { p_link: link, p_accept: accept });
 export const endCoachLink = (sb: SupabaseClient, link: number) => rpc<null>(sb, "end_coach_link", { p_link: link });

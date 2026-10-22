@@ -21,11 +21,13 @@ const USER = {
 };
 
 /** A token shaped like Supabase's: a JWT whose payload names the user and expiry. */
-function session() {
+function session(auth: { signedInAt: number; aal: string } = { signedInAt: Math.floor(Date.now() / 1000), aal: "aal1" }, user: object = USER) {
   const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
   const exp = Math.floor(Date.now() / 1000) + 3600;
-  const jwt = `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ sub: USER.id, exp, role: "authenticated", aud: "authenticated" })}.sig`;
-  return { access_token: jwt, token_type: "bearer", expires_in: 3600, expires_at: exp, refresh_token: "refresh-1", user: USER };
+  // Like Supabase's: the two-factor level and when (and how) the session signed in (M23b).
+  const claims = { sub: USER.id, exp, role: "authenticated", aud: "authenticated", aal: auth.aal, amr: [{ method: auth.aal === "aal2" ? "totp" : "password", timestamp: auth.signedInAt }] };
+  const jwt = `${b64({ alg: "HS256", typ: "JWT" })}.${b64(claims)}.sig`;
+  return { access_token: jwt, token_type: "bearer", expires_in: 3600, expires_at: exp, refresh_token: "refresh-1", user };
 }
 
 interface Calls {
@@ -97,6 +99,9 @@ interface FakeOptions {
   oauthUser?: typeof USER;
   /** What the account already holds (saved from another device). */
   tables?: Partial<Tables>;
+  /** M23b: how long ago the session signed in (seconds), and whether two-factor is on. */
+  signedInAgo?: number;
+  mfa?: boolean;
 }
 
 /** Under 16 on a YYYY-MM birth month: 16 from the first day of the month after. */
@@ -133,7 +138,12 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
   };
   const profile = { ...(opts.profile ?? { username: "Alice_1", username_chosen: true }) };
   const online = { blocks: [] as string[], born: null as string | null, next: null as string | null };
-  let user = { ...USER, identities: [...USER.identities] };
+  let user = { ...USER, identities: [...USER.identities] } as typeof USER & { factors?: object[] };
+  // M23b: the session's sign-in time and two-factor level; the account's authenticator; an email change.
+  const auth = { signedInAt: Math.floor(Date.now() / 1000) - (opts.signedInAgo ?? 0), aal: "aal1", recovery: false };
+  const verifiedFactor = { id: "f1", factor_type: "totp", status: "verified", friendly_name: "Authenticator", created_at: "2026-10-21T00:00:00Z", updated_at: "2026-10-21T00:00:00Z" };
+  if (opts.mfa) user.factors = [verifiedFactor];
+  let emailChange: { status: string; new: string; due_at: string | null; fast: boolean } | null = null;
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, json: body, headers: { "access-control-allow-origin": "*" } });
   await page.route(`${SUPABASE}/**`, async (route) => {
     const req = route.request();
@@ -275,16 +285,54 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
         return json(route, { ...USER, email_confirmed_at: null, confirmation_sent_at: new Date().toISOString() });
       case "/auth/v1/verify":
         calls.verify.push(body ?? {});
-        return json(route, session());
+        // A password-reset link's session may set a password without the current one (as Supabase does).
+        auth.recovery = body?.type === "recovery";
+        return json(route, session(auth, user));
       case "/auth/v1/token":
-        if (url.searchParams.get("grant_type") === "pkce") return json(route, { ...session(), user });
+        if (url.searchParams.get("grant_type") === "pkce") {
+          // A default-email password reset arrives this way too (the fake can't tell it from a provider sign-in).
+          auth.recovery = true;
+          return json(route, session(auth, user));
+        }
+        if (url.searchParams.get("grant_type") === "refresh_token") return json(route, session(auth, user));
         calls.password.push(body ?? {});
-        return body?.password === (opts.password ?? "correct-horse")
-          ? json(route, session())
-          : json(route, { code: "invalid_credentials", error_code: "invalid_credentials", msg: "Invalid login credentials" }, 400);
+        if (body?.password !== (opts.password ?? "correct-horse"))
+          return json(route, { code: "invalid_credentials", error_code: "invalid_credentials", msg: "Invalid login credentials" }, 400);
+        auth.signedInAt = Math.floor(Date.now() / 1000);
+        auth.aal = "aal1";
+        return json(route, session(auth, user));
       case "/auth/v1/user":
-        if (req.method() === "PUT") calls.updateUser.push(body ?? {});
+        if (req.method() === "PUT") {
+          calls.updateUser.push(body ?? {});
+          if (body?.password && !auth.recovery && user.identities.some((i) => i.provider === "email") && body.current_password !== (opts.password ?? "correct-horse"))
+            return json(route, { code: "current_password_invalid", error_code: "current_password_invalid", msg: "Current password is invalid" }, 400);
+        }
         return json(route, user);
+      // Two-factor (M23b): enrol an authenticator, then challenge and verify a code.
+      case "/auth/v1/factors":
+        calls.rpc.push("enroll");
+        return json(route, { id: "f1", type: "totp", friendly_name: "Authenticator", totp: { qr_code: "data:image/svg+xml;utf-8,<svg xmlns='http://www.w3.org/2000/svg'/>", secret: "JBSWY3DPEHPK3PXP", uri: "otpauth://totp/x" } });
+      case "/auth/v1/factors/f1/challenge":
+        return json(route, { id: "c1", type: "totp", expires_at: Math.floor(Date.now() / 1000) + 300 });
+      case "/auth/v1/factors/f1/verify":
+        calls.rpc.push(`verify:${body?.code}`);
+        if (body?.code !== "123456") return json(route, { code: "mfa_verification_failed", error_code: "mfa_verification_failed", msg: "Invalid TOTP code entered" }, 422);
+        user.factors = [verifiedFactor];
+        auth.aal = "aal2";
+        auth.signedInAt = Math.floor(Date.now() / 1000);
+        return json(route, session(auth, user));
+      // The email change (M23b).
+      case "/rest/v1/rpc/my_email_change":
+        return json(route, { change: emailChange, locked_until: null, frozen: false, mfa: !!user.factors?.length });
+      case "/rest/v1/rpc/start_email_change":
+        calls.rpc.push(`start_email_change:${body?.p_new}`);
+        if (Math.floor(Date.now() / 1000) - auth.signedInAt > 600) return json(route, { code: "42501", message: "confirm it's you first", hint: "reauth" }, 400);
+        emailChange = { status: "waiting", new: "n***@example.com", due_at: new Date(Date.now() + 10 * 864e5).toISOString(), fast: false };
+        return json(route, { status: "confirm-new" });
+      case "/rest/v1/rpc/cancel_email_change":
+        calls.rpc.push("cancel_email_change");
+        emailChange = null;
+        return json(route, null);
       case "/auth/v1/logout":
         calls.logout.push(url.searchParams.get("scope") ?? "");
         return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*" } });
@@ -817,10 +865,14 @@ test("settings → account: password, log out everywhere, download my data", asy
   await signedInSettings(page, calls);
   await expect(page.getByText("alice@example.com", { exact: true })).toBeVisible();
 
+  await page.getByLabel("Current password").fill("wrong-horse");
   await page.getByLabel("New password").fill("new-horse-99");
   await page.getByRole("button", { name: "Change password" }).click();
+  await expect(page.getByText("Your current password isn't right.")).toBeVisible();
+  await page.getByLabel("Current password").fill("correct-horse");
+  await page.getByRole("button", { name: "Change password" }).click();
   await expect(page.getByText("Password saved. Other devices are signed out.")).toBeVisible();
-  expect(calls.updateUser).toMatchObject([{ password: "new-horse-99" }]);
+  expect(calls.updateUser.at(-1)).toMatchObject({ password: "new-horse-99", current_password: "correct-horse" });
   expect(calls.logout).toEqual(["others"]);
 
   const [file] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download my data" }).click()]);
@@ -832,6 +884,50 @@ test("settings → account: password, log out everywhere, download my data", asy
   await page.getByRole("button", { name: "Log out everywhere? Click again to confirm" }).click();
   await expect(page.getByRole("link", { name: "Log in" })).toBeVisible();
   expect(calls.logout).toEqual(["others", "global"]);
+});
+
+test("settings → account: an email change first confirms it's you, then waits for the old inbox, with a banner to cancel", async ({ page }) => {
+  const calls = await fakeSupabase(page, { signedInAgo: 3600 });
+  await signedInSettings(page, calls);
+  await page.getByLabel("New email").fill("new@example.com");
+  await page.getByRole("button", { name: "Change email" }).click();
+  // Signed in an hour ago: the password again first.
+  await expect(page.getByText("Confirm it's you")).toBeVisible();
+  await page.getByLabel("Your password").fill("correct-horse");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByText(/Your email changes to n\*\*\*@example\.com on/)).toBeVisible();
+  expect(calls.rpc).toContain("start_email_change:new@example.com");
+  await page.goto(at("/en/learn/"));
+  await expect(page.locator(".email-change-banner")).toContainText("Your account's email changes to n***@example.com");
+  await page.getByRole("button", { name: "Wasn't you? Cancel it" }).click();
+  await expect(page.locator(".email-change-banner")).toHaveCount(0);
+  expect(calls.rpc).toContain("cancel_email_change");
+});
+
+test("settings → account: turning on two-factor sign-in, and the code asked at the next sign-in", async ({ page }) => {
+  const calls = await fakeSupabase(page);
+  await signedInSettings(page, calls);
+  await page.getByRole("button", { name: "Turn on two-factor sign-in" }).click();
+  await expect(page.getByRole("img", { name: "QR code for your authenticator app" })).toBeVisible();
+  await expect(page.getByText("JBSWY3DPEHPK3PXP")).toBeVisible();
+  await page.getByLabel("6-digit code from your authenticator app").fill("000000");
+  await page.getByRole("button", { name: "Verify" }).click();
+  await expect(page.getByText("That code didn't work. Check the app and try again.")).toBeVisible();
+  await page.getByLabel("6-digit code from your authenticator app").fill("123456");
+  await page.getByRole("button", { name: "Verify" }).click();
+  await expect(page.getByText(/Two-factor sign-in is on\./)).toBeVisible();
+  expect(calls.rpc).toEqual(expect.arrayContaining(["enroll", "verify:000000", "verify:123456"]));
+});
+
+test("an account with two-factor on is asked for its code after signing in", async ({ page }) => {
+  const calls = await fakeSupabase(page, { mfa: true });
+  await page.goto(at("/en/auth/callback/?token_hash=abc123&type=signup"));
+  const gate = page.getByRole("dialog", { name: "Two-factor sign-in" });
+  await expect(gate).toBeVisible();
+  await gate.getByLabel("6-digit code from your authenticator app").fill("123456");
+  await gate.getByRole("button", { name: "Verify" }).click();
+  await expect(gate).toHaveCount(0);
+  expect(calls.rpc).toContain("verify:123456");
 });
 
 test("deleting the account: username and password, then 10 days; signing in cancels it", async ({ page }) => {
