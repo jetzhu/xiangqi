@@ -32,7 +32,7 @@ flowchart LR
 
 - The review page: **https://jetzhu.github.io/xiangqi/en/moderate/** (or `/zh/moderate/`). It isn't in the menu; bookmark it. Signed in as a moderator you see the queue; anyone else sees "This page is for moderators."
 - Moderators are listed in the database table `moderators`, never in the repository. Current: **jetzhu** and **JianJetZhu**.
-- **Two-factor is required** (since M23b): add a passkey or an authenticator app in Settings → Account → Account protection. The review page asks for it once per session; signing in doesn't. A code by email doesn't count. Losing the phone: the other moderator can't remove it for you. Ask the owner to delete the factor with a database command (`delete from auth.mfa_factors where user_id = …`), after checking it's really you.
+- **Two-factor is required** (since M23b): add an authenticator app in Settings → Account → Account protection (passkeys once Supabase allows them). The review page asks for it once per session; signing in doesn't. A code by email doesn't count. Losing the phone: the other moderator can't remove it for you. Ask the owner to delete the factor with a database command (`delete from auth.mfa_factors where user_id = …`), after checking it's really you.
 - Appeals arrive by email at the contact address on the fair-play and privacy pages: **jianjetzhu@gmail.com**.
 
 Adding or removing a moderator (see [Database commands](#database-commands)):

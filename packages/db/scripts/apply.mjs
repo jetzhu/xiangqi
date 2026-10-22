@@ -40,9 +40,8 @@ const AUTH = {
   mailer_templates_email_change_content: template("email_change"),
   // M23b: a new password needs the current one; adding or removing an authenticator is emailed.
   security_update_password_require_current_password: true,
-  // Passkeys (WebAuthn) as a second factor, beside the authenticator app.
-  mfa_web_authn_enroll_enabled: true,
-  mfa_web_authn_verify_enabled: true,
+  // Passkeys (WebAuthn) would go here, but hosted projects refuse them for now (2026-10-22:
+  // "Enabling of MFA with WebAuthn not currently supported"); see PASSKEYS in account/security.tsx.
   mailer_notifications_mfa_factor_enrolled_enabled: true,
   mailer_subjects_mfa_factor_enrolled_notification: "Two-factor sign-in turned on · 已开启两步验证 — Xiangqi School 象棋学堂",
   mailer_templates_mfa_factor_enrolled_notification_content: template("mfa_enrolled"),

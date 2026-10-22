@@ -61,6 +61,13 @@ export async function assurance(sb: SupabaseClient) {
   return { current: data?.currentLevel ?? null, next: data?.nextLevel ?? null, lastSignIn: last };
 }
 
+/**
+ * Passkeys as a second factor. Off: Supabase's hosted projects refuse to enable WebAuthn for now
+ * (2026-10-22). The rest of the code takes a passkey wherever one exists, so turning this on (and
+ * the two mfa_web_authn settings in packages/db/scripts/apply.mjs) is all it takes later.
+ */
+const PASSKEYS = false;
+
 type Factor = { id: string; factor_type: string; status: string; friendly_name?: string | undefined; created_at?: string };
 /** The account's verified second factors: authenticator apps ("totp") and passkeys ("webauthn"). */
 async function verifiedFactors(sb: SupabaseClient): Promise<Factor[]> {
@@ -296,15 +303,15 @@ export function TwoFactorSection({ hasPassword, provider }: { hasPassword: boole
       <h2 id="h-2fa">{tt("Account protection", "账号保护")}</h2>
       <p className="muted">
         {tt(
-          "Signing in and playing need only your password (or Google, GitHub, Microsoft). Before a sensitive change, such as your email or these settings, we also ask for your phone: a passkey (fingerprint or face, nothing to install) or an authenticator app. Moderators must have one. It also lets an email change happen at once.",
-          "登录和下棋只需密码（或 Google、GitHub、Microsoft）。进行敏感更改（如邮箱或这些设置）前，我们还会要求验证你的手机：通行密钥（指纹或面容，无需安装）或身份验证器应用。管理员必须开启。开启后更改邮箱可以立即生效。",
+          "Signing in and playing need only your password (or Google, GitHub, Microsoft). Before a sensitive change, such as your email or these settings, we also ask for a code from an authenticator app on your phone. Moderators must have one. It also lets an email change happen at once.",
+          "登录和下棋只需密码（或 Google、GitHub、Microsoft）。进行敏感更改（如邮箱或这些设置）前，我们还会要求输入手机上身份验证器应用的验证码。管理员必须开启。开启后更改邮箱可以立即生效。",
         )}
       </p>
       {factors === null ? (
         <p className="muted">…</p>
       ) : (
         <>
-          <h3>{tt("Passkeys", "通行密钥")}</h3>
+          {(PASSKEYS || passkeys.length > 0) && <h3>{tt("Passkeys", "通行密钥")}</h3>}
           {passkeys.length > 0 && (
             <ul>
               {passkeys.map((f) => (
@@ -314,9 +321,11 @@ export function TwoFactorSection({ hasPassword, provider }: { hasPassword: boole
               ))}
             </ul>
           )}
-          <button type="button" onClick={() => void addPasskey()}>
-            {tt("Add a passkey", "添加通行密钥")}
-          </button>
+          {PASSKEYS && (
+            <button type="button" onClick={() => void addPasskey()}>
+              {tt("Add a passkey", "添加通行密钥")}
+            </button>
+          )}
 
           <h3>{tt("Authenticator app", "身份验证器应用")}</h3>
           {app ? (
