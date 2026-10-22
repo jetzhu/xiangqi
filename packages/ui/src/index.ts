@@ -25,4 +25,3 @@ export { GamePage } from "./online/GamePage.js";
 export { SignUpPage, LogInPage, ResetPasswordPage, AuthCallbackPage } from "./account/AuthPages.js";
 export { LeaderboardPage } from "./online/LeaderboardPage.js";
 export { ModeratePage } from "./online/ModeratePage.js";
-export { EmailChangeBanner } from "./account/security.js";

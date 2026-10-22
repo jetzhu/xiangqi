@@ -1,9 +1,13 @@
 "use client";
-import { AccountProvider, AccountStoreProvider, EmailChangeBanner, NavProvider, SettingsProvider, SiteFooter, SiteNav, SkillQuestion, SyncNotice, prefixNav } from "@xq/ui";
+import { AccountProvider, AccountStoreProvider, NavProvider, SettingsProvider, SiteFooter, SiteNav, SkillQuestion, SyncNotice, prefixNav } from "@xq/ui";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useMemo } from "react";
 import { ACCOUNTS, BASE_PATH } from "../lib/site";
 import { UpdateBanner } from "./UpdateBanner";
+
+// The email-change banner (M23b) brings the account-security code: in its own chunk, after the page.
+const EmailChangeBanner = dynamic(() => import("@xq/ui/account/security.js").then((m) => m.EmailChangeBanner), { ssr: false });
 
 type Section = "home" | "learn" | "puzzles" | "bots" | "online" | "analysis" | "play" | "settings" | "help" | "stats" | "account" | "privacy" | "terms";
 const ACCOUNT_PAGES = ["signup", "login", "reset-password", "auth", "profile", "coach", "guardian", "email-change"];
