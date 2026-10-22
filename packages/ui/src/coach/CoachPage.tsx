@@ -29,7 +29,7 @@ export function useHintText() {
     const hint = e instanceof CoachError ? e.hint : null;
     switch (hint) {
       case "birth-month":
-        return tt("Add your birth month in Settings → Account first.", "请先在“设置 → 账号”中填写出生年月。");
+        return tt("Add your birth month in Settings → Online play first.", "请先在“设置 → 在线对弈”中填写出生年月。");
       case "code":
         return tt("That code doesn't work: it may be used or more than a day old. Ask your coach for a new one.", "该代码无效：可能已使用或已超过一天。请向教练索取新代码。");
       case "coach":
@@ -38,6 +38,8 @@ export function useHintText() {
         return tt("You can't be your own coach.", "不能把自己设为教练。");
       case "coach-age":
         return tt("Coaches must be 18 or over.", "教练必须年满 18 岁。");
+      case "coach-birth":
+        return tt("That player hasn't given their birth month, so they can't coach yet.", "该棋手尚未填写出生年月，暂时不能担任教练。");
       case "coach-email":
         return tt("That player hasn't confirmed their email, so they can't coach yet.", "该棋手尚未验证邮箱，暂时不能担任教练。");
       case "coach-new":
@@ -272,6 +274,7 @@ function MyCoaches({ data, reload }: { data: MyCoaching; reload: () => void }) {
 
 function MyStudents({ data, reload }: { data: MyCoaching; reload: () => void }) {
   const { tt, t, lang } = useT();
+  const nav = useNav();
   const account = useAccount();
   const hintText = useHintText();
   const [open, setOpen] = useState<string | null>(null);
@@ -280,9 +283,15 @@ function MyStudents({ data, reload }: { data: MyCoaching; reload: () => void }) 
   if (!isCoach) {
     return (
       <section aria-labelledby="h-students">
-        <h2 id="h-students">{tt("Coaching others", "担任教练")}</h2>
+        <h2 id="h-students">{tt("My students", "我的学生")}</h2>
         <p className="muted">
-          {data.coach_problem === "age"
+          {data.coach_problem === "birth" ? (
+            <>
+              {tt("To coach, add your birth month (coaches must be 18 or over) in ", "如需担任教练，请在")}
+              <a href={nav.href("/settings")}>{tt("Settings → Online play", "设置 → 在线对弈")}</a>
+              {tt(".", "中填写出生年月（教练须年满 18 岁）。")}
+            </>
+          ) : data.coach_problem === "age"
             ? tt("Coaches must be 18 or over.", "教练必须年满 18 岁。")
             : data.coach_problem === "email"
               ? tt("Confirm your email to coach.", "验证邮箱后即可担任教练。")

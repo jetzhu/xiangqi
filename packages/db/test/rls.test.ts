@@ -1626,6 +1626,7 @@ describe("coaching (M23)", () => {
 
   it("asks a guardian by email for a player under 16; the guardian confirms, and may lower the line", async () => {
     expect(await hint(KID, `public.request_coach('young_coach')`)).toBe("coach-age");
+    expect(await hint(KID, `public.request_coach('mod_three')`)).toBe("coach-birth"); // no birth month given
     expect(await hint(KID, `public.request_coach('coach_lin')`)).toBe("guardian-email");
     expect(await hint(KID, `public.request_coach('coach_lin', null, false, '2@example.com')`)).toBe("guardian-self");
     expect(await run(KID, `public.request_coach('coach_lin', null, false, 'Mum@Example.com')`)).toMatchObject({ status: "guardian", coach: "coach_lin" });

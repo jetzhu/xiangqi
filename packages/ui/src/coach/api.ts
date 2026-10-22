@@ -22,7 +22,7 @@ export type LinkStatus = "guardian" | "coach" | "review" | "active" | "ended" | 
 export interface MyCoaching {
   needs_guardian: boolean;
   /** Why this player can't coach yet, or null. */
-  coach_problem: "age" | "email" | "new" | "barred" | null;
+  coach_problem: "birth" | "age" | "email" | "new" | "barred" | null;
   as_student: { id: number; coach: string; kind: "coach" | "family"; status: LinkStatus; created_at: string; ended_at: string | null; ended_by: string | null }[];
   visits: { coach: string; game: string | null; at: string }[];
   requests: { id: number; student: string; kind: "coach" | "family"; status: "coach" | "review"; under16: boolean; created_at: string }[];
