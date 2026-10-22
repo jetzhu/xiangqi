@@ -27,6 +27,9 @@ export const DonateButtons = dynamic(() => import("@xq/ui/support/DonateButtons.
 export const CoachApp = dynamic(() => import("@xq/ui/coach/CoachPage.js").then((m) => m.CoachPage), { ssr: false, loading });
 export const GuardianApp = dynamic(() => import("@xq/ui/coach/GuardianPage.js").then((m) => m.GuardianPage), { ssr: false, loading });
 export const EmailChangeApp = dynamic(() => import("@xq/ui/account/security.js").then((m) => m.EmailChangePage), { ssr: false, loading });
+export const ChildrenApp = dynamic(() => import("@xq/ui/account/children.js").then((m) => m.ChildrenPage), { ssr: false, loading });
+export const ChildConfirmApp = dynamic(() => import("@xq/ui/account/children.js").then((m) => m.ChildConfirmPage), { ssr: false, loading });
+export const ChildAccountApp = dynamic(() => import("@xq/ui/account/children.js").then((m) => m.ChildAccountPage), { ssr: false, loading });
 export const HelpApp = dynamic(() => import("@xq/ui/HelpPage.js").then((m) => m.HelpPage), { ssr: false, loading });
 export const SignUpApp = dynamic(() => import("@xq/ui/account/AuthPages.js").then((m) => m.SignUpPage), { ssr: false, loading });
 export const LogInApp = dynamic(() => import("@xq/ui/account/AuthPages.js").then((m) => m.LogInPage), { ssr: false, loading });

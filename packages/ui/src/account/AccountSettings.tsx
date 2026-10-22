@@ -17,6 +17,7 @@ export const DELETION_NOTICE = "xq:deletion-scheduled";
 
 
 export function AccountSettings() {
+  const { tt } = useT();
   const account = useAccount();
   const [identities, setIdentities] = useState<UserIdentity[] | null>(null);
   const signedIn = account.state.status === "signedIn";
@@ -28,6 +29,18 @@ export function AccountSettings() {
       .then(({ data }) => setIdentities(data?.identities ?? []));
   }, [signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
   if (account.state.status !== "signedIn") return null;
+  if (account.state.user.child) {
+    return (
+      <div className="account-settings">
+        <p>
+          {tt(
+            "This profile is looked after by your parent: they manage its account from their own (Settings → Child profiles).",
+            "此档案由你的家长管理：家长可在自己的账号中（设置 → 孩子档案）进行管理。",
+          )}
+        </p>
+      </div>
+    );
+  }
   const hasPassword = identities?.some((i) => i.provider === "email") ?? false;
   const provider = identities?.find((i) => i.provider !== "email")?.provider as Provider | undefined;
 

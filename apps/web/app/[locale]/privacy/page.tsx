@@ -4,7 +4,7 @@ import { type Locale, pageMetadata } from "../../../lib/site";
 
 // Rendered on the server, so anyone (and Google's consent-screen check) can read it without
 // running the app. Keep it true to what the code does: packages/db holds what an account stores.
-const UPDATED = "2026-10-21";
+const UPDATED = "2026-10-22";
 const CONTACT = "jianjetzhu@gmail.com";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -137,6 +137,46 @@ function En() {
         Before an account is made we ask for your birth month and year and your country, and apply the minimum age there (13 in most places; 14 to 18 in
         some). Younger players can use everything as a guest, with their progress kept in their own browser; we don't keep the answer.
       </p>
+      <h3 id="child-profiles">Child profiles (under 13)</h3>
+      <p>
+        A parent or legal guardian aged 18 or over can make up to 3 profiles for their children under 13, from their own account (Settings →
+        Child profiles). This section is our notice to parents.
+      </p>
+      <ul>
+        <li>
+          <strong>What we keep:</strong> the nickname, birth year and country the parent gives, and the child's lessons, puzzles, bot games, ratings,
+          saved analyses and settings, so their progress is saved. No email, password, photo or full name of the child. Each profile signs in with an
+          internal address that receives no mail.
+        </li>
+        <li>
+          <strong>Why:</strong> only to run the site for the child. No advertising, nothing sold, nothing used to train AI.
+        </li>
+        <li>
+          <strong>Who sees it:</strong> only the parent, and the child on the parent's device. A child profile has no online play, chat, public
+          profile, leaderboard or coach other than the parent, and is never shown ways to donate. Nothing is disclosed to anyone else.
+        </li>
+        <li>
+          <strong>Where, and who processes it for us:</strong> Supabase, on servers in the United States, stores it; emails to parents go through
+          Gmail. They process it only to provide their service to us.
+        </li>
+        <li>
+          <strong>Consent:</strong> before anything is kept for good, the parent reads this notice, agrees, and confirms from a link we email them; a
+          second email follows a day later. Korean parents also type their consent. A child in Vietnam aged 7 or over is also asked, the first time.
+        </li>
+        <li>
+          <strong>How long:</strong> until the parent deletes it. Unconfirmed profiles are deleted after 14 days; a profile unused for 24 months is
+          deleted, after an email warning a month before. A record of the consent (the parent's email, the date, the notice's version) is kept 3
+          years after a profile ends, as proof.
+        </li>
+        <li>
+          <strong>The parent's rights:</strong> see and download everything, and delete the profile at once (which also withdraws consent), in Settings
+          → Child profiles. From 13 the parent can turn the profile into the child's own account, keeping its history.
+        </li>
+        <li>
+          <strong>Mainland China:</strong> child profiles aren't offered there for now.
+        </li>
+      </ul>
+      <p>The person responsible for children's data is the operator named below.</p>
 
       <h2>Changes and contact</h2>
       <p>
@@ -220,6 +260,19 @@ function Zh() {
 
       <h2>儿童</h2>
       <p>注册账号前，我们会询问你的出生年月和所在国家或地区，并按当地的最低年龄执行（大多数地区为 13 岁，部分地区为 14 至 18 岁）。未达到年龄的棋友可以以访客身份使用全部功能，进度保存在自己的浏览器中；我们不会保存你的回答。</p>
+      <h3 id="child-profiles">孩子档案（13 岁以下）</h3>
+      <p>年满 18 岁的家长或法定监护人可以在自己的账号中（设置 → 孩子档案）为 13 岁以下的孩子建立最多 3 个档案。本节是我们给家长的说明。</p>
+      <ul>
+        <li><strong>保存的内容：</strong>家长填写的昵称、出生年份和国家/地区，以及孩子的课程、题目、人机对局、等级分、保存的分析和设置，以便保存学习进度。不保存孩子的邮箱、密码、照片或真实姓名。每个档案使用一个不接收邮件的内部地址登录。</li>
+        <li><strong>用途：</strong>仅为孩子提供网站服务。没有广告，不出售，不用于训练 AI。</li>
+        <li><strong>谁能看到：</strong>只有家长，以及在家长设备上使用的孩子。孩子档案没有在线对弈、聊天、公开资料、排行榜，除家长外没有其他教练，也不会看到捐助方式。不会向任何其他人披露。</li>
+        <li><strong>存储地点及处理方：</strong>由 Supabase 存储，服务器位于美国；发给家长的邮件通过 Gmail 发送。它们仅为向我们提供服务而处理这些信息。</li>
+        <li><strong>同意：</strong>在长期保存任何内容之前，家长须阅读本说明并同意，并通过我们发送的邮件链接确认；一天后会再发一封邮件。韩国家长还需输入同意声明。越南 7 岁及以上的孩子首次使用时也会被询问。</li>
+        <li><strong>保存期限：</strong>直到家长删除。未确认的档案 14 天后删除；24 个月未使用的档案会在提前一个月邮件提醒后删除。同意记录（家长邮箱、日期、说明版本）在档案结束后保留 3 年作为证明。</li>
+        <li><strong>家长的权利：</strong>可在“设置 → 孩子档案”中查看和下载全部内容，并立即删除档案（同时撤回同意）。孩子年满 13 岁后，家长可将档案转为孩子自己的账号，保留历史记录。</li>
+        <li><strong>中国大陆：</strong>暂不提供孩子档案。</li>
+      </ul>
+      <p>儿童信息的负责人为下方所列的运营方。</p>
 
       <h2>变更与联系</h2>
       <p>

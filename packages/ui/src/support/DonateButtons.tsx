@@ -16,6 +16,8 @@ export function DonateButtons({ lang }: { lang: "en" | "zh" }) {
       .then(setLinks, () => {});
   }, [account]);
   const zh = lang === "zh";
+  // Child profiles (M24) are never shown ways to give.
+  if (account.state.status === "signedIn" && account.state.user.child) return <p className="muted">{zh ? "这部分是给大人看的。" : "This part is for grown-ups."}</p>;
   if (!links || (!links.stripe && !links.github)) {
     return <p className="muted donate-none">{zh ? "捐助方式即将开通。" : "Ways to give are coming soon."}</p>;
   }

@@ -123,6 +123,69 @@ const TEMPLATES: Record<string, (lang: Lang, d: Data, site: string) => Rendered>
       `你的登录验证码是 ${String(d.code)}，10 分钟内有效。\n\n如果你刚才没有登录，可能有人知道你的密码：请登录后在"设置 → 账号"中修改密码。\n\n${SIGN.zh}`,
     ),
   }),
+  "child-consent": (lang, d, site) => {
+    const link = `${site}/${lang}/children/confirm/?t=${String(d.token)}`;
+    const nick = String(d.nickname);
+    return {
+      subject: lang === "zh" ? `请确认：为 ${nick} 建立孩子档案` : `Please confirm: a child profile for ${nick}`,
+      text: both(
+        lang,
+        [
+          "Hello,",
+          "",
+          `You asked to create a child profile for "${nick}" on Xiangqi School. Before anything is kept about your child, please confirm it's you and that you agree:`,
+          link,
+          "",
+          "What we keep: the nickname, birth year and country you gave, and your child's lessons, puzzles, bot games, ratings and settings, so their progress is saved. Why: only to run the site for your child. Where: Supabase's servers in the United States. Who sees it: only you (and your child on your device). No online play, no public profile, no chat, no ads. You can see, download or delete everything at any time in Settings → Children, which also withdraws your consent. Unconfirmed profiles are deleted after 14 days; unused ones after 24 months. The full notice is on the children's section of our privacy policy.",
+          d.korean ? "\nKorea: on the confirmation page, please also type 동의 (I agree) or your own statement of consent." : "",
+          "",
+          "If you didn't ask for this, ignore this email: the profile is deleted in 14 days.",
+          "",
+          SIGN.en,
+        ].join("\n"),
+        [
+          "您好：",
+          "",
+          `您申请在象棋学堂为"${nick}"建立孩子档案。在保存任何有关您孩子的信息之前，请确认是您本人并同意：`,
+          link,
+          "",
+          "我们保存的内容：您填写的昵称、出生年份和国家/地区，以及孩子的课程、题目、人机对局、等级分和设置，以便保存学习进度。用途：仅为孩子提供网站服务。存储地点：位于美国的 Supabase 服务器。谁能看到：只有您（以及在您设备上使用的孩子）。没有在线对弈、公开资料、聊天和广告。您可以随时在“设置 → 孩子”中查看、下载或删除全部内容，删除即撤回同意。未确认的档案 14 天后删除；不再使用的档案 24 个月后删除。完整说明见隐私政策中的儿童部分。",
+          d.korean ? "\n韩国家庭：请在确认页面上输入“동의”（我同意）或您自己的同意声明。" : "",
+          "",
+          "如果不是您本人申请，请忽略此邮件：该档案将在 14 天后删除。",
+          "",
+          SIGN.zh,
+        ].join("\n"),
+      ),
+    };
+  },
+  "child-consent-2": (lang, d, site) => ({
+    subject: lang === "zh" ? `${String(d.nickname)} 的档案已建立：您的权利` : `${String(d.nickname)}'s profile is set up: your rights`,
+    text: both(
+      lang,
+      `Hello,\n\nYesterday you confirmed a child profile for "${String(d.nickname)}". As a reminder: only you can see it; you can download or delete everything, and withdraw your consent, at any time in Settings → Children (${site}/${lang}/children/). Nothing is shared with anyone else, and there is no online play, chat or public profile. Questions: the contact in our privacy policy.\n\n${SIGN.en}`,
+      `您好：\n\n您昨天确认了"${String(d.nickname)}"的孩子档案。提醒您：只有您能看到；您可以随时在“设置 → 孩子”（${site}/${lang}/children/）中下载或删除全部内容并撤回同意。我们不会与任何人共享，也没有在线对弈、聊天或公开资料。如有疑问，请通过隐私政策中的联系方式联系我们。\n\n${SIGN.zh}`,
+    ),
+  }),
+  "child-unused": (lang, d, site) => ({
+    subject: lang === "zh" ? `${String(d.nickname)} 的档案即将删除` : `${String(d.nickname)}'s profile will be deleted soon`,
+    text: both(
+      lang,
+      `Hello,\n\n"${String(d.nickname)}"'s child profile hasn't been used for 23 months, so it will be deleted in a month. To keep it, open it once from Settings → Children (${site}/${lang}/children/).\n\n${SIGN.en}`,
+      `您好：\n\n"${String(d.nickname)}"的孩子档案已 23 个月未使用，将在一个月后删除。如需保留，请在“设置 → 孩子”（${site}/${lang}/children/）中打开一次。\n\n${SIGN.zh}`,
+    ),
+  }),
+  "child-account": (lang, d, site) => {
+    const link = `${site}/${lang}/child-account/?t=${String(d.token)}`;
+    return {
+      subject: lang === "zh" ? "你的象棋学堂账号" : "Your own Xiangqi School account",
+      text: both(
+        lang,
+        `Hello,\n\nYour parent asked to turn your Xiangqi School profile ("${String(d.nickname)}") into your own account, with this email. Your lessons, games and ratings stay. To take it over, open:\n${link}\n\nThen set a password with "Forgot password" on the sign-in page. The link works for 14 days.\n\n${SIGN.en}`,
+        `你好：\n\n你的家长申请把你在象棋学堂的档案（"${String(d.nickname)}"）转为你自己的账号，使用此邮箱。你的课程、对局和等级分都会保留。请打开以下链接接管：\n${link}\n\n然后在登录页面用“忘记密码”设置密码。链接 14 天内有效。\n\n${SIGN.zh}`,
+      ),
+    };
+  },
   test: (lang) => ({
     subject: lang === "zh" ? "象棋学堂测试邮件" : "Xiangqi School test email",
     text: both(lang, "This is a test of the site's mailer. Nothing to do.\n\nXiangqi School", "这是网站发信功能的测试邮件，无需处理。\n\n象棋学堂"),

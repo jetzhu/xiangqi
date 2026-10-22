@@ -106,6 +106,8 @@ interface FakeOptions {
   passkey?: boolean;
   /** The emailed sign-in code is on, and this session hasn't given it. */
   emailCode?: boolean;
+  /** M24: the signed-in account is a child profile (managed by a parent). */
+  child?: boolean;
 }
 
 /** Under 16 on a YYYY-MM birth month: 16 from the first day of the month after. */
@@ -149,6 +151,9 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
   if (opts.mfa) user.factors = [verifiedFactor];
   if (opts.passkey) user.factors = [{ ...verifiedFactor, id: "p1", factor_type: "webauthn", friendly_name: "Passkey" }];
   const signInCheck = { email_code: !!opts.emailCode, needed: !!opts.emailCode };
+  // M24: the parent's child profiles, and what the child function was asked.
+  const kids: Record<string, unknown>[] = [];
+  if (opts.child) Object.assign(profile, { managed_by: "99999999-0000-4000-8000-000000000001" });
   let emailChange: { status: string; new: string; due_at: string | null; fast: boolean } | null = null;
   const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, json: body, headers: { "access-control-allow-origin": "*" } });
   await page.route(`${SUPABASE}/**`, async (route) => {
@@ -342,6 +347,27 @@ async function fakeSupabase(page: Page, opts: FakeOptions = {}): Promise<Calls> 
         if (body?.p_code !== "424242") return json(route, false);
         signInCheck.needed = false;
         return json(route, true);
+      // Child profiles (M24).
+      case "/rest/v1/rpc/my_children":
+        return json(route, kids);
+      case "/functions/v1/child": {
+        calls.rpc.push(`child:${body?.action}:${body?.nickname ?? body?.child}`);
+        if (body?.action === "create") {
+          if (body.country === "CN") return json(route, { error: "not offered in mainland China yet", hint: "china" }, 400);
+          kids.push({ id: "k1", nickname: body.nickname, birth_year: body.birthYear, country: body.country, status: "unconfirmed", created_at: "2026-10-22T10:00:00Z", last_used: null, can_graduate: false, lessons: 0, bot_games: 0, puzzle_rating: null, bot_rating: null, days_active_30: 0 });
+          return json(route, { id: "k1" });
+        }
+        return json(route, { token_hash: "child-th" });
+      }
+      case "/rest/v1/rpc/child_consent_view":
+        return json(route, body?.p_token === "ct1" ? { nickname: "Mei", birth_year: 2018, country: "US", confirmed: calls.rpc.includes("child_confirm"), ended: false, expired: false } : null);
+      case "/rest/v1/rpc/child_confirm":
+        calls.rpc.push("child_confirm");
+        return json(route, null);
+      case "/rest/v1/rpc/my_child_profile":
+        return json(route, { nickname: "Mei", country: "US", ask_agreement: false });
+      case "/rest/v1/rpc/child_used":
+        return json(route, null);
       // The email change (M23b).
       case "/rest/v1/rpc/my_email_change":
         return json(route, { change: emailChange, locked_until: null, frozen: false, mfa: !!user.factors?.length });
@@ -829,7 +855,7 @@ test("profile: avatar, country and a new username, from the account menu", async
   const calls = await fakeSupabase(page, { tables: RATED });
   await page.goto(at("/en/auth/callback/?token_hash=abc123&type=signup"));
   await page.getByRole("button", { name: /Alice_1/ }).click();
-  await page.getByRole("link", { name: "Profile" }).click();
+  await page.getByRole("link", { name: "Profile", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Alice_1");
   await expect(page.getByText("Only you can see this page.")).toBeVisible();
   await expect(page.locator(".stat-card").first()).toContainText("900");
@@ -985,6 +1011,54 @@ test("an account with a passkey is offered it before a sensitive change", async 
   await page.getByRole("button", { name: "Change email" }).click();
   await expect(page.getByRole("button", { name: "Use my passkey" })).toBeVisible();
   await expect(page.getByLabel("6-digit code from your authenticator app")).toHaveCount(0);
+});
+
+test("a parent makes a child profile: the notice, consent, \"confirm it's you\", then an email to confirm", async ({ page }) => {
+  const calls = await fakeSupabase(page);
+  await page.goto(at("/en/auth/callback/?token_hash=abc123&type=signup"));
+  await expect(page.getByText(/signed in as Alice_1/)).toBeVisible();
+  await page.goto(at("/en/children/"));
+  await page.getByRole("button", { name: "Add a child profile" }).click();
+  await page.getByLabel("Nickname (not their full name; only you and your child see it)").fill("Mei");
+  await page.getByLabel("Year of birth").selectOption(String(new Date().getFullYear() - 8));
+  await page.getByLabel("Country or region").selectOption("CN");
+  await expect(page.getByText("Child profiles aren't offered in mainland China yet.", { exact: false })).toBeVisible();
+  await page.getByLabel("Country or region").selectOption("KR");
+  await expect(page.getByRole("heading", { name: "Notice to parents" })).toBeVisible();
+  const create = page.getByRole("button", { name: "Create the profile" });
+  await page.getByRole("checkbox", { name: /I'm this child's parent or legal guardian/ }).check();
+  await expect(create).toBeDisabled(); // Korea: the typed consent too
+  await page.getByLabel("Korea: type 동의 (I agree), or your own statement of consent").fill("동의");
+  await create.click();
+  await expect(page.getByText("Almost done: we've emailed you a link.", { exact: false })).toBeVisible();
+  expect(calls.rpc).toContain("child:create:Mei");
+  await page.getByRole("button", { name: "OK" }).click();
+  await expect(page.getByText("Waiting for you: open the link we emailed you", { exact: false })).toBeVisible();
+});
+
+test("the consent email's link confirms the child profile", async ({ page }) => {
+  const calls = await fakeSupabase(page);
+  await page.goto(at("/en/children/confirm/?t=ct1"));
+  await page.getByRole("button", { name: "I'm the parent or guardian: confirm" }).click();
+  await expect(page.getByText("Mei's profile is confirmed.", { exact: false })).toBeVisible();
+  expect(calls.rpc).toContain("child_confirm");
+  await page.goto(at("/zh/children/confirm/?t=gone"));
+  await expect(page.getByText("此链接已过期或无效。")).toBeVisible();
+});
+
+test("a child profile: a banner for the child, no online play, no donations, settings left to the parent", async ({ page }) => {
+  await fakeSupabase(page, { child: true });
+  await page.goto(at("/en/auth/callback/?token_hash=abc123&type=signup"));
+  await expect(page.locator(".child-banner")).toContainText("Mei's profile. Your parent can see your progress here.");
+  await page.goto(at("/en/online/"));
+  await expect(page.getByText("Online play isn't part of child profiles.", { exact: false })).toBeVisible();
+  await expect(page.locator(".site-footer").getByRole("link", { name: "Support us" })).toHaveCount(0);
+  await page.goto(at("/en/support/"));
+  await expect(page.getByText("This part is for grown-ups.")).toBeVisible();
+  await page.goto(at("/en/settings/?tab=account"));
+  await expect(page.getByText("This profile is looked after by your parent", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Grown-ups: back to your account (sign out)" }).click();
+  await expect(page.locator(".child-banner")).toHaveCount(0);
 });
 
 test("deleting the account: username and password, then 10 days; signing in cancels it", async ({ page }) => {

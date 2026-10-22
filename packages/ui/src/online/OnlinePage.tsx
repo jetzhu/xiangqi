@@ -67,6 +67,14 @@ export function OnlinePage() {
   );
 
   if (account.state.status === "loading") return <p className="muted" style={{ padding: 24 }}>…</p>;
+  if (account.state.status === "signedIn" && account.state.user.child) {
+    return (
+      <div className="online-page">
+        {intro}
+        <p>{tt("Online play isn't part of child profiles. Play the bots instead!", "孩子档案不包含在线对弈。来和机器人下棋吧！")} <a href={nav.href("/bots")}>{tt("Play the bots", "人机对弈")}</a></p>
+      </div>
+    );
+  }
   if (!signedIn) {
     return (
       <div className="online-page">

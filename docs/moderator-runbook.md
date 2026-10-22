@@ -268,6 +268,15 @@ The **Accounts** tab shows email changes that someone undid from the old address
   4. With two-factor on, the change happens as soon as the new address is confirmed.
   5. The old address can undo a change for 30 days.
 
+## Child profiles
+
+Parents make profiles for children under 13 from their own account (`/children`); see the privacy policy's children's section. Moderators have no view of them and need none: there is nothing public, and nothing a child can be reported for.
+
+- **A parent asks to see, export or delete a child's data:** they can do it themselves on the Child profiles page; point them there. If they've lost access to their own account, help with that first ([Accounts](#accounts)).
+- **A parent who has lost their account** (email gone) can't reach the profiles until their account is recovered. Deleting the parent's account deletes the children's profiles too.
+- **A report that a child profile was made by someone who isn't the parent:** delete it with `select public.child_end('<child user id>', 'withdrawn')` (find the id with `select user_id, nickname from public.child_profiles where parent = (select user_id from public.profiles where username = '…')`), then note it in an email to yourself.
+- The daily `child-retention` job deletes unconfirmed profiles after 14 days and unused ones after 24 months, and consent records 3 years after a profile ends.
+
 ## Email from the site
 
 Guardian confirmations, and later the notices to parents, go through the **mail outbox**. The `mailer` function sends them over the Gmail account sign-in uses (port 465), at most 100 an hour. The database asks it every minute while mail is due.
@@ -334,6 +343,7 @@ The Supabase access token expires; when a command says "Invalid access token", c
 | `poke-mailer` | every minute | Asks the mailer to send due emails (only when there are some) |
 | `complete-email-changes` | hourly (:23) | Completes email changes whose 10 days are up; unconfirmed ones lapse after 7 days |
 | `purge-session-checks` | daily (03:47 UTC) | Deletes the record of emailed codes given, once their sessions end |
+| `child-retention` | daily (03:51 UTC) | Deletes unconfirmed child profiles (14 days) and unused ones (24 months, after a warning), and consent records 3 years after a profile ends |
 | `purge-old-mail` | daily (03:43 UTC) | Deletes sent mail after 30 days and ends coach requests nobody answered (14 days for a guardian, 30 for a coach) |
 | `purge-old-feedback` | daily (03:35 UTC) | Deletes feedback 12 months after it was done or declined, 24 months after it was sent |
 | `purge-deleted-accounts` | daily (03:17 UTC) | Finishes account deletions after their 10-day wait |

@@ -28,7 +28,7 @@ export const ACCOUNTS =
     : null;
 export const SITE_NAME = { zh: "象棋学堂", en: "Xiangqi School" } as const;
 
-type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "profile" | "signup" | "login" | "resetPassword" | "authCallback" | "privacy" | "terms" | "player" | "online" | "fairPlay" | "sportsmanship" | "friend" | "challenge" | "game" | "leaderboard" | "moderate" | "feedback" | "support" | "coach" | "guardian" | "emailChange";
+type PageKey = "home" | "learn" | "puzzles" | "bots" | "analysis" | "play" | "settings" | "help" | "stats" | "profile" | "signup" | "login" | "resetPassword" | "authCallback" | "privacy" | "terms" | "player" | "online" | "fairPlay" | "sportsmanship" | "friend" | "challenge" | "game" | "leaderboard" | "moderate" | "feedback" | "support" | "coach" | "guardian" | "emailChange" | "children" | "childConfirm" | "childAccount";
 const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; description: Record<Locale, string> }> = {
   home: {
     path: "/",
@@ -135,6 +135,21 @@ const PAGES: Record<PageKey, { path: string; title: Record<Locale, string>; desc
     path: "/email-change",
     title: { zh: "更改邮箱", en: "Email change" },
     description: { zh: "确认、批准或拒绝象棋学堂账号的邮箱更改。", en: "Confirm, approve or deny a change of a Xiangqi School account's email." },
+  },
+  children: {
+    path: "/children",
+    title: { zh: "孩子档案", en: "Child profiles" },
+    description: { zh: "家长为 13 岁以下的孩子建立的学习档案。", en: "Learning profiles parents make for their children under 13." },
+  },
+  childConfirm: {
+    path: "/children/confirm",
+    title: { zh: "确认孩子档案", en: "Confirm a child profile" },
+    description: { zh: "家长确认孩子档案。", en: "A parent confirms a child profile." },
+  },
+  childAccount: {
+    path: "/child-account",
+    title: { zh: "你自己的账号", en: "Your own account" },
+    description: { zh: "把孩子档案转为自己的账号。", en: "Turn a child profile into your own account." },
   },
   fairPlay: {
     path: "/fair-play",

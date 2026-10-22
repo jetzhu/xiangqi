@@ -78,6 +78,11 @@ describe("the mailer's templates", () => {
     expect(render("email-changed", "en", { token: "t3", new: "n***@example.com" }, "https://x.test").text).toContain("within 30 days");
     expect(render("email-change-denied", "en", { days: 20 }, "https://x.test").text).toContain("for 20 days");
     expect(render("coach-request", "zh", {}, "https://x.test").text).toContain("https://x.test/zh/coach/");
+    const consent = render("child-consent", "en", { token: "c1", nickname: "Mei", korean: true }, "https://x.test");
+    expect(consent.text).toContain("https://x.test/en/children/confirm/?t=c1");
+    expect(consent.text).toContain("type 동의");
+    expect(render("child-consent", "en", { token: "c1", nickname: "Mei", korean: false }, "https://x.test").text).not.toContain("동의");
+    expect(render("child-account", "zh", { token: "g1", nickname: "Bo" }, "https://x.test").text).toContain("https://x.test/zh/child-account/?t=g1");
     expect(render("sign-in-code", "en", { code: "042137" }, "https://x.test").subject).toBe("Your Xiangqi School sign-in code: 042137");
   });
 });

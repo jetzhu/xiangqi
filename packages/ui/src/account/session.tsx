@@ -27,6 +27,8 @@ export interface AccountUser {
   country: string | null;
   /** When the account was made (ISO time). */
   memberSince: string;
+  /** A child profile, managed by a parent's account (M24): no online play, coaching or account settings. */
+  child: boolean;
 }
 
 /** Sign-in providers the site offers besides email (Supabase calls Microsoft "azure"). */
@@ -128,7 +130,7 @@ export function AccountProvider({ config, children }: { config: AccountConfig | 
     if (user) {
       const { data: profile } = await sb
         .from("profiles")
-        .select("username, username_chosen, avatar, country, created_at")
+        .select("username, username_chosen, avatar, country, created_at, managed_by")
         .eq("user_id", user.id)
         .maybeSingle();
       next = {
@@ -141,6 +143,7 @@ export function AccountProvider({ config, children }: { config: AccountConfig | 
           avatar: (profile?.avatar as string | null | undefined) ?? null,
           country: (profile?.country as string | null | undefined) ?? null,
           memberSince: (profile?.created_at as string | undefined) ?? user.created_at,
+          child: !!profile?.managed_by,
         },
       };
     }

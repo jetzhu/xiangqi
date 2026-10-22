@@ -8,9 +8,11 @@ import { UpdateBanner } from "./UpdateBanner";
 
 // The email-change banner (M23b) brings the account-security code: in its own chunk, after the page.
 const EmailChangeBanner = dynamic(() => import("@xq/ui/account/security.js").then((m) => m.EmailChangeBanner), { ssr: false });
+// While a child profile is open (M24): whose it is, and the way back for the parent.
+const ChildBanner = dynamic(() => import("@xq/ui/account/children.js").then((m) => m.ChildBanner), { ssr: false });
 
 type Section = "home" | "learn" | "puzzles" | "bots" | "online" | "analysis" | "play" | "settings" | "help" | "stats" | "account" | "privacy" | "terms";
-const ACCOUNT_PAGES = ["signup", "login", "reset-password", "auth", "profile", "coach", "guardian", "email-change"];
+const ACCOUNT_PAGES = ["signup", "login", "reset-password", "auth", "profile", "coach", "guardian", "email-change", "children", "child-account"];
 /** The online-play pages all sit under "Play online" in the menu. */
 const ONLINE_PAGES = ["online", "friend", "challenge", "game", "player", "leaderboard", "moderate"];
 
@@ -31,6 +33,7 @@ export function Shell({ locale, children }: { locale: "zh" | "en"; children: Rea
             <UpdateBanner />
             <SyncNotice />
             <EmailChangeBanner />
+            <ChildBanner />
             <SkillQuestion />
             {children}
             <SiteFooter />

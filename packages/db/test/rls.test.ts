@@ -15,7 +15,7 @@ const SUPABASE_STANDIN = `
   alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
   create schema auth;
   grant usage on schema auth to anon, authenticated, service_role;
-  create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}', email_confirmed_at timestamptz default now(), created_at timestamptz default now());
+  create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}', email_confirmed_at timestamptz default now(), created_at timestamptz default now(), last_sign_in_at timestamptz);
   create function auth.uid() returns uuid language sql stable as
     $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create function auth.jwt() returns jsonb language sql stable as
@@ -1863,6 +1863,123 @@ describe("account security (M23b)", () => {
     // Two-factor sessions never owe the code.
     expect(await run(ACC, `public.my_sign_in_check()`, [], claims("00000000-0000-4000-8000-00000000a003", "aal2"))).toMatchObject({ needed: false });
     await run(ACC, `public.set_email_code_sign_in(false)`, [], claims(S2));
+  });
+});
+
+describe("child profiles (M24)", () => {
+  const [PARENT, KID1, KID2, KID3, KID4, OTHER] = ["01", "02", "03", "04", "05", "06"].map((x) => `00000000-0000-4000-8000-0000000005${x}`) as [string, string, string, string, string, string];
+  const now = () => Math.floor(Date.now() / 1000);
+  const recent = { aal: "aal1", amr: [{ method: "password", timestamp: now() }] };
+  const run = <T>(user: string | null, sql: string, params: unknown[] = [], claims: object = recent) =>
+    db.transaction(async (tx) => {
+      await tx.query(`select set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claims', $2, true)`, [user ?? "", JSON.stringify(claims)]);
+      await tx.exec(`set local role ${user ? "authenticated" : "anon"}`);
+      return (await tx.query<{ j: T }>(`select ${sql} as j`, params)).rows[0]!.j;
+    });
+  const hint = (user: string | null, sql: string, params: unknown[] = [], claims?: object) =>
+    run(user, sql, params, claims).then(() => "no error", (e: { hint?: string; message: string }) => e.hint ?? e.message);
+  const year = new Date().getFullYear();
+  /** As the `child` function does it: the parent's checks, the identity, then the profile. */
+  const create = async (kid: string, nickname: string, age: number, country = "US", statement: string | null = null) => {
+    await run(PARENT, `public.child_prepare($1, $2, $3, public.child_notice_version(), $4)`, [nickname, year - age, country, statement]);
+    await db.query(`insert into auth.users (id, email, raw_user_meta_data) values ($1, $2, $3)`, [kid, `child-${kid}@children.xiangqi.invalid`, JSON.stringify({ username: `kid-${kid.slice(-4)}`, lang: "en" })]);
+    await db.query(`select public.child_register($1, $2, $3, $4, $5, $6)`, [PARENT, kid, nickname, year - age, country, statement]);
+  };
+  const consentMail = () => q2<{ to_email: string; data: { token: string; nickname: string } }>(`(select to_jsonb(m) from public.mail_outbox m where template = 'child-consent' order by id desc limit 1)`);
+
+  beforeAll(async () => {
+    for (const [u, name] of [[PARENT, "parent_li"], [OTHER, "other_adult"]] as const) await signUp(u, { username: name });
+    await db.query(`alter table public.profiles disable trigger profiles_before_update`);
+    await db.query(`update public.profiles set birth_month = '1985-03-01' where user_id in ($1, $2)`, [PARENT, OTHER]);
+    await db.query(`alter table public.profiles enable trigger profiles_before_update`);
+  });
+
+  it("checks the parent before a profile is made: recent sign-in, adult, the notice, not mainland China, Korea's typed consent", async () => {
+    const prep = (country: string, age = 8, claims: object = recent, statement: string | null = null, notice = "public.child_notice_version()") =>
+      hint(PARENT, `public.child_prepare('Mei', ${year - age}, '${country}', ${notice}, $1)`, [statement], claims);
+    expect(await prep("US", 8, { aal: "aal1", amr: [{ method: "password", timestamp: now() - 3600 }] })).toBe("reauth");
+    expect(await prep("CN")).toBe("china");
+    expect(await prep("US", 8, recent, null, "'v0'")).toBe("notice");
+    expect(await prep("KR")).toBe("statement");
+    expect(await prep("KR", 8, recent, "동의")).toBe("no error");
+    expect(await prep("US", 15)).toBe("age");
+    await create(KID1, "Mei", 8);
+    expect(await consentMail()).toMatchObject({ to_email: "1@example.com", data: { nickname: "Mei" } });
+    // Mail never goes to the child's own address.
+    expect(await q2(`public.queue_mail('child-x@children.xiangqi.invalid', 'test', 'en', '{}', null)`)).toBeNull();
+  });
+
+  it("opens only after the parent confirms by email, and a second email follows a day later", async () => {
+    expect(await hint(PARENT, `public.child_switch_check($1)`, [KID1])).toBe("unconfirmed");
+    expect(await hint(OTHER, `public.child_switch_check($1)`, [KID1])).toBe("not your child");
+    const tok = (await consentMail()).data.token;
+    expect(await run(null, `public.child_consent_view($1)`, [tok])).toMatchObject({ nickname: "Mei", confirmed: false });
+    await run(null, `public.child_confirm($1)`, [tok]);
+    expect(await run(PARENT, `public.child_switch_check($1)`, [KID1])).toBe(`child-${KID1}@children.xiangqi.invalid`);
+    const second = await q2<{ send_after: string; template: string }>(`(select to_jsonb(m) from public.mail_outbox m where template = 'child-consent-2' order by id desc limit 1)`);
+    expect(Date.parse(second.send_after) - Date.now()).toBeGreaterThan(23 * 3600_000);
+    const kids = await run<{ nickname: string; status: string; can_graduate: boolean }[]>(PARENT, `public.my_children()`);
+    expect(kids).toEqual([expect.objectContaining({ nickname: "Mei", status: "confirmed", can_graduate: false })]);
+  });
+
+  it("keeps a child out of online play, public profiles, coaching and feedback replies", async () => {
+    expect(await run(KID1, `public.online_eligibility()`)).toMatchObject({ child: true, eligible: false, casual_ok: false });
+    const username = await q2<string>(`(select username from public.profiles where user_id = $1)`, [KID1]);
+    expect(await run(null, `public.public_profile($1)`, [username])).toBeNull();
+    expect(await run(OTHER, `public.public_profile('parent_li')`)).toMatchObject({ username: "parent_li" });
+    expect(await hint(KID1, `public.request_coach('parent_li')`)).toBe("child");
+    expect(await q2(`public.coach_problem($1)`, [KID1])).toBe("child");
+    await run(KID1, `public.send_feedback('idea', 'more puzzles please', null, null, 'en', true)`);
+    expect(await q2(`(select may_reply from public.feedback where user_id = $1)`, [KID1])).toBe(false);
+    expect((await q2<{ feedback: { message: string }[] }>(`public.triage_digest_input()`)).feedback.map((f) => f.message)).not.toContain("more puzzles please");
+    expect(await run(KID1, `public.my_child_profile()`)).toMatchObject({ nickname: "Mei", ask_agreement: false });
+  });
+
+  it("lets the parent export and delete a profile; the consent record stays", async () => {
+    await db.query(`insert into public.lesson_progress (user_id, lesson_id, status) values ($1, 'the-board', 'mastered')`, [KID1]);
+    expect(await hint(OTHER, `public.child_export($1)`, [KID1])).toBe("not your child");
+    expect(await run(PARENT, `public.child_export($1)`, [KID1])).toMatchObject({ profile: { nickname: "Mei" }, lesson_progress: [{ lesson_id: "the-board" }] });
+    await run(PARENT, `public.delete_child($1, true)`, [KID1]);
+    expect(await q2(`(select count(*)::int from auth.users where id = $1)`, [KID1])).toBe(0);
+    expect(await q2(`(select count(*)::int from public.lesson_progress where user_id = $1)`, [KID1])).toBe(0);
+    expect(await q2(`(select ended_why from public.child_consents where child_id = $1)`, [KID1])).toBe("withdrawn");
+  });
+
+  it("allows 3 profiles a parent, clears unconfirmed ones after 14 days, and turns a 13-year-old's into their own account", async () => {
+    await create(KID2, "Bo", 13);
+    await run(null, `public.child_confirm($1)`, [(await consentMail()).data.token]);
+    await create(KID3, "Lan", 6, "VN");
+    await create(KID4, "Yu", 4);
+    expect(await hint(PARENT, `public.child_prepare('Four', ${year - 5}, 'US', public.child_notice_version(), null)`)).toBe("limit");
+    // Vietnam: a child of 7 or over agrees the first time.
+    await db.query(`update public.child_profiles set birth_year = $2 where user_id = $1`, [KID3, year - 7]);
+    expect(await run(KID3, `public.my_child_profile()`)).toMatchObject({ ask_agreement: true });
+    await run(KID3, `public.child_agree()`);
+    expect(await run(KID3, `public.my_child_profile()`)).toMatchObject({ ask_agreement: false });
+
+    await db.query(`update public.child_profiles set created_at = now() - interval '15 days' where user_id in ($1, $2)`, [KID3, KID4]);
+    expect(await q2(`public.child_retention()`)).toBe(2);
+    expect(await q2(`(select count(*)::int from auth.users where id in ($1, $2))`, [KID3, KID4])).toBe(0);
+
+    await run(PARENT, `public.start_child_graduation($1, 'bo@example.com')`, [KID2]);
+    const tok = (await q2<{ token: string }>(`(select data from public.mail_outbox where template = 'child-account' order by id desc limit 1)`)).token;
+    expect(await run(null, `public.finish_child_graduation($1)`, [tok])).toBe("bo@example.com");
+    expect(await q2(`(select email from auth.users where id = $1)`, [KID2])).toBe("bo@example.com");
+    expect(await q2(`public.is_child($1)`, [KID2])).toBe(false);
+    expect(await run<object[]>(PARENT, `public.my_children()`)).toEqual([]);
+    expect(await q2(`(select ended_why from public.child_consents where child_id = $1)`, [KID2])).toBe("own-account");
+  });
+
+  it("warns the parent after 23 months unused, and deletes at 24; a parent's deletion takes their children", async () => {
+    const K = "00000000-0000-4000-8000-000000000599";
+    await create(K, "Old", 9);
+    await run(null, `public.child_confirm($1)`, [(await consentMail()).data.token]);
+    await db.query(`update public.child_profiles set created_at = now() - interval '23 months 5 days' where user_id = $1`, [K]);
+    await q2(`public.child_retention()`);
+    expect(await q2(`(select count(*)::int from public.mail_outbox where template = 'child-unused')`)).toBe(1);
+    await db.query(`delete from auth.users where id = $1`, [PARENT]);
+    expect(await q2(`(select count(*)::int from auth.users where id = $1)`, [K])).toBe(0);
+    expect(await q2(`(select ended_why from public.child_consents where child_id = $1)`, [K])).toBe("parent-deleted");
   });
 });
 

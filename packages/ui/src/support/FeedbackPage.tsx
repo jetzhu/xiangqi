@@ -33,7 +33,8 @@ export function FeedbackPage({ version, issuesUrl }: FeedbackPageProps) {
   const [mayReply, setMayReply] = useState(false);
   const [state, setState] = useState<"edit" | "sending" | "sent">("edit");
   const [error, setError] = useState<string | null>(null);
-  const signedIn = account.state.status === "signedIn";
+  // A child profile has no address of its own to reply to (M24).
+  const signedIn = account.state.status === "signedIn" && !account.state.user.child;
   // Where the visitor came from, if it was a page of this site.
   const from = typeof document !== "undefined" && document.referrer.startsWith(location.origin) ? new URL(document.referrer).pathname : "";
 

@@ -77,9 +77,16 @@ export function AccountMenu() {
           <li>
             <a href={nav.href("/analysis#saved")}>{tt("My analyses", "我的分析")}</a>
           </li>
-          <li>
-            <a href={nav.href("/coach")}>{tt("Coaching", "教练")}</a>
-          </li>
+          {!state.user.child && (
+            <>
+              <li>
+                <a href={nav.href("/coach")}>{tt("Coaching", "教练")}</a>
+              </li>
+              <li>
+                <a href={nav.href("/children")}>{tt("Child profiles", "孩子档案")}</a>
+              </li>
+            </>
+          )}
           <li>
             <a href={nav.href("/settings")}>{tt("Settings", "设置")}</a>
           </li>
